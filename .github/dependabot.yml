@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    allow:
+      - dependency-type: direct # Dependencies explicitly defined in the Cargo.toml file
+      - dependency-type: indirect # Dependencies implicitly defined in the Cargo.lock file
+    groups:
+      cargo:
+        patterns:
+          - "*"

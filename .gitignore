@@ -1,0 +1,10 @@
+# Specific folder of Visual Studio
+.devcontainer/
+.vscode/
+
+# Specific folder of Zed
+.zed/
+
+# Misc
+dist/
+target/

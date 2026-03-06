@@ -1,0 +1,44 @@
+name: Continuous Integration - Audit
+
+on:
+  push:
+    paths:
+      - ".github/workflows/audit.yml"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+  pull_request:
+    paths:
+      - ".github/workflows/audit.yml"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: audit-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    permissions:
+      contents: read
+      checks: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.1
+
+      - name: Cache cargo audit registry
+        uses: actions/cache@v5.0.2
+        with:
+          path: |
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin
+            ~/.cargo/advisory-db
+          key: audit-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo-audit
+        uses: actions-rust-lang/audit@v1.2.7
+        continue-on-error: true

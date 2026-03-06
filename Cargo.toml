@@ -1,0 +1,30 @@
+[package]
+name = "educational-game-rs"
+version = "1.0.0"
+authors = ["Jérémy Audiger"]
+edition = "2024"
+rust-version = "1.94"
+
+[dependencies]
+bevy = { version = "0.18.0", features = ["debug", "experimental_bevy_ui_widgets"] }
+bevy-persistent = { version = "0.10.0", features = ["json"] }
+rand = "0.9"
+serde = { version = "1", features = ["derive"] }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+missing_panics_doc = "allow"
+needless_pass_by_value = "allow"
+
+[profile.dev]
+split-debuginfo = "unpacked"
+
+[profile.release]
+codegen-units = 1
+lto = true
+incremental = false
+opt-level = "z"
+panic = "abort"
+strip = "symbols"
