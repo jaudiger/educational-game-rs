@@ -15,7 +15,6 @@
 //! 3. Add any theme-specific animation systems to [`LessonMascotPlugin`].
 
 use bevy::prelude::*;
-use rand::Rng;
 
 use crate::data::MapTheme;
 use crate::states::AppState;
@@ -28,12 +27,7 @@ impl Plugin for LessonMascotPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (
-                animate_swaying_envelope,
-                animate_pulled_basket,
-                spawn_lesson_air_waves,
-                animate_lesson_air_waves,
-            )
+            (animate_swaying_envelope, animate_pulled_basket)
                 .run_if(in_state(AppState::LessonPlay)),
         );
     }
@@ -48,25 +42,6 @@ struct SwayingEnvelope;
 /// with a dephased rotation and horizontal follow.
 #[derive(Component, Reflect)]
 struct PulledBasket;
-
-/// Spawner that periodically creates air-wave particles near the balloon.
-#[derive(Component, Reflect)]
-struct LessonAirWaveSpawner {
-    timer: Timer,
-    #[reflect(ignore)]
-    wave_textures: Vec<Handle<Image>>,
-}
-
-/// Individual air-wave particle that drifts and fades out.
-/// Tracks its own pixel position so the system can update `Node::left`
-/// and `Node::top` each frame (since `Val` doesn't support arithmetic).
-#[derive(Component, Reflect)]
-struct LessonAirWave {
-    lifetime: Timer,
-    velocity: Vec2,
-    position: Vec2,
-    initial_opacity: f32,
-}
 
 /// Design-pixel width for the balloon envelope (aspect ratio 256:320 = 0.8).
 const SKY_ENVELOPE_WIDTH: f32 = 196.0;
@@ -94,17 +69,6 @@ const BOB_AMPLITUDE: f32 = 2.0;
 /// Vertical bob frequency (rad/s).
 const BOB_FREQUENCY: f32 = 0.8;
 
-/// Seconds between air-wave spawns.
-const WAVE_SPAWN_INTERVAL: f32 = 2.0;
-/// How long each wave lives before being despawned.
-const WAVE_LIFETIME: f32 = 6.0;
-/// Horizontal drift speed (px/s).
-const WAVE_DRIFT_SPEED: f32 = 25.0;
-/// Starting opacity of each wave particle.
-const WAVE_INITIAL_OPACITY: f32 = 0.9;
-/// Design-pixel size of the wave sprite node.
-const WAVE_SIZE: f32 = 36.0;
-
 /// Spawns the lesson mascot for the current [`MapTheme`].
 ///
 /// Called during lesson play screen setup. The mascot is absolutely
@@ -127,39 +91,25 @@ pub fn spawn_lesson_mascot(
     }
 }
 
-/// Spawns an animated balloon (envelope + basket + air waves) for the
-/// Sky theme.
+/// Spawns an animated balloon (envelope + basket) for the Sky theme.
 ///
 /// The balloon reuses the cursor assets displayed as UI image nodes. It
 /// is absolutely positioned in the middle-right area of the background,
 /// resting on the painted grass. The envelope gently sways while the
-/// basket follows with a dephased pull, and air-wave particles drift
-/// from the basket area.
+/// basket follows with a dephased pull.
 fn spawn_sky_balloon_mascot(parent: &mut ChildSpawnerCommands, asset_server: &AssetServer) {
     let envelope_image = asset_server.load("cursor/balloon_envelope.png");
     let basket_image = asset_server.load("cursor/balloon_basket.png");
-    let wave_textures: Vec<Handle<Image>> = vec![
-        asset_server.load("cursor/air_wave_1.png"),
-        asset_server.load("cursor/air_wave_2.png"),
-        asset_server.load("cursor/air_wave_3.png"),
-    ];
 
     parent
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                right: percent(8.0),
-                bottom: percent(47.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                overflow: Overflow::visible(),
-                ..default()
-            },
-            LessonAirWaveSpawner {
-                timer: Timer::from_seconds(WAVE_SPAWN_INTERVAL, TimerMode::Repeating),
-                wave_textures,
-            },
-        ))
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            right: percent(8.0),
+            bottom: percent(47.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            ..default()
+        })
         .with_children(|children| {
             // Balloon envelope (animated sway)
             children.spawn((
@@ -240,105 +190,5 @@ fn animate_pulled_basket(time: Res<Time>, mut query: Query<&mut UiTransform, Wit
             x: px(pull_x),
             y: px(bob_y),
         };
-    }
-}
-
-/// Periodically spawns air-wave particles near the balloon basket.
-fn spawn_lesson_air_waves(
-    time: Res<Time>,
-    mut commands: Commands,
-    mut query: Query<(Entity, &mut LessonAirWaveSpawner, &ComputedNode)>,
-) {
-    let mut rng = rand::rng();
-
-    for (entity, mut spawner, computed) in &mut query {
-        spawner.timer.tick(time.delta());
-        if !spawner.timer.just_finished() || spawner.wave_textures.is_empty() {
-            continue;
-        }
-
-        // ComputedNode::size() returns physical pixels; convert to logical
-        // pixels (used by Val::Px) by applying the inverse scale factor.
-        let scale = computed.inverse_scale_factor();
-        let size = computed.size() * scale;
-        // Skip if layout hasn't been computed yet
-        if size.y < 1.0 {
-            continue;
-        }
-
-        let texture_index = rng.random_range(0..spawner.wave_textures.len());
-        let texture = spawner.wave_textures[texture_index].clone();
-
-        // Spread across the middle of the balloon (30% to 70%)
-        let y_fraction = rng.random_range(0.30_f32..0.70);
-        let drift_y = rng.random_range(-3.0_f32..3.0);
-
-        // Start past the left edge and drift rightward across the balloon
-        let initial_pos = Vec2::new(-30.0, size.y * y_fraction);
-
-        let wave_id = commands
-            .spawn((
-                LessonAirWave {
-                    lifetime: Timer::from_seconds(WAVE_LIFETIME, TimerMode::Once),
-                    velocity: Vec2::new(WAVE_DRIFT_SPEED, drift_y), // rightward across balloon
-                    position: initial_pos,
-                    initial_opacity: WAVE_INITIAL_OPACITY,
-                },
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(initial_pos.x),
-                    top: Val::Px(initial_pos.y),
-                    width: theme::scaled(WAVE_SIZE),
-                    height: theme::scaled(WAVE_SIZE),
-                    ..default()
-                },
-                ImageNode {
-                    image: texture,
-                    color: Color::srgba(1.0, 1.0, 1.0, WAVE_INITIAL_OPACITY),
-                    ..default()
-                },
-            ))
-            .id();
-
-        commands.entity(entity).add_child(wave_id);
-    }
-}
-
-/// Drifts and fades air-wave particles, despawning them when expired.
-fn animate_lesson_air_waves(
-    time: Res<Time>,
-    mut commands: Commands,
-    mut query: Query<
-        (Entity, &mut LessonAirWave, &mut Node, &mut ImageNode),
-        Without<LessonAirWaveSpawner>,
-    >,
-) {
-    let dt = time.delta_secs();
-    let elapsed = time.elapsed_secs();
-
-    for (entity, mut wave, mut node, mut image) in &mut query {
-        wave.lifetime.tick(time.delta());
-
-        // Sinusoidal vertical oscillation: perturb velocity for a natural drift.
-        wave.velocity.y += (elapsed * 3.0).sin() * 0.5 * dt;
-
-        wave.position.x += wave.velocity.x * dt;
-        wave.position.y += wave.velocity.y * dt;
-
-        node.left = Val::Px(wave.position.x);
-        node.top = Val::Px(wave.position.y);
-
-        // Full opacity for the first half, then fade out linearly
-        let fraction = wave.lifetime.fraction();
-        let opacity = if fraction < 0.5 {
-            wave.initial_opacity
-        } else {
-            wave.initial_opacity * (fraction - 0.5).mul_add(-2.0, 1.0)
-        };
-        image.color = Color::srgba(1.0, 1.0, 1.0, opacity);
-
-        if wave.lifetime.is_finished() {
-            commands.entity(entity).despawn();
-        }
     }
 }

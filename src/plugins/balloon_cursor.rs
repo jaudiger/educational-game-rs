@@ -7,6 +7,7 @@ use bevy_persistent::prelude::Persistent;
 use rand::Rng;
 
 use crate::data::{GameSettings, MapTheme};
+use crate::plugins::sky_background::generate_cloud_image;
 use crate::states::AppState;
 
 /// Animated hot-air balloon cursor for the `MapTheme::Sky` theme.
@@ -36,8 +37,8 @@ impl Plugin for BalloonCursorPlugin {
                 (
                     follow_mouse_system,
                     animate_balloon_system,
-                    spawn_air_waves_system,
-                    animate_air_waves_system,
+                    spawn_cloud_puffs_system,
+                    animate_cloud_puffs_system,
                 )
                     .run_if(in_state(AppState::MapExploration))
                     .run_if(resource_exists::<BalloonCursorActive>),
@@ -58,14 +59,14 @@ struct BalloonEnvelope {
 struct BalloonBasket;
 
 #[derive(Component, Reflect)]
-struct AirWaveSpawner {
+struct CloudPuffSpawner {
     timer: Timer,
     #[reflect(ignore)]
-    wave_textures: Vec<Handle<Image>>,
+    puff_textures: Vec<Handle<Image>>,
 }
 
 #[derive(Component, Reflect)]
-struct AirWave {
+struct CloudPuff {
     lifetime: Timer,
     velocity: Vec2,
     initial_opacity: f32,
@@ -86,7 +87,7 @@ struct BalloonCursorActive;
 struct CursorAssets {
     envelope: Handle<Image>,
     basket: Handle<Image>,
-    waves: Vec<Handle<Image>>,
+    puffs: Vec<Handle<Image>>,
 }
 
 /// Render layer used exclusively for cursor sprites. The overlay camera
@@ -108,9 +109,38 @@ const BASKET_OFFSET_Y: f32 = 23.0;
 /// Envelope displayed height: 320 * 0.19 ~ 60.8 px
 const ENVELOPE_BASE_Y: f32 = 20.0;
 
+/// A cloud shape: `(image_width, image_height, blobs)` where each blob
+/// is `(center_x, center_y, radius)`.
+type CloudShape = (u32, u32, Vec<(f32, f32, f32)>);
+
+/// Small cloud puff shapes for the balloon trail particles.
+fn cloud_puff_definitions() -> Vec<CloudShape> {
+    vec![
+        // Tiny round puff
+        (
+            30,
+            30,
+            vec![(15.0, 15.0, 14.0), (12.0, 18.0, 10.0), (20.0, 13.0, 11.0)],
+        ),
+        // Small wisp
+        (
+            45,
+            22,
+            vec![(12.0, 12.0, 10.0), (25.0, 11.0, 12.0), (38.0, 13.0, 9.0)],
+        ),
+        // Soft cloudlet
+        (
+            35,
+            28,
+            vec![(17.0, 14.0, 14.0), (12.0, 16.0, 10.0), (24.0, 12.0, 11.0)],
+        ),
+    ]
+}
+
 fn setup_balloon_cursor(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut images: ResMut<Assets<Image>>,
     settings: Res<Persistent<GameSettings>>,
     mut cursor_opts: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
@@ -124,19 +154,19 @@ fn setup_balloon_cursor(
     // Hide the OS cursor
     cursor_opts.visible = false;
 
-    // Load textures
     let envelope_texture: Handle<Image> = asset_server.load("cursor/balloon_envelope.png");
     let basket_texture: Handle<Image> = asset_server.load("cursor/balloon_basket.png");
-    let wave_textures: Vec<Handle<Image>> = vec![
-        asset_server.load("cursor/air_wave_1.png"),
-        asset_server.load("cursor/air_wave_2.png"),
-        asset_server.load("cursor/air_wave_3.png"),
-    ];
+
+    // Generate cloud puff textures procedurally (no PNG assets needed)
+    let puff_textures: Vec<Handle<Image>> = cloud_puff_definitions()
+        .iter()
+        .map(|(w, h, blobs)| images.add(generate_cloud_image(*w, *h, blobs)))
+        .collect();
 
     commands.insert_resource(CursorAssets {
         envelope: envelope_texture.clone(),
         basket: basket_texture.clone(),
-        waves: wave_textures.clone(),
+        puffs: puff_textures.clone(),
     });
 
     let cursor_layer = RenderLayers::layer(CURSOR_RENDER_LAYER);
@@ -158,9 +188,9 @@ fn setup_balloon_cursor(
     commands.spawn((
         BalloonCursor,
         cursor_layer.clone(),
-        AirWaveSpawner {
-            timer: Timer::from_seconds(0.8, TimerMode::Repeating),
-            wave_textures,
+        CloudPuffSpawner {
+            timer: Timer::from_seconds(1.6, TimerMode::Repeating),
+            puff_textures,
         },
         children![
             // Balloon envelope
@@ -191,7 +221,7 @@ fn cleanup_balloon_cursor(
     mut commands: Commands,
     active: Option<Res<BalloonCursorActive>>,
     cursor_query: Query<Entity, With<BalloonCursor>>,
-    wave_query: Query<Entity, With<AirWave>>,
+    wave_query: Query<Entity, With<CloudPuff>>,
     camera_query: Query<Entity, With<CursorCamera>>,
     mut cursor_opts: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
@@ -257,19 +287,19 @@ fn animate_balloon_system(
     }
 }
 
-fn spawn_air_waves_system(
+fn spawn_cloud_puffs_system(
     time: Res<Time>,
     mut commands: Commands,
-    mut spawner_query: Query<(&mut AirWaveSpawner, &GlobalTransform)>,
+    mut spawner_query: Query<(&mut CloudPuffSpawner, &GlobalTransform)>,
 ) {
     let mut rng = rand::rng();
 
     for (mut spawner, global_transform) in &mut spawner_query {
         spawner.timer.tick(time.delta());
 
-        if spawner.timer.just_finished() && !spawner.wave_textures.is_empty() {
-            let texture_index = rng.random_range(0..spawner.wave_textures.len());
-            let texture = spawner.wave_textures[texture_index].clone();
+        if spawner.timer.just_finished() && !spawner.puff_textures.is_empty() {
+            let texture_index = rng.random_range(0..spawner.puff_textures.len());
+            let texture = spawner.puff_textures[texture_index].clone();
 
             let root_pos = global_transform.translation();
             let offset_y = rng.random_range(-15.0_f32..15.0);
@@ -278,14 +308,14 @@ fn spawn_air_waves_system(
             let drift_y = rng.random_range(-8.0_f32..8.0);
 
             commands.spawn((
-                AirWave {
+                CloudPuff {
                     lifetime: Timer::from_seconds(5.0, TimerMode::Once),
                     velocity: Vec2::new(20.0, drift_y),
-                    initial_opacity: 0.6,
+                    initial_opacity: 0.35,
                 },
                 Sprite {
                     image: texture,
-                    color: Color::srgba(1.0, 1.0, 1.0, 0.6),
+                    color: Color::srgba(1.0, 1.0, 1.0, 0.35),
                     ..default()
                 },
                 Transform::from_translation(spawn_pos).with_scale(Vec3::splat(0.5)),
@@ -295,29 +325,27 @@ fn spawn_air_waves_system(
     }
 }
 
-fn animate_air_waves_system(
+fn animate_cloud_puffs_system(
     time: Res<Time>,
     mut commands: Commands,
-    mut wave_query: Query<(Entity, &mut AirWave, &mut Transform, &mut Sprite)>,
+    mut puff_query: Query<(Entity, &mut CloudPuff, &mut Transform, &mut Sprite)>,
 ) {
     let dt = time.delta_secs();
     let elapsed = time.elapsed_secs();
 
-    for (entity, mut wave, mut transform, mut sprite) in &mut wave_query {
-        wave.lifetime.tick(time.delta());
+    for (entity, mut puff, mut transform, mut sprite) in &mut puff_query {
+        puff.lifetime.tick(time.delta());
 
         // Vertical oscillation
-        wave.velocity.y += (elapsed * 3.0).sin() * 0.5 * dt;
+        puff.velocity.y += (elapsed * 3.0).sin() * 0.5 * dt;
 
-        // Move
-        transform.translation.x += wave.velocity.x * dt;
-        transform.translation.y += wave.velocity.y * dt;
+        transform.translation.x += puff.velocity.x * dt;
+        transform.translation.y += puff.velocity.y * dt;
 
-        // Fade out
-        let opacity = wave.initial_opacity * (1.0 - wave.lifetime.fraction());
+        let opacity = puff.initial_opacity * (1.0 - puff.lifetime.fraction());
         sprite.color = Color::srgba(1.0, 1.0, 1.0, opacity);
 
-        if wave.lifetime.is_finished() {
+        if puff.lifetime.is_finished() {
             commands.entity(entity).despawn();
         }
     }

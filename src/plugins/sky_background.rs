@@ -177,7 +177,7 @@ fn generate_gradient_image() -> Image {
     clippy::cast_sign_loss,
     clippy::cast_precision_loss
 )]
-fn generate_cloud_image(width: u32, height: u32, blobs: &[(f32, f32, f32)]) -> Image {
+pub fn generate_cloud_image(width: u32, height: u32, blobs: &[(f32, f32, f32)]) -> Image {
     let pixel_count = (width * height * 4) as usize;
     let mut data = vec![0u8; pixel_count];
 

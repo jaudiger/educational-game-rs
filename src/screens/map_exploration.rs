@@ -54,6 +54,8 @@ struct CardColors {
     border_unavailable: Color,
     title_shadow: Color,
     card_text_shadow: Color,
+    shadow_base: Color,
+    back_button_bg: Color,
 }
 
 /// Shadow and floating-animation parameters for a card-styled map button.
@@ -93,14 +95,16 @@ impl MapCardStyle {
         match map_theme {
             MapTheme::Sky => Some(Self {
                 colors: CardColors {
-                    bg_available: Color::srgba(1.0, 1.0, 1.0, 0.8),
-                    bg_unavailable: Color::srgba(0.7, 0.7, 0.7, 0.5),
+                    bg_available: Color::srgba(0.88, 0.93, 1.0, 0.82),
+                    bg_unavailable: Color::srgba(0.78, 0.82, 0.90, 0.45),
                     text_available: theme::colors::TEXT_DARK,
                     progress_color: theme::colors::PRIMARY,
-                    border_available: Color::srgba(1.0, 1.0, 1.0, 0.6),
-                    border_unavailable: Color::srgba(0.6, 0.6, 0.6, 0.4),
-                    title_shadow: Color::srgba(1.0, 1.0, 1.0, 0.8),
-                    card_text_shadow: Color::srgba(1.0, 1.0, 1.0, 0.6),
+                    border_available: Color::srgba(0.72, 0.86, 1.0, 0.55),
+                    border_unavailable: Color::srgba(0.58, 0.65, 0.75, 0.35),
+                    title_shadow: Color::srgba(0.72, 0.86, 1.0, 0.7),
+                    card_text_shadow: Color::srgba(0.78, 0.90, 1.0, 0.5),
+                    shadow_base: Color::srgba(0.08, 0.12, 0.28, 1.0),
+                    back_button_bg: Color::srgb(0.30, 0.55, 0.88),
                 },
                 dims: CardDimensions {
                     width: theme::sizes::SKY_CARD_WIDTH,
@@ -154,6 +158,7 @@ fn setup_world_overview(
     let back_label = i18n.t(&TranslationKey::Back).into_owned();
 
     let card_style = MapCardStyle::for_theme(ctx.settings.map_theme);
+    let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
 
     let theme_buttons: Vec<ThemeButtonData> = content
         .themes
@@ -225,7 +230,7 @@ fn setup_world_overview(
             parent.spawn((
                 standard_button(
                     &back_label,
-                    theme::colors::PRIMARY,
+                    back_btn_color,
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
@@ -331,18 +336,20 @@ fn insert_card_overlay(
         )
     };
 
+    let shadow_color = style.colors.shadow_base.with_alpha(shadow_alpha);
+
     button.insert((
         Node {
-            border: px(1.5).all(),
+            border: px(2.0).all(),
             ..card_node_layout(dims)
         },
         BorderColor::all(border_color),
         BoxShadow::new(
-            Color::srgba(0.0, 0.0, 0.0, shadow_alpha),
+            shadow_color,
             Val::Px(0.0),
             Val::Px(4.0),
-            Val::Px(12.0),
-            Val::Px(0.0),
+            Val::Px(16.0),
+            Val::Px(2.0),
         ),
         FloatingCard {
             phase: index as f32 * theme::animation::FLOATING_PHASE_OFFSET,
@@ -525,6 +532,7 @@ fn setup_theme_detail(
     });
 
     let card_style = MapCardStyle::for_theme(ctx.settings.map_theme);
+    let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
 
     let lesson_buttons: Vec<LessonButtonData> = theme_data
         .lessons
@@ -590,7 +598,7 @@ fn setup_theme_detail(
             parent.spawn((
                 standard_button(
                     &back_label,
-                    theme::colors::PRIMARY,
+                    back_btn_color,
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
