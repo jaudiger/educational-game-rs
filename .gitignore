@@ -1,11 +1,9 @@
-# Specific folder of Visual Studio
-.devcontainer/
+# IDE
 .vscode/
-
-# Specific folder of Zed
 .zed/
 
 # Misc
+.zcodeprism/
 dist/
 local/
 target/
