@@ -236,7 +236,7 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &DraftQuestion, wind
                 ..default()
             },
             Interaction::None,
-            QuestionRow(idx),
+            QuestionRow(full_prompt.clone()),
         ))
         .with_children(|row| {
             // Label: dynamically truncated by update_question_labels
@@ -686,25 +686,12 @@ pub(super) fn update_question_labels(mut query: Query<(&mut Text, &ComputedNode,
 /// Checks every frame (not `Changed<Interaction>`) because child buttons
 /// inside the row steal the hover, making the row's `Interaction` flicker.
 pub(super) fn update_config_hover_text(
-    rows: Query<(&Interaction, &Children), With<QuestionRow>>,
-    labels: Query<&QuestionLabel>,
+    rows: Query<(&Interaction, &QuestionRow)>,
     mut hover_text: Query<&mut Text, With<ConfigHoverText>>,
 ) {
-    let mut hovered_prompt: Option<&str> = None;
-
-    for (interaction, children) in &rows {
-        if *interaction == Interaction::Hovered {
-            for child in children.iter() {
-                if let Ok(ql) = labels.get(child) {
-                    hovered_prompt = Some(&ql.0);
-                    break;
-                }
-            }
-            if hovered_prompt.is_some() {
-                break;
-            }
-        }
-    }
+    let hovered_prompt = rows
+        .iter()
+        .find_map(|(interaction, row)| (*interaction == Interaction::Hovered).then_some(row.0.as_str()));
 
     for mut text in &mut hover_text {
         match hovered_prompt {

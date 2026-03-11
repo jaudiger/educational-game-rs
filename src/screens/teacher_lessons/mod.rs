@@ -137,7 +137,7 @@ struct CountText;
 struct VisualToggleButton(usize);
 
 #[derive(Component, Reflect)]
-struct QuestionRow(usize);
+struct QuestionRow(String);
 
 #[derive(Component, Reflect)]
 struct ScrollFrame;
