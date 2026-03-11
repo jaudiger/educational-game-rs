@@ -478,7 +478,7 @@ fn handle_delete_click(
         if *interaction == Interaction::Pressed {
             // Despawn any existing delete popover first
             for entity in &existing_popover {
-                commands.entity(entity).despawn();
+                commands.entity(entity).try_despawn();
             }
 
             let slot_index = delete_btn.0;
@@ -547,7 +547,7 @@ fn handle_cancel_delete(
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             for entity in &popover_query {
-                commands.entity(entity).despawn();
+                commands.entity(entity).try_despawn();
             }
         }
     }
