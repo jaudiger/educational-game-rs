@@ -26,8 +26,7 @@ impl Plugin for SettingsScreenPlugin {
             .add_systems(
                 Update,
                 (
-                    update_music_volume_label,
-                    update_sfx_volume_label,
+                    update_volume_label,
                     rebuild_settings_on_language_change.run_if(resource_changed::<I18n>),
                 )
                     .run_if(in_state(AppState::Settings)),
@@ -38,23 +37,19 @@ impl Plugin for SettingsScreenPlugin {
 #[derive(Component, Reflect)]
 struct SettingsRoot;
 
-#[derive(Component, Reflect)]
-struct MusicVolumeSlider;
+/// Identifies which audio channel a volume slider or its percentage label belongs to.
+#[derive(Component, Reflect, Clone, Copy, PartialEq, Eq)]
+enum VolumeChannel {
+    Music,
+    Sfx,
+}
 
-#[derive(Component, Reflect)]
-struct MusicVolumeValueLabel;
-
-#[derive(Component, Reflect)]
-struct SfxVolumeSlider;
-
-#[derive(Component, Reflect)]
-struct SfxVolumeValueLabel;
-
-#[derive(Component, Reflect)]
-struct ExplanationCheckbox;
-
-#[derive(Component, Reflect)]
-struct GamepadNavigationCheckbox;
+/// Identifies which boolean setting a checkbox controls.
+#[derive(Component, Reflect, Clone, Copy)]
+enum BoolSettingField {
+    ShowExplanations,
+    GamepadNavigation,
+}
 
 #[derive(Component, Reflect)]
 struct ModeRadio(GameMode);
@@ -113,10 +108,20 @@ fn spawn_settings_ui(
                     mode_section(settings.mode, i18n, window),
                     language_section(settings.language, i18n, window),
                     map_theme_section(settings.map_theme, i18n, window),
-                    explanation_section(settings.show_explanations, i18n, window),
-                    gamepad_navigation_section(settings.gamepad_navigation, i18n, window),
-                    music_volume_section(settings.music_volume, i18n, window),
-                    sfx_volume_section(settings.sfx_volume, i18n, window),
+                    bool_setting_section(
+                        BoolSettingField::ShowExplanations,
+                        settings.show_explanations,
+                        i18n,
+                        window,
+                    ),
+                    bool_setting_section(
+                        BoolSettingField::GamepadNavigation,
+                        settings.gamepad_navigation,
+                        i18n,
+                        window,
+                    ),
+                    volume_section(VolumeChannel::Music, settings.music_volume, i18n, window),
+                    volume_section(VolumeChannel::Sfx, settings.sfx_volume, i18n, window),
                 ],
             ),
             // Back button
@@ -395,61 +400,24 @@ fn handle_theme_radio_change(
     }
 }
 
-fn explanation_section(
-    show_explanations: bool,
+fn bool_setting_section(
+    field: BoolSettingField,
+    enabled: bool,
     i18n: &I18n,
     window: Entity,
 ) -> impl Bundle + use<> {
-    let label = i18n.t(&TranslationKey::ExplanationsLabel);
-    let checkbox_label = i18n.t(&TranslationKey::ExplanationsOn);
-
-    (
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        },
-        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            parent.spawn((
-                Text::new(label),
-                TextFont {
-                    font_size: theme::fonts::HEADING,
-                    ..default()
-                },
-                TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
-            ));
-
-            let mut cmd = parent.spawn((
-                checkbox(&checkbox_label, show_explanations, window),
-                ExplanationCheckbox,
-                observe(checkbox_self_update),
-                observe(handle_explanation_checkbox_change),
-            ));
-            if show_explanations {
-                cmd.insert(Checked);
-            }
-        })),
-    )
-}
-
-fn handle_explanation_checkbox_change(
-    event: On<ValueChange<bool>>,
-    mut settings: ResMut<Persistent<GameSettings>>,
-) {
-    let val = event.value;
-    settings
-        .update(|s| s.show_explanations = val)
-        .expect("failed to update game settings");
-}
-
-fn gamepad_navigation_section(enabled: bool, i18n: &I18n, window: Entity) -> impl Bundle + use<> {
-    let label = i18n.t(&TranslationKey::GamepadNavigationLabel);
-    let checkbox_label = i18n.t(&TranslationKey::GamepadNavigationOn);
+    let (label_key, checkbox_key) = match field {
+        BoolSettingField::ShowExplanations => (
+            TranslationKey::ExplanationsLabel,
+            TranslationKey::ExplanationsOn,
+        ),
+        BoolSettingField::GamepadNavigation => (
+            TranslationKey::GamepadNavigationLabel,
+            TranslationKey::GamepadNavigationOn,
+        ),
+    };
+    let label = i18n.t(&label_key);
+    let checkbox_label = i18n.t(&checkbox_key);
 
     (
         Node {
@@ -474,9 +442,9 @@ fn gamepad_navigation_section(enabled: bool, i18n: &I18n, window: Entity) -> imp
 
             let mut cmd = parent.spawn((
                 checkbox(&checkbox_label, enabled, window),
-                GamepadNavigationCheckbox,
+                field,
                 observe(checkbox_self_update),
-                observe(handle_gamepad_navigation_checkbox_change),
+                observe(handle_bool_setting_change),
             ));
             if enabled {
                 cmd.insert(Checked);
@@ -485,19 +453,36 @@ fn gamepad_navigation_section(enabled: bool, i18n: &I18n, window: Entity) -> imp
     )
 }
 
-fn handle_gamepad_navigation_checkbox_change(
+fn handle_bool_setting_change(
     event: On<ValueChange<bool>>,
+    field_query: Query<&BoolSettingField>,
     mut settings: ResMut<Persistent<GameSettings>>,
 ) {
     let val = event.value;
+    let Ok(field) = field_query.get(event.event_target()) else {
+        return;
+    };
+    let f = *field;
     settings
-        .update(|s| s.gamepad_navigation = val)
+        .update(|s| match f {
+            BoolSettingField::ShowExplanations => s.show_explanations = val,
+            BoolSettingField::GamepadNavigation => s.gamepad_navigation = val,
+        })
         .expect("failed to update game settings");
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn music_volume_section(volume: f32, i18n: &I18n, window: Entity) -> impl Bundle + use<> {
-    let label = i18n.t(&TranslationKey::MusicVolumeLabel);
+fn volume_section(
+    channel: VolumeChannel,
+    volume: f32,
+    i18n: &I18n,
+    window: Entity,
+) -> impl Bundle + use<> {
+    let label_key = match channel {
+        VolumeChannel::Music => TranslationKey::MusicVolumeLabel,
+        VolumeChannel::Sfx => TranslationKey::SfxVolumeLabel,
+    };
+    let label = i18n.t(&label_key);
     let percent = ((volume.clamp(0.0, 1.0) * 100.0).round()) as u32;
 
     (
@@ -522,9 +507,9 @@ fn music_volume_section(volume: f32, i18n: &I18n, window: Entity) -> impl Bundle
             ),
             (
                 slider(0.0, 1.0, volume, 0.05),
-                MusicVolumeSlider,
+                channel,
                 observe(slider_self_update),
-                observe(handle_music_volume_slider_change),
+                observe(handle_volume_slider_change),
             ),
             (
                 Text::new(format!("{percent} %")),
@@ -533,7 +518,7 @@ fn music_volume_section(volume: f32, i18n: &I18n, window: Entity) -> impl Bundle
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
-                MusicVolumeValueLabel,
+                channel,
                 DesignFontSize {
                     size: theme::fonts::BODY,
                     window,
@@ -543,98 +528,36 @@ fn music_volume_section(volume: f32, i18n: &I18n, window: Entity) -> impl Bundle
     )
 }
 
-fn handle_music_volume_slider_change(
+fn handle_volume_slider_change(
     event: On<ValueChange<f32>>,
+    channel_query: Query<&VolumeChannel>,
     mut settings: ResMut<Persistent<GameSettings>>,
 ) {
     let volume = event.value;
+    let Ok(channel) = channel_query.get(event.event_target()) else {
+        return;
+    };
+    let ch = *channel;
     settings
-        .update(|s| s.music_volume = volume)
+        .update(|s| match ch {
+            VolumeChannel::Music => s.music_volume = volume,
+            VolumeChannel::Sfx => s.sfx_volume = volume,
+        })
         .expect("failed to update game settings");
 }
 
-/// Updates the music volume percentage label to match the current slider value.
+/// Updates the volume percentage label to match the current slider value.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn update_music_volume_label(
-    slider_query: Query<&SliderValue, (With<MusicVolumeSlider>, Changed<SliderValue>)>,
-    mut label_query: Query<&mut Text, With<MusicVolumeValueLabel>>,
+fn update_volume_label(
+    slider_query: Query<(&SliderValue, &VolumeChannel), Changed<SliderValue>>,
+    mut label_query: Query<(&mut Text, &VolumeChannel), Without<SliderValue>>,
 ) {
-    for slider_value in &slider_query {
+    for (slider_value, channel) in &slider_query {
         let percent = ((slider_value.0.clamp(0.0, 1.0) * 100.0).round()) as u32;
-        for mut text in &mut label_query {
-            **text = format!("{percent} %");
-        }
-    }
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn sfx_volume_section(volume: f32, i18n: &I18n, window: Entity) -> impl Bundle + use<> {
-    let label = i18n.t(&TranslationKey::SfxVolumeLabel);
-    let percent = ((volume.clamp(0.0, 1.0) * 100.0).round()) as u32;
-
-    (
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        },
-        children![
-            (
-                Text::new(label),
-                TextFont {
-                    font_size: theme::fonts::HEADING,
-                    ..default()
-                },
-                TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
-            ),
-            (
-                slider(0.0, 1.0, volume, 0.05),
-                SfxVolumeSlider,
-                observe(slider_self_update),
-                observe(handle_sfx_volume_slider_change),
-            ),
-            (
-                Text::new(format!("{percent} %")),
-                TextFont {
-                    font_size: theme::fonts::BODY,
-                    ..default()
-                },
-                TextColor(theme::colors::TEXT_DARK),
-                SfxVolumeValueLabel,
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
-            ),
-        ],
-    )
-}
-
-fn handle_sfx_volume_slider_change(
-    event: On<ValueChange<f32>>,
-    mut settings: ResMut<Persistent<GameSettings>>,
-) {
-    let volume = event.value;
-    settings
-        .update(|s| s.sfx_volume = volume)
-        .expect("failed to update game settings");
-}
-
-/// Updates the SFX volume percentage label to match the current slider value.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn update_sfx_volume_label(
-    slider_query: Query<&SliderValue, (With<SfxVolumeSlider>, Changed<SliderValue>)>,
-    mut label_query: Query<&mut Text, With<SfxVolumeValueLabel>>,
-) {
-    for slider_value in &slider_query {
-        let percent = ((slider_value.0.clamp(0.0, 1.0) * 100.0).round()) as u32;
-        for mut text in &mut label_query {
-            **text = format!("{percent} %");
+        for (mut text, label_channel) in &mut label_query {
+            if label_channel == channel {
+                **text = format!("{percent} %");
+            }
         }
     }
 }
