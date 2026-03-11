@@ -12,8 +12,9 @@ use crate::ui::theme::DesignFontSize;
 
 use super::{
     ConfigHoverText, ConfigLessonButton, CountButton, CountText, DraftQuestion, LessonConfigDraft,
-    LessonsView, QuestionLabel, QuestionRow, ResetConfigButton, ReturnToTreeButton, SaveConfigButton,
-    ScrollContent, ScrollFrame, ScrollIndicator, TeacherLessonsState, VisualToggleButton,
+    LessonsView, QuestionLabel, QuestionRow, ResetConfigButton, ReturnToTreeButton,
+    SaveConfigButton, ScrollContent, ScrollFrame, ScrollIndicator, TeacherLessonsState,
+    VisualToggleButton,
 };
 
 pub(super) fn spawn_config_view(
@@ -689,9 +690,9 @@ pub(super) fn update_config_hover_text(
     rows: Query<(&Interaction, &QuestionRow)>,
     mut hover_text: Query<&mut Text, With<ConfigHoverText>>,
 ) {
-    let hovered_prompt = rows
-        .iter()
-        .find_map(|(interaction, row)| (*interaction == Interaction::Hovered).then_some(row.0.as_str()));
+    let hovered_prompt = rows.iter().find_map(|(interaction, row)| {
+        (*interaction == Interaction::Hovered).then_some(row.0.as_str())
+    });
 
     for mut text in &mut hover_text {
         match hovered_prompt {

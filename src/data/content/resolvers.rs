@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rand::Rng;
 use rand::seq::{IndexedRandom, SliceRandom};
 
@@ -52,28 +54,22 @@ impl McqTemplate {
         );
 
         // Build 4 unique choices including the correct answer.
-        let mut choice_values: Vec<i32> = vec![result];
+        let mut seen: HashSet<i32> = HashSet::from([result]);
         for &candidate in &[a, b, result * 2, result + 1] {
-            if candidate > 0 && !choice_values.contains(&candidate) {
-                choice_values.push(candidate);
+            if candidate > 0 {
+                seen.insert(candidate);
             }
-            if choice_values.len() >= 4 {
+            if seen.len() >= 4 {
                 break;
             }
         }
         let mut fill = 1;
-        while choice_values.len() < 4 {
-            if !choice_values.contains(&fill) {
-                choice_values.push(fill);
-            }
+        while seen.len() < 4 {
+            seen.insert(fill);
             fill += 1;
         }
-        choice_values.truncate(4);
 
-        let mut choices: Vec<String> = choice_values
-            .iter()
-            .map(std::string::ToString::to_string)
-            .collect();
+        let mut choices: Vec<String> = seen.into_iter().map(|v| v.to_string()).collect();
         choices.shuffle(rng);
         let correct_str = result.to_string();
         let correct_index = choices.iter().position(|c| *c == correct_str).unwrap_or(0);
@@ -590,41 +586,26 @@ fn generate_fraction_addition_choices(
     rng: &mut impl Rng,
 ) -> (Vec<String>, usize) {
     let correct = format!("{sum}/{b}");
-    let mut choices: Vec<String> = vec![correct.clone()];
+    let mut seen: HashSet<String> = HashSet::from([correct.clone()]);
 
     // Distractor: adding denominators too (common student mistake).
-    let d1 = format!("{sum}/{}", b * 2);
-    if !choices.contains(&d1) {
-        choices.push(d1);
-    }
+    seen.insert(format!("{sum}/{}", b * 2));
     // Distractor: first operand only.
-    let d2 = format!("{a}/{b}");
-    if !choices.contains(&d2) {
-        choices.push(d2);
-    }
+    seen.insert(format!("{a}/{b}"));
     // Distractor: second operand only.
-    let d3 = format!("{c}/{b}");
-    if !choices.contains(&d3) {
-        choices.push(d3);
-    }
+    seen.insert(format!("{c}/{b}"));
     // Distractor: off-by-one numerator.
-    if choices.len() < 4 {
-        let d4 = format!("{}/{b}", sum + 1);
-        if !choices.contains(&d4) {
-            choices.push(d4);
-        }
+    if seen.len() < 4 {
+        seen.insert(format!("{}/{b}", sum + 1));
     }
     // Fill remaining slots.
     let mut fill = 1;
-    while choices.len() < 4 {
-        let candidate = format!("{fill}/{b}");
-        if !choices.contains(&candidate) {
-            choices.push(candidate);
-        }
+    while seen.len() < 4 {
+        seen.insert(format!("{fill}/{b}"));
         fill += 1;
     }
-    choices.truncate(4);
 
+    let mut choices: Vec<String> = seen.into_iter().collect();
     choices.shuffle(rng);
     let correct_index = choices.iter().position(|ch| *ch == correct).unwrap_or(0);
     (choices, correct_index)
@@ -634,7 +615,7 @@ fn generate_fraction_addition_choices(
 /// answer and 3 plausible distractors. Returns `(choices, correct_index)`.
 fn generate_multiplication_distractors(a: u32, b: u32, rng: &mut impl Rng) -> (Vec<String>, usize) {
     let correct = a * b;
-    let mut values: Vec<u32> = vec![correct];
+    let mut seen: HashSet<u32> = HashSet::from([correct]);
 
     // Plausible distractors: neighbouring products.
     let candidates = [
@@ -649,28 +630,22 @@ fn generate_multiplication_distractors(a: u32, b: u32, rng: &mut impl Rng) -> (V
     ];
 
     for candidate in candidates.into_iter().flatten() {
-        if candidate > 0 && !values.contains(&candidate) {
-            values.push(candidate);
+        if candidate > 0 {
+            seen.insert(candidate);
         }
-        if values.len() >= 4 {
+        if seen.len() >= 4 {
             break;
         }
     }
 
     // Fill remaining with offset values.
     let mut fill = correct + 2;
-    while values.len() < 4 {
-        if !values.contains(&fill) {
-            values.push(fill);
-        }
+    while seen.len() < 4 {
+        seen.insert(fill);
         fill += 1;
     }
-    values.truncate(4);
 
-    let mut choices: Vec<String> = values
-        .iter()
-        .map(std::string::ToString::to_string)
-        .collect();
+    let mut choices: Vec<String> = seen.into_iter().map(|v| v.to_string()).collect();
     choices.shuffle(rng);
     let correct_str = correct.to_string();
     let correct_index = choices.iter().position(|c| *c == correct_str).unwrap_or(0);
@@ -686,7 +661,7 @@ fn generate_fraction_identification(
     rng: &mut impl Rng,
 ) -> FractionIdentificationDefinition {
     let correct = format!("{numerator}/{denominator}");
-    let mut choices: Vec<String> = vec![correct.clone()];
+    let mut seen: HashSet<String> = HashSet::from([correct.clone()]);
 
     let candidates = [
         (denominator != numerator).then(|| format!("{denominator}/{numerator}")),
@@ -695,23 +670,19 @@ fn generate_fraction_identification(
         Some(format!("{numerator}/{}", denominator + 1)),
     ];
     for candidate in candidates.into_iter().flatten() {
-        if !choices.contains(&candidate) {
-            choices.push(candidate);
-        }
-        if choices.len() >= 4 {
+        seen.insert(candidate);
+        if seen.len() >= 4 {
             break;
         }
     }
-    // Fill remaining slots
+    // Fill remaining slots.
     let mut d = denominator + 2;
-    while choices.len() < 4 {
-        let alt = format!("{numerator}/{d}");
-        if !choices.contains(&alt) {
-            choices.push(alt);
-        }
+    while seen.len() < 4 {
+        seen.insert(format!("{numerator}/{d}"));
         d += 1;
     }
-    choices.truncate(4);
+
+    let mut choices: Vec<String> = seen.into_iter().collect();
     choices.shuffle(rng);
 
     let correct_index = choices.iter().position(|c| *c == correct).unwrap_or(0);
