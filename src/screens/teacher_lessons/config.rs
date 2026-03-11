@@ -11,10 +11,9 @@ use crate::ui::theme;
 use crate::ui::theme::DesignFontSize;
 
 use super::{
-    ConfigHoverText, ConfigLessonButton, CountDecrementButton, CountIncrementButton, CountText,
-    DraftQuestion, LessonConfigDraft, LessonsView, QuestionLabel, QuestionRow, ResetConfigButton,
-    ReturnToTreeButton, SaveConfigButton, ScrollContent, ScrollFrame, ScrollIndicator,
-    TeacherLessonsState, VisualToggleButton,
+    ConfigHoverText, ConfigLessonButton, CountButton, CountText, DraftQuestion, LessonConfigDraft,
+    LessonsView, QuestionLabel, QuestionRow, ResetConfigButton, ReturnToTreeButton, SaveConfigButton,
+    ScrollContent, ScrollFrame, ScrollIndicator, TeacherLessonsState, VisualToggleButton,
 };
 
 pub(super) fn spawn_config_view(
@@ -318,9 +317,10 @@ fn spawn_counter_controls(
 
         controls.world_mut().entity_mut(dec_entity).insert((
             counter_button("\u{2212}", theme::colors::ERROR, window),
-            CountDecrementButton {
+            CountButton {
                 index: idx,
                 count_text: text_entity,
+                delta: -1_isize,
             },
         ));
         controls.world_mut().entity_mut(text_entity).insert((
@@ -343,9 +343,10 @@ fn spawn_counter_controls(
         ));
         controls.world_mut().entity_mut(inc_entity).insert((
             counter_button("+", theme::colors::SUCCESS, window),
-            CountIncrementButton {
+            CountButton {
                 index: idx,
                 count_text: text_entity,
+                delta: 1_isize,
             },
         ));
     });
@@ -484,9 +485,10 @@ pub(super) fn handle_config_button_click(
     }
 }
 
-/// Increments the repetition count for a specific question.
-pub(super) fn handle_count_increment(
-    query: Query<(&Interaction, &CountIncrementButton), Changed<Interaction>>,
+/// Increments or decrements the repetition count for a specific question.
+/// The direction and magnitude come from the `delta` field on the button component.
+pub(super) fn handle_count_change(
+    query: Query<(&Interaction, &CountButton), Changed<Interaction>>,
     mut lessons_state: ResMut<TeacherLessonsState>,
     mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
@@ -505,39 +507,11 @@ pub(super) fn handle_count_increment(
         let Some(q) = editing.questions.iter_mut().find(|q| q.index == idx) else {
             continue;
         };
-        if q.count < MAX_QUESTION_REPETITIONS {
-            q.count += 1;
-            if let Ok(mut text) = text_query.get_mut(btn.count_text) {
-                **text = q.count.to_string();
+        if let Some(new_count) = q.count.checked_add_signed(btn.delta) {
+            if new_count > MAX_QUESTION_REPETITIONS {
+                continue;
             }
-            update_save_button_state(&mut save_btn_query, editing);
-        }
-    }
-}
-
-/// Decrements the repetition count for a specific question.
-pub(super) fn handle_count_decrement(
-    query: Query<(&Interaction, &CountDecrementButton), Changed<Interaction>>,
-    mut lessons_state: ResMut<TeacherLessonsState>,
-    mut text_query: Query<&mut Text, With<CountText>>,
-    mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
-) {
-    for (interaction, btn) in &query {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-        let idx = btn.index;
-        let LessonsView::Config {
-            ref mut editing, ..
-        } = lessons_state.view
-        else {
-            continue;
-        };
-        let Some(q) = editing.questions.iter_mut().find(|q| q.index == idx) else {
-            continue;
-        };
-        if q.count > 0 {
-            q.count -= 1;
+            q.count = new_count;
             if let Ok(mut text) = text_query.get_mut(btn.count_text) {
                 **text = q.count.to_string();
             }

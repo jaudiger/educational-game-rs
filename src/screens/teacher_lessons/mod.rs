@@ -43,8 +43,7 @@ impl Plugin for TeacherLessonsScreenPlugin {
                 Update,
                 (
                     config::handle_config_button_click,
-                    config::handle_count_increment,
-                    config::handle_count_decrement,
+                    config::handle_count_change,
                     config::handle_visual_toggle,
                     config::handle_reset_config,
                     config::handle_save_config,
@@ -116,15 +115,10 @@ struct ConfigLessonButton {
 }
 
 #[derive(Component, Reflect)]
-struct CountIncrementButton {
+struct CountButton {
     index: usize,
     count_text: Entity,
-}
-
-#[derive(Component, Reflect)]
-struct CountDecrementButton {
-    index: usize,
-    count_text: Entity,
+    delta: isize,
 }
 
 #[derive(Component, Reflect)]
