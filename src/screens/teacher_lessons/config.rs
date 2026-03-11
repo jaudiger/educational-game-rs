@@ -274,6 +274,7 @@ fn spawn_counter_controls(
     count_str: &str,
     window: Entity,
 ) {
+    let count_str_owned = count_str.to_owned();
     row.spawn(Node {
         flex_direction: FlexDirection::Row,
         align_items: AlignItems::Center,
@@ -309,19 +310,28 @@ fn spawn_counter_controls(
                 ));
         }
 
-        controls.spawn((
+        // Pre-allocate child slots in visual order (dec | text | inc) so each
+        // button can carry a direct entity reference to the count text.
+        let dec_entity = controls.spawn_empty().id();
+        let text_entity = controls.spawn_empty().id();
+        let inc_entity = controls.spawn_empty().id();
+
+        controls.world_mut().entity_mut(dec_entity).insert((
             counter_button("\u{2212}", theme::colors::ERROR, window),
-            CountDecrementButton(idx),
+            CountDecrementButton {
+                index: idx,
+                count_text: text_entity,
+            },
         ));
-        controls.spawn((
-            Text::new(count_str.to_owned()),
+        controls.world_mut().entity_mut(text_entity).insert((
+            Text::new(count_str_owned),
             TextFont {
                 font_size: theme::fonts::SMALL,
                 ..default()
             },
             TextColor(theme::colors::TEXT_DARK),
             TextLayout::new_with_justify(Justify::Center),
-            CountText(idx),
+            CountText,
             Node {
                 min_width: theme::scaled(24.0),
                 ..default()
@@ -331,9 +341,12 @@ fn spawn_counter_controls(
                 window,
             },
         ));
-        controls.spawn((
+        controls.world_mut().entity_mut(inc_entity).insert((
             counter_button("+", theme::colors::SUCCESS, window),
-            CountIncrementButton(idx),
+            CountIncrementButton {
+                index: idx,
+                count_text: text_entity,
+            },
         ));
     });
 }
@@ -475,14 +488,14 @@ pub(super) fn handle_config_button_click(
 pub(super) fn handle_count_increment(
     query: Query<(&Interaction, &CountIncrementButton), Changed<Interaction>>,
     mut lessons_state: ResMut<TeacherLessonsState>,
-    mut text_query: Query<(&mut Text, &CountText)>,
+    mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        let idx = btn.0;
+        let idx = btn.index;
         let LessonsView::Config {
             ref mut editing, ..
         } = lessons_state.view
@@ -494,10 +507,8 @@ pub(super) fn handle_count_increment(
         };
         if q.count < MAX_QUESTION_REPETITIONS {
             q.count += 1;
-            for (mut text, ct) in &mut text_query {
-                if ct.0 == idx {
-                    **text = q.count.to_string();
-                }
+            if let Ok(mut text) = text_query.get_mut(btn.count_text) {
+                **text = q.count.to_string();
             }
             update_save_button_state(&mut save_btn_query, editing);
         }
@@ -508,14 +519,14 @@ pub(super) fn handle_count_increment(
 pub(super) fn handle_count_decrement(
     query: Query<(&Interaction, &CountDecrementButton), Changed<Interaction>>,
     mut lessons_state: ResMut<TeacherLessonsState>,
-    mut text_query: Query<(&mut Text, &CountText)>,
+    mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        let idx = btn.0;
+        let idx = btn.index;
         let LessonsView::Config {
             ref mut editing, ..
         } = lessons_state.view
@@ -527,10 +538,8 @@ pub(super) fn handle_count_decrement(
         };
         if q.count > 0 {
             q.count -= 1;
-            for (mut text, ct) in &mut text_query {
-                if ct.0 == idx {
-                    **text = q.count.to_string();
-                }
+            if let Ok(mut text) = text_query.get_mut(btn.count_text) {
+                **text = q.count.to_string();
             }
             update_save_button_state(&mut save_btn_query, editing);
         }
@@ -571,12 +580,10 @@ pub(super) fn handle_visual_toggle(
     }
 }
 
-/// Set every count text node whose question is in `questions` back to "1".
-fn reset_count_texts(text_query: &mut Query<(&mut Text, &CountText)>, questions: &[DraftQuestion]) {
-    for (mut text, ct) in text_query {
-        if questions.iter().any(|q| q.index == ct.0) {
-            "1".clone_into(&mut *text);
-        }
+/// Resets all count text nodes to "1".
+fn reset_count_texts(text_query: &mut Query<&mut Text, With<CountText>>) {
+    for mut text in text_query {
+        "1".clone_into(&mut *text);
     }
 }
 
@@ -606,7 +613,7 @@ fn reset_visual_toggles(
 pub(super) fn handle_reset_config(
     query: Query<&Interaction, (Changed<Interaction>, With<ResetConfigButton>)>,
     mut lessons_state: ResMut<TeacherLessonsState>,
-    mut text_query: Query<(&mut Text, &CountText)>,
+    mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
     mut toggle_bg_query: Query<
         (&mut BackgroundColor, &VisualToggleButton),
@@ -629,7 +636,7 @@ pub(super) fn handle_reset_config(
                 q.show_visual = q.default_show_visual;
             }
         }
-        reset_count_texts(&mut text_query, &editing.questions);
+        reset_count_texts(&mut text_query);
         reset_visual_toggles(&mut toggle_bg_query, &editing.questions);
         update_save_button_state(&mut save_btn_query, editing);
     }

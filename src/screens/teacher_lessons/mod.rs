@@ -116,10 +116,16 @@ struct ConfigLessonButton {
 }
 
 #[derive(Component, Reflect)]
-struct CountIncrementButton(usize);
+struct CountIncrementButton {
+    index: usize,
+    count_text: Entity,
+}
 
 #[derive(Component, Reflect)]
-struct CountDecrementButton(usize);
+struct CountDecrementButton {
+    index: usize,
+    count_text: Entity,
+}
 
 #[derive(Component, Reflect)]
 struct SaveConfigButton;
@@ -131,7 +137,7 @@ struct ReturnToTreeButton;
 struct ResetConfigButton;
 
 #[derive(Component, Reflect)]
-struct CountText(usize);
+struct CountText;
 
 #[derive(Component, Reflect)]
 struct VisualToggleButton(usize);
