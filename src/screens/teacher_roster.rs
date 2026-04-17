@@ -57,11 +57,15 @@ impl Plugin for TeacherRosterScreenPlugin {
                     .run_if(resource_exists::<TeacherRosterState>),
             )
             // Student selection available across all lesson-flow states.
-            // sync_roster_selection must run before handle_student_click so that
-            // a click in the same frame as an ActiveStudent removal is not undone.
+            // sync_roster_selection only runs on the frame ActiveStudent is removed,
+            // and is chained before handle_student_click so a click in that same
+            // frame is not undone.
             .add_systems(
                 Update,
-                (sync_roster_selection, handle_student_click)
+                (
+                    sync_roster_selection.run_if(resource_removed::<ActiveStudent>),
+                    handle_student_click,
+                )
                     .chain()
                     .run_if(in_state(InLessonFlow))
                     .run_if(resource_exists::<TeacherRosterState>),
@@ -552,18 +556,15 @@ fn handle_student_click(
     }
 }
 
-/// When `ActiveStudent` is removed externally (e.g. by `clear_active_student_for_question`),
-/// sync the roster's visual state: clear the highlight and `TeacherRosterState.selected_student`.
+/// Clears the roster's visual selection when `ActiveStudent` is removed externally.
+/// Gated by `resource_removed` so it runs only on the transition frame.
 fn sync_roster_selection(
-    active_student: Option<Res<ActiveStudent>>,
     mut state: ResMut<TeacherRosterState>,
     mut bg_query: Query<(&StudentRow, &mut BackgroundColor)>,
 ) {
-    if active_student.is_none() && state.selected_student.is_some() {
-        state.selected_student = None;
-        for (_row, mut bg) in &mut bg_query {
-            *bg = theme::colors::CARD_BG.into();
-        }
+    state.selected_student = None;
+    for (_row, mut bg) in &mut bg_query {
+        *bg = theme::colors::CARD_BG.into();
     }
 }
 
