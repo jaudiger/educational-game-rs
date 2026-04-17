@@ -355,11 +355,7 @@ fn precompute_stats(
         });
     }
 
-    let grand_pct = if grand_total > 0 {
-        (grand_correct * 100) / grand_total
-    } else {
-        0
-    };
+    let grand_pct = (grand_correct * 100).checked_div(grand_total).unwrap_or(0);
     let global_total = GlobalTotal {
         label: match i18n.language {
             Language::French => format!("{total_text} score : "),

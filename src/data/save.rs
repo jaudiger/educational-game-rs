@@ -30,12 +30,8 @@ pub struct TypeScore {
 
 impl TypeScore {
     /// Computes the percentage of correct answers for this question type.
-    pub const fn percentage(&self) -> u32 {
-        if self.total > 0 {
-            (self.correct * 100) / self.total
-        } else {
-            0
-        }
+    pub fn percentage(&self) -> u32 {
+        (self.correct * 100).checked_div(self.total).unwrap_or(0)
     }
 }
 
@@ -61,12 +57,9 @@ impl LessonProgress {
 
     /// Overall percentage across all question types.
     pub fn percentage(&self) -> u32 {
-        let total = self.total_questions();
-        if total > 0 {
-            (self.total_correct() * 100) / total
-        } else {
-            0
-        }
+        (self.total_correct() * 100)
+            .checked_div(self.total_questions())
+            .unwrap_or(0)
     }
 }
 

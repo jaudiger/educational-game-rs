@@ -83,11 +83,7 @@ fn setup_lesson_summary(
     let window = *primary_window;
     let correct = session.correct_count;
     let total = session.total_answered;
-    let percentage = if total > 0 {
-        (correct * 100) / total
-    } else {
-        0
-    };
+    let percentage = (correct * 100).checked_div(total).unwrap_or(0);
 
     let message_key = if percentage == 100 {
         TranslationKey::SummaryPerfect
