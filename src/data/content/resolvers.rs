@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::{Display, Write as _};
 
 use rand::Rng;
 use rand::seq::{IndexedRandom, SliceRandom};
@@ -13,19 +14,14 @@ use super::types::{
 };
 
 /// Shuffle `correct` together with `distractors` and return the shuffled list
-/// alongside the index of the correct answer. The correctness flag travels
-/// with each value through the shuffle, so the index is exact by construction
-/// and cannot be confused with a distractor via value equality.
-fn shuffle_choices<T>(correct: T, distractors: Vec<T>, rng: &mut impl Rng) -> (Vec<T>, usize) {
-    let mut tagged: Vec<(T, bool)> = distractors.into_iter().map(|d| (d, false)).collect();
-    tagged.push((correct, true));
-    tagged.shuffle(rng);
-    let correct_index = tagged
-        .iter()
-        .position(|(_, is_correct)| *is_correct)
-        .expect("correct answer was tagged before the shuffle");
-    let choices = tagged.into_iter().map(|(v, _)| v).collect();
-    (choices, correct_index)
+/// alongside the index of the correct answer. The distractors are shuffled
+/// first, then the correct value is inserted at a uniformly random slot, so
+/// the index is known by construction without any post-shuffle lookup.
+fn shuffle_choices<T>(correct: T, mut distractors: Vec<T>, rng: &mut impl Rng) -> (Vec<T>, usize) {
+    distractors.shuffle(rng);
+    let correct_index = rng.random_range(0..=distractors.len());
+    distractors.insert(correct_index, correct);
+    (distractors, correct_index)
 }
 
 impl McqTemplate {
@@ -65,8 +61,8 @@ impl McqTemplate {
         let result = a / b;
 
         let prompt = LocalizedText::new(
-            substitute_template(&self.prompt_template.fr, &[("a", a), ("b", b)]),
-            substitute_template(&self.prompt_template.en, &[("a", a), ("b", b)]),
+            substitute_template(&self.prompt_template.fr, &[("a", &a), ("b", &b)]),
+            substitute_template(&self.prompt_template.en, &[("a", &a), ("b", &b)]),
         );
 
         // Build 4 unique choices including the correct answer.
@@ -90,10 +86,14 @@ impl McqTemplate {
         let (choices, correct_index) = shuffle_choices(result.to_string(), distractors, rng);
 
         let explanation = LocalizedText::new(
-            substitute_template(&self.explanation_template.fr, &[("a", a), ("b", b)])
-                .replace("{result}", &result.to_string()),
-            substitute_template(&self.explanation_template.en, &[("a", a), ("b", b)])
-                .replace("{result}", &result.to_string()),
+            substitute_template(
+                &self.explanation_template.fr,
+                &[("a", &a), ("b", &b), ("result", &result)],
+            ),
+            substitute_template(
+                &self.explanation_template.en,
+                &[("a", &a), ("b", &b), ("result", &result)],
+            ),
         );
 
         McqDefinition {
@@ -137,23 +137,34 @@ impl McqTemplate {
         let sum = a + c;
 
         let prompt = LocalizedText::new(
-            substitute_template(&self.prompt_template.fr, &[("a", a), ("b", b), ("c", c)]),
-            substitute_template(&self.prompt_template.en, &[("a", a), ("b", b), ("c", c)]),
+            substitute_template(&self.prompt_template.fr, &[("a", &a), ("b", &b), ("c", &c)]),
+            substitute_template(&self.prompt_template.en, &[("a", &a), ("b", &b), ("c", &c)]),
         );
 
         let (choices, correct_index) = generate_fraction_addition_choices(a, b, c, sum, rng);
 
+        let result = format!("{sum}/{b}");
         let explanation = LocalizedText::new(
             substitute_template(
                 &self.explanation_template.fr,
-                &[("a", a), ("b", b), ("c", c), ("sum", sum)],
-            )
-            .replace("{result}", &format!("{sum}/{b}")),
+                &[
+                    ("a", &a),
+                    ("b", &b),
+                    ("c", &c),
+                    ("sum", &sum),
+                    ("result", &result),
+                ],
+            ),
             substitute_template(
                 &self.explanation_template.en,
-                &[("a", a), ("b", b), ("c", c), ("sum", sum)],
-            )
-            .replace("{result}", &format!("{sum}/{b}")),
+                &[
+                    ("a", &a),
+                    ("b", &b),
+                    ("c", &c),
+                    ("sum", &sum),
+                    ("result", &result),
+                ],
+            ),
         );
 
         McqDefinition {
@@ -189,8 +200,8 @@ impl McqTemplate {
         let (name_fr, name_en) = fraction_name(d);
 
         let prompt = LocalizedText::new(
-            self.prompt_template.fr.replace("{name}", name_fr),
-            self.prompt_template.en.replace("{name}", name_en),
+            substitute_template(&self.prompt_template.fr, &[("name", &name_fr)]),
+            substitute_template(&self.prompt_template.en, &[("name", &name_en)]),
         );
 
         let correct = format!("1/{d}");
@@ -217,18 +228,15 @@ impl McqTemplate {
 
         let (choices, correct_index) = shuffle_choices(correct.clone(), distractors, rng);
 
-        let d_str = d.to_string();
         let explanation = LocalizedText::new(
-            self.explanation_template
-                .fr
-                .replace("{name}", name_fr)
-                .replace("{fraction}", &correct)
-                .replace("{d}", &d_str),
-            self.explanation_template
-                .en
-                .replace("{name}", name_en)
-                .replace("{fraction}", &correct)
-                .replace("{d}", &d_str),
+            substitute_template(
+                &self.explanation_template.fr,
+                &[("name", &name_fr), ("fraction", &correct), ("d", &d)],
+            ),
+            substitute_template(
+                &self.explanation_template.en,
+                &[("name", &name_en), ("fraction", &correct), ("d", &d)],
+            ),
         );
 
         McqDefinition {
@@ -259,18 +267,22 @@ impl McqTemplate {
         let result = a * b;
 
         let prompt = LocalizedText::new(
-            substitute_template(&self.prompt_template.fr, &[("a", a), ("b", b)]),
-            substitute_template(&self.prompt_template.en, &[("a", a), ("b", b)]),
+            substitute_template(&self.prompt_template.fr, &[("a", &a), ("b", &b)]),
+            substitute_template(&self.prompt_template.en, &[("a", &a), ("b", &b)]),
         );
 
         #[allow(clippy::cast_sign_loss)]
         let (choices, correct_index) = generate_multiplication_distractors(a as u32, b as u32, rng);
 
         let explanation = LocalizedText::new(
-            substitute_template(&self.explanation_template.fr, &[("a", a), ("b", b)])
-                .replace("{result}", &result.to_string()),
-            substitute_template(&self.explanation_template.en, &[("a", a), ("b", b)])
-                .replace("{result}", &result.to_string()),
+            substitute_template(
+                &self.explanation_template.fr,
+                &[("a", &a), ("b", &b), ("result", &result)],
+            ),
+            substitute_template(
+                &self.explanation_template.en,
+                &[("a", &a), ("b", &b), ("result", &result)],
+            ),
         );
 
         #[allow(clippy::cast_sign_loss)]
@@ -334,29 +346,26 @@ impl FractionVisualizationTemplate {
             .collect();
         let numerator = *valid_nums.choose(rng).unwrap_or(&1);
 
-        let num_str = numerator.to_string();
-        let den_str = denominator.to_string();
-
         let prompt = LocalizedText::new(
-            self.prompt_template
-                .fr
-                .replace("{n}", &num_str)
-                .replace("{d}", &den_str),
-            self.prompt_template
-                .en
-                .replace("{n}", &num_str)
-                .replace("{d}", &den_str),
+            substitute_template(
+                &self.prompt_template.fr,
+                &[("n", &numerator), ("d", &denominator)],
+            ),
+            substitute_template(
+                &self.prompt_template.en,
+                &[("n", &numerator), ("d", &denominator)],
+            ),
         );
 
         let explanation = LocalizedText::new(
-            self.explanation_template
-                .fr
-                .replace("{n}", &num_str)
-                .replace("{d}", &den_str),
-            self.explanation_template
-                .en
-                .replace("{n}", &num_str)
-                .replace("{d}", &den_str),
+            substitute_template(
+                &self.explanation_template.fr,
+                &[("n", &numerator), ("d", &denominator)],
+            ),
+            substitute_template(
+                &self.explanation_template.en,
+                &[("n", &numerator), ("d", &denominator)],
+            ),
         );
 
         FractionVisualizationDefinition {
@@ -444,19 +453,18 @@ impl FractionComparisonTemplate {
             ComparisonAnswer::B
         };
 
-        let num_a = fraction_a.0.to_string();
-        let den_a = fraction_a.1.to_string();
-        let num_b = fraction_b.0.to_string();
-        let den_b = fraction_b.1.to_string();
-
         let substitute_explanation = |template: &str| {
-            template
-                .replace("{na}", &num_a)
-                .replace("{da}", &den_a)
-                .replace("{nb}", &num_b)
-                .replace("{db}", &den_b)
-                .replace("{char_a}", &self.character_a)
-                .replace("{char_b}", &self.character_b)
+            substitute_template(
+                template,
+                &[
+                    ("na", &fraction_a.0),
+                    ("da", &fraction_a.1),
+                    ("nb", &fraction_b.0),
+                    ("db", &fraction_b.1),
+                    ("char_a", &self.character_a),
+                    ("char_b", &self.character_b),
+                ],
+            )
         };
 
         let explanation = LocalizedText::new(
@@ -539,31 +547,19 @@ impl NumericInputTemplate {
         let b = *self.factor_b_range.choose(rng).unwrap_or(&3);
         let correct_answer = a * b;
 
-        let a_str = a.to_string();
-        let b_str = b.to_string();
-        let result_str = correct_answer.to_string();
-
         let prompt = LocalizedText::new(
-            self.prompt_template
-                .fr
-                .replace("{a}", &a_str)
-                .replace("{b}", &b_str),
-            self.prompt_template
-                .en
-                .replace("{a}", &a_str)
-                .replace("{b}", &b_str),
+            substitute_template(&self.prompt_template.fr, &[("a", &a), ("b", &b)]),
+            substitute_template(&self.prompt_template.en, &[("a", &a), ("b", &b)]),
         );
         let explanation = LocalizedText::new(
-            self.explanation_template
-                .fr
-                .replace("{a}", &a_str)
-                .replace("{b}", &b_str)
-                .replace("{result}", &result_str),
-            self.explanation_template
-                .en
-                .replace("{a}", &a_str)
-                .replace("{b}", &b_str)
-                .replace("{result}", &result_str),
+            substitute_template(
+                &self.explanation_template.fr,
+                &[("a", &a), ("b", &b), ("result", &correct_answer)],
+            ),
+            substitute_template(
+                &self.explanation_template.en,
+                &[("a", &a), ("b", &b), ("result", &correct_answer)],
+            ),
         );
 
         let question_visual = if self.with_grid {
@@ -716,10 +712,29 @@ fn generate_fraction_identification(
     }
 }
 
-fn substitute_template(template: &str, params: &[(&str, i32)]) -> String {
-    let mut result = template.to_owned();
-    for &(name, value) in params {
-        result = result.replace(&format!("{{{name}}}"), &value.to_string());
+/// Substitute `{name}` placeholders with their matching parameter value in a
+/// single pass. Unknown placeholders are left untouched so callers can chain
+/// additional substitutions on the result if needed.
+fn substitute_template(template: &str, params: &[(&str, &dyn Display)]) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        let tail = &rest[start + 1..];
+        let Some(end) = tail.find('}') else {
+            out.push_str(&rest[start..]);
+            return out;
+        };
+        let name = &tail[..end];
+        if let Some(value) = params.iter().find_map(|&(n, v)| (n == name).then_some(v)) {
+            write!(out, "{value}").expect("writing to a String never fails");
+        } else {
+            out.push('{');
+            out.push_str(name);
+            out.push('}');
+        }
+        rest = &tail[end + 1..];
     }
-    result
+    out.push_str(rest);
+    out
 }

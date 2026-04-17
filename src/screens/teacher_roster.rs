@@ -152,7 +152,7 @@ fn on_rebuild_roster(
         last_click: None,
     });
 
-    let students = class_save.students.clone();
+    let student_names: Vec<String> = class_save.students.iter().map(|s| s.name.clone()).collect();
     let show_input = *app_state.get() == AppState::MapExploration;
     let active_tab = ts.teacher_tab.map_or(TeacherTab::Students, |t| *t);
 
@@ -198,7 +198,7 @@ fn on_rebuild_roster(
 
             spawn_student_list(
                 parent,
-                &students,
+                &student_names,
                 &no_students_text,
                 selected_index,
                 show_input,
@@ -213,7 +213,7 @@ fn on_rebuild_roster(
 
 fn spawn_student_list(
     parent: &mut ChildSpawner,
-    students: &[crate::data::ClassStudent],
+    names: &[String],
     no_students_text: &str,
     selected_index: Option<usize>,
     show_delete: bool,
@@ -228,12 +228,12 @@ fn spawn_student_list(
             ..default()
         },))
         .with_children(|list| {
-            for (i, student) in students.iter().enumerate() {
+            for (i, name) in names.iter().enumerate() {
                 let is_selected = selected_index == Some(i);
-                spawn_student_row(list, i, &student.name, is_selected, show_delete, window);
+                spawn_student_row(list, i, name, is_selected, show_delete, window);
             }
 
-            if students.is_empty() {
+            if names.is_empty() {
                 list.spawn((
                     Text::new(no_students_text.to_owned()),
                     TextFont {

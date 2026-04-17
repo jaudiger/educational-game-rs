@@ -112,7 +112,7 @@ fn on_rebuild_stats(
         return;
     };
 
-    let progress = student.progress.clone();
+    let has_any_progress = !student.progress.is_empty();
     let active_tab = ts.teacher_tab.map_or(TeacherTab::Students, |t| *t);
 
     let tab = tab_header(&ts.i18n, active_tab, window);
@@ -122,7 +122,7 @@ fn on_rebuild_stats(
         .into_owned();
     let no_lessons_text = ts.i18n.t(&TranslationKey::NoLessonsCompleted).into_owned();
     let return_text = ts.i18n.t(&TranslationKey::Back).into_owned();
-    let (stats_data, global_total) = precompute_stats(&progress, &content, &ts.i18n);
+    let (stats_data, global_total) = precompute_stats(&student.progress, &content, &ts.i18n);
 
     spawn_stats_root(
         &mut commands,
@@ -133,7 +133,7 @@ fn on_rebuild_stats(
             title_text,
             no_lessons_text,
             return_text,
-            progress,
+            has_any_progress,
             stats_data,
             global_total,
         },
@@ -144,7 +144,7 @@ struct StatsViewData {
     title_text: String,
     no_lessons_text: String,
     return_text: String,
-    progress: HashMap<String, LessonProgress>,
+    has_any_progress: bool,
     stats_data: Vec<ThemeStatsData>,
     global_total: GlobalTotal,
 }
@@ -183,7 +183,10 @@ fn spawn_stats_root(
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |content: &mut ChildSpawner| {
-                    if data.progress.is_empty() {
+                    if data.has_any_progress {
+                        spawn_stats_frame(content, data.stats_data, window);
+                        spawn_global_total(content, &data.global_total, window);
+                    } else {
                         content.spawn((
                             Text::new(data.no_lessons_text),
                             TextFont {
@@ -196,9 +199,6 @@ fn spawn_stats_root(
                                 window,
                             },
                         ));
-                    } else {
-                        spawn_stats_frame(content, data.stats_data, window);
-                        spawn_global_total(content, &data.global_total, window);
                     }
                 })),
             ));

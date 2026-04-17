@@ -225,9 +225,11 @@ fn on_rebuild_lessons(
         });
         let header = tab_header(&ts.i18n, active_tab, window);
         let i18n_owned = I18n::new(ts.i18n.language);
-        let themes = content.themes.clone();
-        let save_data_cloned = (*ts.ctx.save_data).clone();
-        let active_slot_cloned = ts.ctx.active_slot.map(|s| (*s).clone());
+        let tree_specs = tree::build_tree_specs(
+            &content.themes,
+            &ts.ctx.save_data,
+            ts.ctx.active_slot.as_deref(),
+        );
         commands.spawn((
             Node {
                 width: percent(100.0),
@@ -244,15 +246,7 @@ fn on_rebuild_lessons(
             TeacherContentRoot,
             Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
                 parent.spawn(header);
-                tree::spawn_tree_view(
-                    parent,
-                    &themes,
-                    &i18n_owned,
-                    is_map_exploration,
-                    &save_data_cloned,
-                    active_slot_cloned.as_ref(),
-                    window,
-                );
+                tree::spawn_tree_view(parent, &tree_specs, &i18n_owned, is_map_exploration, window);
             })),
         ));
     }

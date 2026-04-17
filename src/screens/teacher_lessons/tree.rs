@@ -9,13 +9,63 @@ use crate::ui::theme::DesignFontSize;
 
 use super::ConfigLessonButton;
 
-pub(super) fn spawn_tree_view(
-    parent: &mut ChildSpawner,
+/// Compact, owned description of a single lesson row in the tree.
+/// Carries only the fields the UI needs so it can be moved into a
+/// `SpawnWith` closure without cloning the full `ContentLibrary` / `SaveData`.
+pub(super) struct LessonTreeRowSpec {
+    pub theme_id: String,
+    pub lesson_id: String,
+    pub title_key: TranslationKey,
+    pub available: bool,
+    pub has_custom_config: bool,
+}
+
+/// Compact description of a theme section in the tree.
+pub(super) struct ThemeTreeSpec {
+    pub title_key: TranslationKey,
+    pub available: bool,
+    pub lessons: Vec<LessonTreeRowSpec>,
+}
+
+/// Resolve `ContentLibrary` + `SaveData` into the compact spec the tree UI
+/// needs. Called before the UI-building closure so the closure moves only
+/// this owned spec, not the source resources.
+pub(super) fn build_tree_specs(
     themes: &[Theme],
-    i18n: &I18n,
-    show_config_buttons: bool,
     save_data: &SaveData,
     active_slot: Option<&ActiveSlot>,
+) -> Vec<ThemeTreeSpec> {
+    themes
+        .iter()
+        .map(|t| {
+            let lessons = if t.available {
+                t.lessons
+                    .iter()
+                    .map(|lesson| LessonTreeRowSpec {
+                        theme_id: t.id.clone(),
+                        lesson_id: lesson.id.clone(),
+                        title_key: lesson.title_key.clone(),
+                        available: lesson.available,
+                        has_custom_config: lesson_has_custom_config(lesson, save_data, active_slot),
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            ThemeTreeSpec {
+                title_key: t.title_key.clone(),
+                available: t.available,
+                lessons,
+            }
+        })
+        .collect()
+}
+
+pub(super) fn spawn_tree_view(
+    parent: &mut ChildSpawner,
+    themes: &[ThemeTreeSpec],
+    i18n: &I18n,
+    show_config_buttons: bool,
     window: Entity,
 ) {
     parent
@@ -72,16 +122,7 @@ pub(super) fn spawn_tree_view(
                 }
 
                 for lesson in &theme_data.lessons {
-                    spawn_lesson_tree_row(
-                        list,
-                        &theme_data.id,
-                        lesson,
-                        i18n,
-                        show_config_buttons,
-                        save_data,
-                        active_slot,
-                        window,
-                    );
+                    spawn_lesson_tree_row(list, lesson, i18n, show_config_buttons, window);
                 }
             }
         });
@@ -108,15 +149,11 @@ fn lesson_has_custom_config(
         })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn spawn_lesson_tree_row(
     parent: &mut ChildSpawner,
-    theme_id: &str,
-    lesson: &Lesson,
+    lesson: &LessonTreeRowSpec,
     i18n: &I18n,
     show_config_button: bool,
-    save_data: &SaveData,
-    active_slot: Option<&ActiveSlot>,
     window: Entity,
 ) {
     let is_available = lesson.available;
@@ -125,8 +162,6 @@ fn spawn_lesson_tree_row(
     } else {
         theme::colors::TEXT_MUTED
     };
-
-    let has_config = lesson_has_custom_config(lesson, save_data, active_slot);
 
     parent
         .spawn(Node {
@@ -168,12 +203,12 @@ fn spawn_lesson_tree_row(
             ));
 
             if show_config_button && is_available {
-                let gear_bg = if has_config {
+                let gear_bg = if lesson.has_custom_config {
                     theme::colors::PRIMARY
                 } else {
                     theme::colors::TOGGLE_INACTIVE
                 };
-                let gear_text_color = if has_config {
+                let gear_text_color = if lesson.has_custom_config {
                     theme::colors::TEXT_LIGHT
                 } else {
                     theme::colors::TEXT_DARK
@@ -190,8 +225,8 @@ fn spawn_lesson_tree_row(
                         window,
                     ),
                     ConfigLessonButton {
-                        theme_id: theme_id.to_owned(),
-                        lesson_id: lesson.id.clone(),
+                        theme_id: lesson.theme_id.clone(),
+                        lesson_id: lesson.lesson_id.clone(),
                     },
                 ));
             }
