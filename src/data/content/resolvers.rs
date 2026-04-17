@@ -12,6 +12,22 @@ use super::types::{
     QuestionVisual,
 };
 
+/// Shuffle `correct` together with `distractors` and return the shuffled list
+/// alongside the index of the correct answer. The correctness flag travels
+/// with each value through the shuffle, so the index is exact by construction
+/// and cannot be confused with a distractor via value equality.
+fn shuffle_choices<T>(correct: T, distractors: Vec<T>, rng: &mut impl Rng) -> (Vec<T>, usize) {
+    let mut tagged: Vec<(T, bool)> = distractors.into_iter().map(|d| (d, false)).collect();
+    tagged.push((correct, true));
+    tagged.shuffle(rng);
+    let correct_index = tagged
+        .iter()
+        .position(|(_, is_correct)| *is_correct)
+        .expect("correct answer was tagged before the shuffle");
+    let choices = tagged.into_iter().map(|(v, _)| v).collect();
+    (choices, correct_index)
+}
+
 impl McqTemplate {
     fn param_values(&self, name: &str, default: &[i32]) -> Vec<i32> {
         self.parameters
@@ -69,10 +85,9 @@ impl McqTemplate {
             fill += 1;
         }
 
-        let mut choices: Vec<String> = seen.into_iter().map(|v| v.to_string()).collect();
-        choices.shuffle(rng);
-        let correct_str = result.to_string();
-        let correct_index = choices.iter().position(|c| *c == correct_str).unwrap_or(0);
+        seen.remove(&result);
+        let distractors: Vec<String> = seen.into_iter().map(|v| v.to_string()).collect();
+        let (choices, correct_index) = shuffle_choices(result.to_string(), distractors, rng);
 
         let explanation = LocalizedText::new(
             substitute_template(&self.explanation_template.fr, &[("a", a), ("b", b)])
@@ -179,29 +194,28 @@ impl McqTemplate {
         );
 
         let correct = format!("1/{d}");
-        let mut choices: Vec<String> = vec![correct.clone()];
+        let mut distractors: Vec<String> = Vec::new();
 
         // Inverted fraction.
         let d1 = format!("{d}/1");
-        if !choices.contains(&d1) {
-            choices.push(d1);
+        if d1 != correct {
+            distractors.push(d1);
         }
         // Other unit fractions as distractors.
         for &other_d in &[2, 3, 4, 5, 6, 8] {
-            if choices.len() >= 4 {
+            if distractors.len() >= 3 {
                 break;
             }
             if other_d != d {
                 let dist = format!("1/{other_d}");
-                if !choices.contains(&dist) {
-                    choices.push(dist);
+                if !distractors.contains(&dist) {
+                    distractors.push(dist);
                 }
             }
         }
-        choices.truncate(4);
+        distractors.truncate(3);
 
-        choices.shuffle(rng);
-        let correct_index = choices.iter().position(|ch| *ch == correct).unwrap_or(0);
+        let (choices, correct_index) = shuffle_choices(correct.clone(), distractors, rng);
 
         let d_str = d.to_string();
         let explanation = LocalizedText::new(
@@ -605,10 +619,9 @@ fn generate_fraction_addition_choices(
         fill += 1;
     }
 
-    let mut choices: Vec<String> = seen.into_iter().collect();
-    choices.shuffle(rng);
-    let correct_index = choices.iter().position(|ch| *ch == correct).unwrap_or(0);
-    (choices, correct_index)
+    seen.remove(&correct);
+    let distractors: Vec<String> = seen.into_iter().collect();
+    shuffle_choices(correct, distractors, rng)
 }
 
 /// Generate 4 MCQ choices for a multiplication `a * b`, including the correct
@@ -645,12 +658,9 @@ fn generate_multiplication_distractors(a: u32, b: u32, rng: &mut impl Rng) -> (V
         fill += 1;
     }
 
-    let mut choices: Vec<String> = seen.into_iter().map(|v| v.to_string()).collect();
-    choices.shuffle(rng);
-    let correct_str = correct.to_string();
-    let correct_index = choices.iter().position(|c| *c == correct_str).unwrap_or(0);
-
-    (choices, correct_index)
+    seen.remove(&correct);
+    let distractors: Vec<String> = seen.into_iter().map(|v| v.to_string()).collect();
+    shuffle_choices(correct.to_string(), distractors, rng)
 }
 
 /// Build a `FractionIdentificationDefinition` with plausible distractors
@@ -682,10 +692,9 @@ fn generate_fraction_identification(
         d += 1;
     }
 
-    let mut choices: Vec<String> = seen.into_iter().collect();
-    choices.shuffle(rng);
-
-    let correct_index = choices.iter().position(|c| *c == correct).unwrap_or(0);
+    seen.remove(&correct);
+    let distractors: Vec<String> = seen.into_iter().collect();
+    let (choices, correct_index) = shuffle_choices(correct, distractors, rng);
 
     FractionIdentificationDefinition {
         numerator,
