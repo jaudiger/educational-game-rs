@@ -11,17 +11,17 @@ use crate::ui::theme;
 use crate::ui::theme::DesignFontSize;
 
 use super::{
-    ConfigHoverText, ConfigLessonButton, CountButton, CountText, DraftQuestion, LessonConfigDraft,
-    LessonsView, QuestionLabel, QuestionRow, ResetConfigButton, ReturnToTreeButton,
-    SaveConfigButton, ScrollContent, ScrollFrame, ScrollIndicator, TeacherLessonsState,
-    VisualToggleButton,
+    ConfigHoverText, ConfigLessonButton, CountButton, CountText, DraftQuestion,
+    LessonConfigDraftRes, LessonsView, QuestionLabel, QuestionRow, ResetConfigButton,
+    ReturnToTreeButton, SaveConfigButton, ScrollContent, ScrollFrame, ScrollIndicator,
+    TeacherLessonsState, VisualToggleButton,
 };
 
 pub(super) fn spawn_config_view(
     parent: &mut ChildSpawner,
     i18n: &I18n,
     lesson_title: &str,
-    draft: &LessonConfigDraft,
+    draft: &LessonConfigDraftRes,
     active_tab: TeacherTab,
     window: Entity,
 ) {
@@ -125,7 +125,7 @@ fn spawn_config_header(
 fn spawn_question_counter_section(
     parent: &mut ChildSpawner,
     i18n: &I18n,
-    draft: &LessonConfigDraft,
+    draft: &LessonConfigDraftRes,
     window: Entity,
 ) {
     let i18n_owned = I18n::new(i18n.language);
@@ -356,7 +356,7 @@ fn spawn_counter_controls(
 fn spawn_button_row(
     parent: &mut ChildSpawner,
     i18n: &I18n,
-    draft: &LessonConfigDraft,
+    draft: &LessonConfigDraftRes,
     window: Entity,
 ) {
     let can_save = draft.has_any_selected();
@@ -477,10 +477,9 @@ pub(super) fn handle_config_button_click(
         lessons_state.view = LessonsView::Config {
             lesson_id: config_btn.lesson_id.clone(),
             lesson_title,
-            editing: LessonConfigDraft { questions },
         };
+        commands.insert_resource(LessonConfigDraftRes { questions });
         commands.insert_resource(TeacherInDetailView);
-        commands.trigger(super::RebuildLessons);
 
         return; // Only handle first press
     }
@@ -490,22 +489,20 @@ pub(super) fn handle_config_button_click(
 /// The direction and magnitude come from the `delta` field on the button component.
 pub(super) fn handle_count_change(
     query: Query<(&Interaction, &CountButton), Changed<Interaction>>,
-    mut lessons_state: ResMut<TeacherLessonsState>,
+    lessons_state: Res<TeacherLessonsState>,
+    mut draft: ResMut<LessonConfigDraftRes>,
     mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
 ) {
+    if !matches!(lessons_state.view, LessonsView::Config { .. }) {
+        return;
+    }
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
         let idx = btn.index;
-        let LessonsView::Config {
-            ref mut editing, ..
-        } = lessons_state.view
-        else {
-            continue;
-        };
-        let Some(q) = editing.questions.iter_mut().find(|q| q.index == idx) else {
+        let Some(q) = draft.questions.iter_mut().find(|q| q.index == idx) else {
             continue;
         };
         if let Some(new_count) = q.count.checked_add_signed(btn.delta) {
@@ -516,7 +513,7 @@ pub(super) fn handle_count_change(
             if let Ok(mut text) = text_query.get_mut(btn.count_text) {
                 **text = q.count.to_string();
             }
-            update_save_button_state(&mut save_btn_query, editing);
+            update_save_button_state(&mut save_btn_query, &draft);
         }
     }
 }
@@ -524,21 +521,19 @@ pub(super) fn handle_count_change(
 /// Toggles the optional visual for a specific question on/off.
 pub(super) fn handle_visual_toggle(
     query: Query<(&Interaction, &VisualToggleButton), Changed<Interaction>>,
-    mut lessons_state: ResMut<TeacherLessonsState>,
+    lessons_state: Res<TeacherLessonsState>,
+    mut draft: ResMut<LessonConfigDraftRes>,
     mut bg_query: Query<(&mut BackgroundColor, &VisualToggleButton)>,
 ) {
+    if !matches!(lessons_state.view, LessonsView::Config { .. }) {
+        return;
+    }
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
         let idx = btn.0;
-        let LessonsView::Config {
-            ref mut editing, ..
-        } = lessons_state.view
-        else {
-            continue;
-        };
-        let Some(q) = editing.questions.iter_mut().find(|q| q.index == idx) else {
+        let Some(q) = draft.questions.iter_mut().find(|q| q.index == idx) else {
             continue;
         };
         q.show_visual = !q.show_visual;
@@ -587,7 +582,8 @@ fn reset_visual_toggles(
 /// Resets all question counts to the default value (1) and visual toggles to their defaults.
 pub(super) fn handle_reset_config(
     query: Query<&Interaction, (Changed<Interaction>, With<ResetConfigButton>)>,
-    mut lessons_state: ResMut<TeacherLessonsState>,
+    lessons_state: Res<TeacherLessonsState>,
+    mut draft: ResMut<LessonConfigDraftRes>,
     mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
     mut toggle_bg_query: Query<
@@ -595,25 +591,22 @@ pub(super) fn handle_reset_config(
         Without<SaveConfigButton>,
     >,
 ) {
+    if !matches!(lessons_state.view, LessonsView::Config { .. }) {
+        return;
+    }
     for interaction in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        let LessonsView::Config {
-            ref mut editing, ..
-        } = lessons_state.view
-        else {
-            continue;
-        };
-        for q in &mut editing.questions {
+        for q in &mut draft.questions {
             q.count = 1;
             if q.has_visual {
                 q.show_visual = q.default_show_visual;
             }
         }
         reset_count_texts(&mut text_query);
-        reset_visual_toggles(&mut toggle_bg_query, &editing.questions);
-        update_save_button_state(&mut save_btn_query, editing);
+        reset_visual_toggles(&mut toggle_bg_query, &draft.questions);
+        update_save_button_state(&mut save_btn_query, &draft);
     }
 }
 
@@ -712,7 +705,7 @@ pub(super) fn update_config_hover_text(
 
 fn update_save_button_state(
     query: &mut Query<&mut BackgroundColor, With<SaveConfigButton>>,
-    draft: &LessonConfigDraft,
+    draft: &LessonConfigDraftRes,
 ) {
     let can_save = draft.has_any_selected();
     let bg = if can_save {
@@ -729,7 +722,8 @@ fn update_save_button_state(
 pub(super) fn handle_save_config(
     query: Query<&Interaction, (Changed<Interaction>, With<SaveConfigButton>)>,
     mut commands: Commands,
-    lessons_state: Res<TeacherLessonsState>,
+    mut lessons_state: ResMut<TeacherLessonsState>,
+    draft: Res<LessonConfigDraftRes>,
     mut save_data: ResMut<Persistent<SaveData>>,
     active_slot: Option<Res<ActiveSlot>>,
 ) {
@@ -738,22 +732,17 @@ pub(super) fn handle_save_config(
             continue;
         }
 
-        let LessonsView::Config {
-            ref lesson_id,
-            ref editing,
-            ..
-        } = lessons_state.view
-        else {
+        let LessonsView::Config { ref lesson_id, .. } = lessons_state.view else {
             continue;
         };
 
         // Don't save if all counts are zero
-        if !editing.has_any_selected() {
+        if !draft.has_any_selected() {
             continue;
         }
 
-        let counts: Vec<usize> = editing.questions.iter().map(|q| q.count).collect();
-        let show_visuals: Vec<bool> = editing.questions.iter().map(|q| q.show_visual).collect();
+        let counts: Vec<usize> = draft.questions.iter().map(|q| q.count).collect();
+        let show_visuals: Vec<bool> = draft.questions.iter().map(|q| q.show_visual).collect();
         let config = LessonSessionConfig {
             counts,
             show_visuals,
@@ -773,19 +762,22 @@ pub(super) fn handle_save_config(
             })
             .expect("failed to update save data");
 
+        lessons_state.view = LessonsView::Tree;
+        commands.remove_resource::<LessonConfigDraftRes>();
         commands.remove_resource::<TeacherInDetailView>();
-        commands.trigger(super::RebuildLessons);
     }
 }
 
 pub(super) fn handle_return_to_tree(
     query: Query<&Interaction, (Changed<Interaction>, With<ReturnToTreeButton>)>,
     mut commands: Commands,
+    mut lessons_state: ResMut<TeacherLessonsState>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            lessons_state.view = LessonsView::Tree;
+            commands.remove_resource::<LessonConfigDraftRes>();
             commands.remove_resource::<TeacherInDetailView>();
-            commands.trigger(super::RebuildLessons);
         }
     }
 }

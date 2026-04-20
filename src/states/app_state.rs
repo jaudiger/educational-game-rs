@@ -40,3 +40,21 @@ impl ComputedStates for InLessonFlow {
         }
     }
 }
+
+/// Computed state covering the active-lesson cycle (`LessonPlay` and
+/// `LessonSummary`). Used as the cleanup scope for per-lesson runtime
+/// resources so that both normal completion and early exit (quit button)
+/// trigger a single `OnExit` cleanup when returning to `MapExploration`.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ActiveLesson;
+
+impl ComputedStates for ActiveLesson {
+    type SourceStates = AppState;
+
+    fn compute(sources: AppState) -> Option<Self> {
+        match sources {
+            AppState::LessonPlay | AppState::LessonSummary => Some(Self),
+            _ => None,
+        }
+    }
+}

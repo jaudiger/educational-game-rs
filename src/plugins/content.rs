@@ -54,21 +54,21 @@ fn build_content_library() -> ContentLibrary {
                 id: "french".into(),
                 title_key: TranslationKey::ThemeFrench,
                 available: false,
-                lessons: Vec::new(),
+                lessons: vec![],
                 ..Default::default()
             },
             Theme {
                 id: "english".into(),
                 title_key: TranslationKey::ThemeEnglish,
                 available: false,
-                lessons: Vec::new(),
+                lessons: vec![],
                 ..Default::default()
             },
             Theme {
                 id: "science".into(),
                 title_key: TranslationKey::ThemeScience,
                 available: false,
-                lessons: Vec::new(),
+                lessons: vec![],
                 ..Default::default()
             },
         ],
@@ -230,7 +230,7 @@ fn build_visual_fraction_questions() -> Vec<QuestionDefinition> {
 
 #[allow(clippy::literal_string_with_formatting_args)]
 fn build_multiplication_tables_questions() -> Vec<QuestionDefinition> {
-    let mut questions = Vec::new();
+    let mut questions = vec![];
 
     // Two difficulty levels:
     // Beginner: even tables [2,4,6,8], factor_b 1..9
@@ -303,7 +303,7 @@ fn build_multiplication_tables_questions() -> Vec<QuestionDefinition> {
 
 #[allow(clippy::literal_string_with_formatting_args)]
 fn build_multiply_10_100_1000_questions() -> Vec<QuestionDefinition> {
-    let mut questions = Vec::new();
+    let mut questions = vec![];
 
     let factor_b: Vec<u32> = vec![10, 100, 1000];
 

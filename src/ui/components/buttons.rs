@@ -54,7 +54,7 @@ pub fn action_button(
             ..default()
         },
         children![(
-            Text::new(label.to_owned()),
+            Text::new(label),
             TextFont {
                 font_size: theme::fonts::BUTTON_SMALL,
                 ..default()
@@ -93,7 +93,7 @@ pub fn icon_button(
             ..default()
         },
         children![(
-            Text::new(label.to_owned()),
+            Text::new(label),
             TextFont {
                 font_size,
                 ..default()
@@ -136,7 +136,7 @@ pub fn standard_button(
             ..default()
         },
         children![(
-            Text::new(label.to_owned()),
+            Text::new(label),
             TextFont {
                 font_size: theme::fonts::BUTTON,
                 ..default()
@@ -182,7 +182,7 @@ pub fn toggle_button(label: &str, active: bool, window: Entity) -> impl Bundle +
             ..default()
         },
         children![(
-            Text::new(label.to_owned()),
+            Text::new(label),
             TextFont {
                 font_size: theme::fonts::BUTTON_SMALL,
                 ..default()

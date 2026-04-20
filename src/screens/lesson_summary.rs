@@ -4,11 +4,10 @@ use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
-    ActiveSlot, GameMode, GameSettings, LastAnswer, LessonProgress, LessonSession, SaveData,
-    SelectedLesson,
+    ActiveSlot, GameMode, GameSettings, LessonProgress, LessonSession, SaveData, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
-use crate::states::{AppState, StateScopedResourceExt};
+use crate::states::AppState;
 use crate::ui::components::{screen_root, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -19,13 +18,10 @@ pub struct LessonSummaryScreenPlugin;
 
 impl Plugin for LessonSummaryScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.register_state_scoped_resource::<AppState, LessonSession>(AppState::LessonSummary)
-            .register_state_scoped_resource::<AppState, SelectedLesson>(AppState::LessonSummary)
-            .register_state_scoped_resource::<AppState, LastAnswer>(AppState::LessonSummary)
-            .add_systems(
-                OnEnter(AppState::LessonSummary),
-                (save_lesson_progress, setup_lesson_summary).chain(),
-            );
+        app.add_systems(
+            OnEnter(AppState::LessonSummary),
+            (save_lesson_progress, setup_lesson_summary).chain(),
+        );
     }
 }
 

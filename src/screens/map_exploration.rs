@@ -361,7 +361,7 @@ fn insert_card_overlay(
 /// Returns a centered text bundle for use inside card buttons.
 fn card_text(text: &str, font_size: f32, color: Color, window: Entity) -> impl Bundle + use<> {
     (
-        Text::new(text.to_owned()),
+        Text::new(text),
         TextFont {
             font_size,
             ..default()

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 use bevy_persistent::prelude::Persistent;
@@ -80,29 +81,32 @@ pub(super) fn build_session(
 }
 
 /// Resolve a single `QuestionDefinition`. Templates are turned into their
-/// concrete counterpart; static definitions are returned unchanged.
-fn resolve_question(def: &QuestionDefinition, rng: &mut impl rand::Rng) -> QuestionDefinition {
+/// concrete counterpart; static definitions are borrowed as-is.
+fn resolve_question<'a>(
+    def: &'a QuestionDefinition,
+    rng: &mut impl rand::Rng,
+) -> Cow<'a, QuestionDefinition> {
     match def {
-        // Static definitions: pass through.
+        // Static definitions: borrow.
         QuestionDefinition::Mcq(_)
         | QuestionDefinition::FractionVisualization(_)
         | QuestionDefinition::FractionComparison(_)
         | QuestionDefinition::FractionIdentification(_)
-        | QuestionDefinition::NumericInput(_) => def.clone(),
+        | QuestionDefinition::NumericInput(_) => Cow::Borrowed(def),
 
-        // Templates: resolve.
-        QuestionDefinition::McqTemplate(t) => QuestionDefinition::Mcq(t.resolve(rng)),
+        // Templates: resolve into a fresh owned value.
+        QuestionDefinition::McqTemplate(t) => Cow::Owned(QuestionDefinition::Mcq(t.resolve(rng))),
         QuestionDefinition::FractionVisualizationTemplate(t) => {
-            QuestionDefinition::FractionVisualization(t.resolve(rng))
+            Cow::Owned(QuestionDefinition::FractionVisualization(t.resolve(rng)))
         }
         QuestionDefinition::FractionComparisonTemplate(t) => {
-            QuestionDefinition::FractionComparison(t.resolve(rng))
+            Cow::Owned(QuestionDefinition::FractionComparison(t.resolve(rng)))
         }
         QuestionDefinition::FractionIdentificationTemplate(t) => {
-            QuestionDefinition::FractionIdentification(t.resolve(rng))
+            Cow::Owned(QuestionDefinition::FractionIdentification(t.resolve(rng)))
         }
         QuestionDefinition::NumericInputTemplate(t) => {
-            QuestionDefinition::NumericInput(t.resolve(rng))
+            Cow::Owned(QuestionDefinition::NumericInput(t.resolve(rng)))
         }
     }
 }
@@ -119,15 +123,15 @@ fn resolve_unique(
         let resolved = resolve_question(def, rng);
         if let Some(fp) = resolved.fingerprint() {
             if seen.insert(fp) {
-                return resolved;
+                return resolved.into_owned();
             }
         } else {
             // Static definition or no fingerprint; accept as-is.
-            return resolved;
+            return resolved.into_owned();
         }
     }
     // Exhausted retries; accept the last attempt to avoid an infinite loop.
-    resolve_question(def, rng)
+    resolve_question(def, rng).into_owned()
 }
 
 pub(super) fn update_session_score(session: &mut LessonSession, result: &AnswerResult) {

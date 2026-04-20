@@ -203,7 +203,7 @@ fn spawn_slot_card(
         if let Some(slot_name) = name {
             // Filled slot: show name + delete button
             card.spawn((
-                Text::new(slot_name.to_owned()),
+                Text::new(slot_name),
                 TextFont {
                     font_size: theme::fonts::HEADING,
                     ..default()
@@ -216,7 +216,7 @@ fn spawn_slot_card(
             ));
 
             card.spawn((
-                Text::new(slot_label.to_owned()),
+                Text::new(slot_label),
                 TextFont {
                     font_size: theme::fonts::SMALL,
                     ..default()
@@ -255,7 +255,7 @@ fn spawn_slot_card(
         } else {
             // Empty slot
             card.spawn((
-                Text::new(empty_label.to_owned()),
+                Text::new(empty_label),
                 TextFont {
                     font_size: theme::fonts::HEADING,
                     ..default()
@@ -268,7 +268,7 @@ fn spawn_slot_card(
             ));
 
             card.spawn((
-                Text::new(slot_label.to_owned()),
+                Text::new(slot_label),
                 TextFont {
                     font_size: theme::fonts::SMALL,
                     ..default()

@@ -3,14 +3,6 @@ use bevy::prelude::*;
 use crate::data::content::QuestionType;
 use crate::i18n::{I18n, TranslationKey};
 
-/// Trigger to (re)build the student roster UI in the teacher window.
-#[derive(Event)]
-pub struct RebuildRoster;
-
-/// Trigger to (re)build the student stats UI in the teacher window.
-#[derive(Event)]
-pub struct RebuildStats;
-
 /// Inserted when the stats detail view is open for a student.
 /// Holds the student's index within the current class slot.
 #[derive(Resource, Clone, Debug, Deref, Reflect)]

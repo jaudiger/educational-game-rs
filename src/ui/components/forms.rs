@@ -125,7 +125,7 @@ pub fn checkbox(label: &str, mark_visible: bool, window: Entity) -> impl Bundle 
             ),
             // Label
             (
-                Text::new(label.to_owned()),
+                Text::new(label),
                 TextFont {
                     font_size: theme::fonts::BODY,
                     ..default()
@@ -217,7 +217,7 @@ pub fn radio_button(label: &str, mark_visible: bool, window: Entity) -> impl Bun
             ),
             // Label
             (
-                Text::new(label.to_owned()),
+                Text::new(label),
                 TextFont {
                     font_size: theme::fonts::BODY,
                     ..default()

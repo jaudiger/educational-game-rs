@@ -83,7 +83,7 @@ pub fn spawn_prompt_and_grid(
         })
         .with_children(|row| {
             row.spawn((
-                Text::new(prompt_text.to_owned()),
+                Text::new(prompt_text),
                 TextFont {
                     font_size: theme::fonts::HEADING,
                     ..default()

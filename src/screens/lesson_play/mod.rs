@@ -8,7 +8,7 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
 use crate::states::cleanup_root;
-use crate::states::{AppState, LessonPhase};
+use crate::states::{ActiveLesson, AppState, LessonPhase, StateScopedResourceExt};
 
 mod explanations;
 mod layout;
@@ -20,7 +20,10 @@ pub struct LessonPlayScreenPlugin;
 
 impl Plugin for LessonPlayScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
+        app.register_state_scoped_resource::<ActiveLesson, LessonSession>(ActiveLesson)
+            .register_state_scoped_resource::<ActiveLesson, SelectedLesson>(ActiveLesson)
+            .register_state_scoped_resource::<ActiveLesson, LastAnswer>(ActiveLesson)
+            .add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
             .add_systems(
                 OnEnter(LessonPhase::ShowQuestion),
                 (
@@ -124,17 +127,10 @@ fn advance_question(
 
 fn handle_quit_lesson(
     query: Query<&Interaction, (Changed<Interaction>, With<QuitLessonButton>)>,
-    mut commands: Commands,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            // Early exit: goes directly to MapExploration, bypassing LessonSummary.
-            // State-scoped cleanup on OnExit(LessonSummary) won't fire, so remove
-            // lesson resources explicitly.
-            commands.remove_resource::<LessonSession>();
-            commands.remove_resource::<SelectedLesson>();
-            commands.remove_resource::<LastAnswer>();
             next_state.set(AppState::MapExploration);
         }
     }

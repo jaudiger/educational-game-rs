@@ -13,9 +13,8 @@ use crate::plugins::teacher::{
     TeacherContentRoot, TeacherInDetailView, TeacherScreenParam, TeacherTab, TeacherWindowParam,
     tab_header,
 };
-use crate::screens::teacher_shared::{
-    RebuildRoster, RebuildStats, ViewingStudentStats, question_type_label,
-};
+use crate::screens::teacher_roster::TeacherRosterView;
+use crate::screens::teacher_shared::{ViewingStudentStats, question_type_label};
 use crate::states::{AppState, StateScopedResourceExt, cleanup_root};
 use crate::ui::components::{
     PopoverCancelButton, PopoverConfirmButton, icon_button, spawn_confirmation_modal,
@@ -32,7 +31,19 @@ impl Plugin for TeacherStatsScreenPlugin {
         app.register_state_scoped_resource::<AppState, ViewingStudentStats>(
             AppState::MapExploration,
         )
-        .add_observer(on_rebuild_stats)
+        .add_systems(
+            Update,
+            (
+                rebuild_stats_ui.run_if(
+                    resource_exists::<ViewingStudentStats>.and(
+                        resource_changed::<ViewingStudentStats>
+                            .or(resource_changed::<Persistent<SaveData>>),
+                    ),
+                ),
+                cleanup_stats_on_view_removed.run_if(resource_removed::<ViewingStudentStats>),
+            )
+                .run_if(in_state(AppState::MapExploration)),
+        )
         .add_systems(
             Update,
             (
@@ -76,12 +87,12 @@ enum StatsResetTarget {
     Type(String, QuestionType),
 }
 
-/// Builds the stats UI when triggered via [`RebuildStats`].
-/// Called from the roster's double-click handler.
-fn on_rebuild_stats(
-    _event: On<RebuildStats>,
+/// Builds the stats UI. Runs when `ViewingStudentStats` is first inserted
+/// (entering the detail view), replaced with a different student, or when
+/// the underlying save data changes (e.g. progress reset).
+fn rebuild_stats_ui(
     mut commands: Commands,
-    viewing: Option<Res<ViewingStudentStats>>,
+    viewing: Res<ViewingStudentStats>,
     ts: TeacherScreenParam<'_, '_>,
     content: Res<ContentLibrary>,
     existing_root: Query<Entity, With<TeacherStatsRoot>>,
@@ -99,7 +110,6 @@ fn on_rebuild_stats(
     if ts.ctx.settings.mode != GameMode::Group {
         return;
     }
-    let Some(ref viewing) = viewing else { return };
     let camera_entity = *ts.teacher.camera;
     let window = *ts.teacher.window;
     let Some(ref slot) = ts.ctx.active_slot else {
@@ -108,7 +118,8 @@ fn on_rebuild_stats(
     let Some(ref class_save) = ts.ctx.save_data.class_slots[slot.0] else {
         return;
     };
-    let Some(student) = class_save.students.get(viewing.0) else {
+    let student_index = viewing.0;
+    let Some(student) = class_save.students.get(student_index) else {
         return;
     };
 
@@ -138,6 +149,17 @@ fn on_rebuild_stats(
             global_total,
         },
     );
+}
+
+/// Despawns the stats UI when `ViewingStudentStats` is removed (returning to
+/// the roster list or exiting `MapExploration`).
+fn cleanup_stats_on_view_removed(
+    mut commands: Commands,
+    existing_root: Query<Entity, With<TeacherStatsRoot>>,
+) {
+    for entity in &existing_root {
+        commands.entity(entity).despawn();
+    }
 }
 
 struct StatsViewData {
@@ -226,7 +248,7 @@ fn spawn_stats_title_row(parent: &mut ChildSpawner, title_text: &str, window: En
         },
         children![
             (
-                Text::new(title_text.to_owned()),
+                Text::new(title_text),
                 TextFont {
                     font_size: theme::fonts::HEADING,
                     ..default()
@@ -691,7 +713,7 @@ fn handle_confirm_reset(
         });
 
         commands.entity(popover_entity).try_despawn();
-        commands.trigger(RebuildStats);
+        // rebuild_stats_ui reacts to the Persistent<SaveData> change tick.
     }
 }
 
@@ -717,8 +739,9 @@ fn handle_return_to_list(
         if *interaction == Interaction::Pressed {
             commands.remove_resource::<ViewingStudentStats>();
             commands.remove_resource::<TeacherInDetailView>();
-            commands.trigger(RebuildStats);
-            commands.trigger(RebuildRoster);
+            // Roster rebuild is handled reactively by `rebuild_roster_ui`
+            // via the `resource_removed::<ViewingStudentStats>` run condition.
+            commands.insert_resource(TeacherRosterView);
         }
     }
 }

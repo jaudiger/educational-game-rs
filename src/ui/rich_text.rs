@@ -112,7 +112,7 @@ pub fn spawn_rich_text(
     if !has_fraction {
         // Fast path: no fractions, single Text entity.
         parent.spawn((
-            Text::new(text.to_owned()),
+            Text::new(text),
             TextFont {
                 font_size,
                 ..default()
@@ -185,7 +185,7 @@ fn spawn_word(
     window: Entity,
 ) {
     row.spawn((
-        Text::new(word.to_owned()),
+        Text::new(word),
         TextFont {
             font_size,
             ..default()
@@ -221,7 +221,7 @@ fn spawn_fraction_with_punct(
             n, d, font_size, text_color, text_color, window,
         ));
         group.spawn((
-            Text::new(punct.to_owned()),
+            Text::new(punct),
             TextFont {
                 font_size,
                 ..default()

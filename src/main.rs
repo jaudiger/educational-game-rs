@@ -22,7 +22,7 @@ use screens::{
     MapExplorationScreenPlugin, SaveSlotsScreenPlugin, SettingsScreenPlugin,
     TeacherLessonsScreenPlugin, TeacherRosterScreenPlugin, TeacherStatsScreenPlugin,
 };
-use states::{AppState, InLessonFlow, LessonPhase, MapView};
+use states::{ActiveLesson, AppState, InLessonFlow, LessonPhase, MapView};
 use ui::{
     FocusNavigationPlugin, NavigationPlugin, ScrollPlugin, TextInputPlugin, ThemePlugin,
     UiAnimationPlugin,
@@ -43,6 +43,7 @@ fn main() {
         // States
         .init_state::<AppState>()
         .add_computed_state::<InLessonFlow>()
+        .add_computed_state::<ActiveLesson>()
         .add_sub_state::<LessonPhase>()
         .add_sub_state::<MapView>()
         // Plugins

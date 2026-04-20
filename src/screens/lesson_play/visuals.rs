@@ -527,7 +527,7 @@ fn spawn_pv_header_row(
                 ))
                 .with_children(|cell| {
                     cell.spawn((
-                        Text::new(abbr.to_owned()),
+                        Text::new(abbr),
                         TextFont {
                             font_size: theme::fonts::BODY,
                             ..default()
@@ -576,7 +576,7 @@ fn spawn_pv_digit_row(
                     BorderColor::all(border_color),
                 ))
                 .with_children(|cell| {
-                    let text = digit.map_or_else(String::new, |d| d.to_string());
+                    let text = digit.map(|d| d.to_string()).unwrap_or_default();
                     cell.spawn((
                         Text::new(text),
                         TextFont {

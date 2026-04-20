@@ -100,7 +100,7 @@ fn spawn_top_bar(parent: &mut ChildSpawnerCommands, progress: &str, window: Enti
                 BackgroundColor(theme::colors::CARD_OVERLAY),
                 BorderColor::all(theme::colors::CARD_BORDER),
                 children![(
-                    Text::new(progress.to_owned()),
+                    Text::new(progress),
                     TextFont {
                         font_size: theme::fonts::HEADING,
                         ..default()

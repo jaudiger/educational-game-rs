@@ -79,7 +79,7 @@ fn display_node(value: &str, window: Entity) -> impl Bundle {
         BackgroundColor(theme::colors::CARD_BG),
         BorderColor::all(theme::colors::INPUT_BORDER),
         children![(
-            Text::new(value.to_owned()),
+            Text::new(value),
             TextFont {
                 font_size: theme::fonts::HEADING,
                 ..default()

@@ -122,7 +122,7 @@ impl McqTemplate {
 
         // Valid triplets: a > 0, c > 0, b > 0, a < b, c < b, and a+c <= b
         // (no improper fractions in the result).
-        let mut valid_triplets: Vec<(i32, i32, i32)> = Vec::new();
+        let mut valid_triplets: Vec<(i32, i32, i32)> = vec![];
         for &a in &a_values {
             for &b in &b_values {
                 for &c in &c_values {
@@ -205,7 +205,7 @@ impl McqTemplate {
         );
 
         let correct = format!("1/{d}");
-        let mut distractors: Vec<String> = Vec::new();
+        let mut distractors: Vec<String> = vec![];
 
         // Inverted fraction.
         let d1 = format!("{d}/1");
@@ -398,7 +398,7 @@ impl FractionComparisonTemplate {
             }
             ComparisonDifficulty::MultipleDenominator => {
                 // Pick two distinct denominators where one divides the other.
-                let mut denom_pairs: Vec<(u32, u32)> = Vec::new();
+                let mut denom_pairs: Vec<(u32, u32)> = vec![];
                 for &d1 in &self.denominator_range {
                     for &d2 in &self.denominator_range {
                         if d1 != d2 && (d1 % d2 == 0 || d2 % d1 == 0) {
