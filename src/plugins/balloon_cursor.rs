@@ -337,10 +337,10 @@ fn animate_cloud_puffs_system(
         puff.lifetime.tick(time.delta());
 
         // Vertical oscillation
-        puff.velocity.y += (elapsed * 3.0).sin() * 0.5 * dt;
+        puff.velocity.y = ((elapsed * 3.0).sin() * 0.5).mul_add(dt, puff.velocity.y);
 
-        transform.translation.x += puff.velocity.x * dt;
-        transform.translation.y += puff.velocity.y * dt;
+        transform.translation.x = puff.velocity.x.mul_add(dt, transform.translation.x);
+        transform.translation.y = puff.velocity.y.mul_add(dt, transform.translation.y);
 
         let opacity = puff.initial_opacity * (1.0 - puff.lifetime.fraction());
         sprite.color = Color::srgba(1.0, 1.0, 1.0, opacity);

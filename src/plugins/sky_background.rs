@@ -392,7 +392,7 @@ fn animate_clouds(
     let half_w = window.width() / 2.0;
 
     for (cloud, mut transform) in &mut clouds {
-        transform.translation.x += cloud.speed * dt;
+        transform.translation.x = cloud.speed.mul_add(dt, transform.translation.x);
 
         // When the cloud fully exits the right edge, teleport to left.
         let wrap_margin = half_w + cloud.half_width + 50.0;
