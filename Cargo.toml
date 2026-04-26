@@ -6,9 +6,9 @@ edition = "2024"
 rust-version = "1.95"
 
 [dependencies]
-bevy = { version = "0.18.0", features = ["debug", "experimental_bevy_ui_widgets"] }
+bevy = { version = "0.18.1", features = ["debug", "experimental_bevy_ui_widgets"] }
 bevy-persistent = { version = "0.10.0", features = ["json"] }
-rand = "0.9"
+rand = "0.10"
 serde = { version = "1", features = ["derive"] }
 
 [lints.clippy]
