@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::Persistent;
-use rand::Rng;
+use rand::RngExt;
 
 use crate::data::{GameSettings, MapTheme};
 use crate::states::AppState;

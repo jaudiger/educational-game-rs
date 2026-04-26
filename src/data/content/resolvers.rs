@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Write as _};
 
-use rand::Rng;
 use rand::seq::{IndexedRandom, SliceRandom};
+use rand::{Rng, RngExt};
 
 use super::types::{
     ComparisonAnswer, ComparisonDifficulty, ComparisonSide, ComparisonSideWithConversion,

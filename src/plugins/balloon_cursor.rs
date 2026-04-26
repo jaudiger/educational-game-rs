@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor;
 use bevy::window::{CursorOptions, PrimaryWindow};
 use bevy_persistent::prelude::Persistent;
-use rand::Rng;
+use rand::RngExt;
 
 use crate::data::{GameSettings, MapTheme};
 use crate::plugins::sky_background::generate_cloud_image;
