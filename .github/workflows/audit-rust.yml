@@ -1,14 +1,14 @@
-name: Continuous Integration - Audit
+name: Continuous Integration - Audit (Rust)
 
 on:
   push:
     paths:
-      - ".github/workflows/audit.yml"
+      - ".github/workflows/audit-rust.yml"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
   pull_request:
     paths:
-      - ".github/workflows/audit.yml"
+      - ".github/workflows/audit-rust.yml"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
   schedule:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: audit-${{ github.ref_name }}
+  group: audit-rust-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
             ~/.cargo/.crates2.json
             ~/.cargo/bin
             ~/.cargo/advisory-db
-          key: audit-${{ hashFiles('**/Cargo.lock') }}
+          key: rust-audit-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run cargo-audit
         uses: actions-rust-lang/audit@v1.2.7

@@ -1,32 +1,50 @@
-name: Continuous Integration - Static Analysis
+name: Continuous Integration - Static Analysis (Rust)
 
 on:
   push:
     paths:
-      - ".github/workflows/static-analysis.yml"
+      - ".github/workflows/static-analysis-rust.yml"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
       - "**/*.rs"
   pull_request:
     paths:
-      - ".github/workflows/static-analysis.yml"
+      - ".github/workflows/static-analysis-rust.yml"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
       - "**/*.rs"
   workflow_dispatch:
 
 concurrency:
-  group: static-analysis-${{ github.ref_name }}
+  group: static-analysis-rust-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
+  rust-format:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [stable, nightly]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Install Rust (${{ matrix.toolchain }})
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: "rustfmt"
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
   rust-lint:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         toolchain: [stable, nightly]
-    continue-on-error: ${{ matrix.toolchain == 'nightly' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -57,23 +75,3 @@ jobs:
 
       - name: Check linting
         run: cargo clippy --all-targets --all-features -- -D warnings
-
-  rust-format:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        toolchain: [stable, nightly]
-    continue-on-error: ${{ matrix.toolchain == 'nightly' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.2
-
-      - name: Install Rust (${{ matrix.toolchain }})
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          components: "rustfmt"
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
