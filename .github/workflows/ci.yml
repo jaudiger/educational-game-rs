@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          filters: |
+            rust:
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+              - '**/*.rs'
+            workflows:
+              - '.github/workflows/**'
+
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-rust.yml@af70992c9dcbb3bf0a833629b18cb661b7c616fe
+    with:
+      system-packages: "libasound2-dev libudev-dev libwayland-dev"
+
+  lint-actions:
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-github-actions.yml@af70992c9dcbb3bf0a833629b18cb661b7c616fe
+
+  ci:
+    if: always()
+    needs: [lint-rust, lint-actions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all required checks passed
+        env:
+          RESULTS: ${{ toJson(needs.*.result) }}
+        run: |
+          echo "Job results: $RESULTS"
+          if echo "$RESULTS" | grep -qE '"(failure|cancelled)"'; then
+            echo "One or more required checks failed"
+            exit 1
+          fi

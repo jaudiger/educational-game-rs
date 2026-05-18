@@ -15,29 +15,9 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
-concurrency:
-  group: audit-rust-${{ github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
-  rust-audit:
+  audit-rust:
     permissions:
       contents: read
       checks: write
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.2
-
-      - name: Cache cargo audit registry
-        uses: actions/cache@v5.0.5
-        with:
-          path: |
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
-            ~/.cargo/bin
-            ~/.cargo/advisory-db
-          key: rust-audit-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Run cargo-audit
-        uses: actions-rust-lang/audit@v1.2.7
+    uses: jaudiger/reusable-workflows/.github/workflows/audit-rust.yml@af70992c9dcbb3bf0a833629b18cb661b7c616fe
