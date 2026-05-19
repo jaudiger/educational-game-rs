@@ -36,21 +36,28 @@ jobs:
             workflows:
               - '.github/workflows/**'
 
+  build-rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    uses: jaudiger/reusable-workflows/.github/workflows/build-rust.yml@4aef3115afe05a19785b3e14970ecd4f400cc457
+    with:
+      system-packages: "libasound2-dev libudev-dev libwayland-dev"
+
   lint-rust:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
-    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-rust.yml@af70992c9dcbb3bf0a833629b18cb661b7c616fe
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-rust.yml@4aef3115afe05a19785b3e14970ecd4f400cc457
     with:
       system-packages: "libasound2-dev libudev-dev libwayland-dev"
 
   lint-actions:
     needs: changes
     if: needs.changes.outputs.workflows == 'true'
-    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-github-actions.yml@af70992c9dcbb3bf0a833629b18cb661b7c616fe
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-github-actions.yml@4aef3115afe05a19785b3e14970ecd4f400cc457
 
   ci:
     if: always()
-    needs: [lint-rust, lint-actions]
+    needs: [build-rust, lint-rust, lint-actions]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all required checks passed
