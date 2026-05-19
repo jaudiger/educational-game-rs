@@ -32,6 +32,7 @@ jobs:
               - '**/Cargo.toml'
               - '**/Cargo.lock'
               - '**/*.rs'
+              - '.github/workflows/ci.yml'
             workflows:
               - '.github/workflows/**'
 
