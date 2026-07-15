@@ -39,21 +39,21 @@ jobs:
   build-rust:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
-    uses: jaudiger/reusable-workflows/.github/workflows/build-rust.yml@16364121c482897e29680101ea22b8a3ea472c25
+    uses: jaudiger/reusable-workflows/.github/workflows/build-rust.yml@8104be620dc861697cf02b53d8fe3119edece0b5
     with:
       system-packages: "libasound2-dev libudev-dev libwayland-dev"
 
   lint-rust:
     needs: changes
     if: needs.changes.outputs.rust == 'true'
-    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-rust.yml@16364121c482897e29680101ea22b8a3ea472c25
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-rust.yml@8104be620dc861697cf02b53d8fe3119edece0b5
     with:
       system-packages: "libasound2-dev libudev-dev libwayland-dev"
 
   lint-actions:
     needs: changes
     if: needs.changes.outputs.workflows == 'true'
-    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-github-actions.yml@16364121c482897e29680101ea22b8a3ea472c25
+    uses: jaudiger/reusable-workflows/.github/workflows/static-analysis-github-actions.yml@8104be620dc861697cf02b53d8fe3119edece0b5
 
   ci:
     if: always()
