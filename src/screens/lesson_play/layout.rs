@@ -102,7 +102,7 @@ fn spawn_top_bar(parent: &mut ChildSpawnerCommands, progress: &str, window: Enti
                 children![(
                     Text::new(progress),
                     TextFont {
-                        font_size: theme::fonts::HEADING,
+                        font_size: FontSize::Px(theme::fonts::HEADING),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_DARK),

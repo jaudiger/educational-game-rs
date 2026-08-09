@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy::ui_widgets::{MenuPlugin, UiWidgetsPlugins};
+use bevy::ui_widgets::MenuPlugin;
 
 mod data;
 mod i18n;
@@ -30,16 +30,17 @@ use ui::{
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Educational Game".into(),
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Educational Game".into(),
+                        ..default()
+                    }),
                     ..default()
-                }),
-                ..default()
-            }),
-            UiWidgetsPlugins.build().disable::<MenuPlugin>(),
-        ))
+                })
+                .disable::<MenuPlugin>(),
+        )
         // States
         .init_state::<AppState>()
         .add_computed_state::<InLessonFlow>()

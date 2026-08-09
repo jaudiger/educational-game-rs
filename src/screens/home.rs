@@ -41,7 +41,7 @@ fn setup_home(
             (
                 Text::new(title),
                 TextFont {
-                    font_size: theme::fonts::HERO,
+                    font_size: FontSize::Px(theme::fonts::HERO),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),

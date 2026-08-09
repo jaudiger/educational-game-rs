@@ -35,9 +35,9 @@ impl Plugin for TeacherStatsScreenPlugin {
             Update,
             (
                 rebuild_stats_ui.run_if(
-                    resource_exists::<ViewingStudentStats>.and(
+                    resource_exists::<ViewingStudentStats>.and_then(
                         resource_changed::<ViewingStudentStats>
-                            .or(resource_changed::<Persistent<SaveData>>),
+                            .or_else(resource_changed::<Persistent<SaveData>>),
                     ),
                 ),
                 cleanup_stats_on_view_removed.run_if(resource_removed::<ViewingStudentStats>),
@@ -212,7 +212,7 @@ fn spawn_stats_root(
                         content.spawn((
                             Text::new(data.no_lessons_text),
                             TextFont {
-                                font_size: theme::fonts::BODY,
+                                font_size: FontSize::Px(theme::fonts::BODY),
                                 ..default()
                             },
                             TextColor(theme::colors::TEXT_MUTED),
@@ -250,7 +250,7 @@ fn spawn_stats_title_row(parent: &mut ChildSpawner, title_text: &str, window: En
             (
                 Text::new(title_text),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -424,7 +424,7 @@ fn spawn_stats_frame(parent: &mut ChildSpawner, data: Vec<ThemeStatsData>, windo
                 list.spawn((
                     Text::new(theme_section.theme_title.clone()),
                     TextFont {
-                        font_size: theme::fonts::BODY,
+                        font_size: FontSize::Px(theme::fonts::BODY),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_DARK),
@@ -496,7 +496,7 @@ fn spawn_lesson_header(
             (
                 Text::new(lesson_name),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -518,7 +518,7 @@ fn spawn_global_total(parent: &mut ChildSpawner, total: &GlobalTotal, window: En
         .spawn((
             Text::new(total.label.clone()),
             TextFont {
-                font_size: theme::fonts::BODY,
+                font_size: FontSize::Px(theme::fonts::BODY),
                 ..default()
             },
             TextColor(theme::colors::TEXT_DARK),
@@ -530,7 +530,7 @@ fn spawn_global_total(parent: &mut ChildSpawner, total: &GlobalTotal, window: En
         .with_child((
             TextSpan::new(total.score.clone()),
             TextFont {
-                font_size: theme::fonts::BODY,
+                font_size: FontSize::Px(theme::fonts::BODY),
                 ..default()
             },
             TextColor(total.score_color),
@@ -567,7 +567,7 @@ fn spawn_type_row(
             row.spawn((
                 Text::new(type_label),
                 TextFont {
-                    font_size: theme::fonts::SMALL,
+                    font_size: FontSize::Px(theme::fonts::SMALL),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -584,7 +584,7 @@ fn spawn_type_row(
             row.spawn((
                 Text::new(score_text),
                 TextFont {
-                    font_size: theme::fonts::SMALL,
+                    font_size: FontSize::Px(theme::fonts::SMALL),
                     ..default()
                 },
                 TextColor(score_color),

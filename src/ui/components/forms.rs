@@ -127,7 +127,7 @@ pub fn checkbox(label: &str, mark_visible: bool, window: Entity) -> impl Bundle 
             (
                 Text::new(label),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -219,7 +219,7 @@ pub fn radio_button(label: &str, mark_visible: bool, window: Entity) -> impl Bun
             (
                 Text::new(label),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -296,7 +296,7 @@ pub fn radio_button_muted(
             (
                 Text::new(label_text),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_MUTED),
@@ -340,7 +340,7 @@ pub fn stacked_fraction(
             (
                 Text::new(numerator.to_string()),
                 TextFont {
-                    font_size: fraction_font,
+                    font_size: FontSize::Px(fraction_font),
                     ..default()
                 },
                 TextColor(numerator_color),
@@ -362,7 +362,7 @@ pub fn stacked_fraction(
             (
                 Text::new(denominator.to_string()),
                 TextFont {
-                    font_size: fraction_font,
+                    font_size: FontSize::Px(fraction_font),
                     ..default()
                 },
                 TextColor(denominator_color),

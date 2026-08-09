@@ -85,7 +85,7 @@ pub fn spawn_prompt_and_grid(
             row.spawn((
                 Text::new(prompt_text),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),

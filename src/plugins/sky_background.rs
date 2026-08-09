@@ -194,7 +194,7 @@ pub fn generate_cloud_image(width: u32, height: u32, blobs: &[(f32, f32, f32)]) 
                 let r_sq = radius * radius;
                 if dist_sq < r_sq {
                     let t = 1.0 - dist_sq / r_sq;
-                    alpha += t * t; // quartic falloff
+                    alpha = t.mul_add(t, alpha); // quartic falloff
                 }
             }
             alpha = alpha.min(1.0);

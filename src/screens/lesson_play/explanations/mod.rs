@@ -256,7 +256,7 @@ fn spawn_result_text(
     parent.spawn((
         Text::new(i18n.t(&key)),
         TextFont {
-            font_size: theme::fonts::TITLE,
+            font_size: FontSize::Px(theme::fonts::TITLE),
             ..default()
         },
         TextColor(color),

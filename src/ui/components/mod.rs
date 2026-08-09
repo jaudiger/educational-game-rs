@@ -37,6 +37,7 @@ pub struct TooltipLifetime(pub Timer);
 /// The entity must have `Interaction` (automatic for `Button`,
 /// add `Interaction::None` manually for plain nodes).
 #[derive(Component, Reflect)]
+#[require(Interaction)]
 pub struct HoverTooltip {
     pub message: String,
     pub window: Entity,

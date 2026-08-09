@@ -222,7 +222,7 @@ fn rebuild_roster_ui(
             parent.spawn((
                 Text::new(title_text),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -286,7 +286,7 @@ fn spawn_student_list(
                 list.spawn((
                     Text::new(no_students_text),
                     TextFont {
-                        font_size: theme::fonts::BODY,
+                        font_size: FontSize::Px(theme::fonts::BODY),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_MUTED),
@@ -316,7 +316,7 @@ fn spawn_add_student_row(
             (
                 Text::new(name_label),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -342,7 +342,7 @@ fn spawn_add_student_row(
                 children![(
                     Text::new(add_label),
                     TextFont {
-                        font_size: theme::fonts::SMALL,
+                        font_size: FontSize::Px(theme::fonts::SMALL),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_LIGHT),
@@ -387,7 +387,7 @@ fn spawn_student_row(
             row.spawn((
                 Text::new(name),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),

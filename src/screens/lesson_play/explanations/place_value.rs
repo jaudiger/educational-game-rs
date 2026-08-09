@@ -53,7 +53,7 @@ impl ExplanationRenderer for PlaceValueRenderer {
             (
                 Text::new(s),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(color),
