@@ -87,7 +87,7 @@ fn spawn_settings_ui(
             (
                 Text::new(title),
                 TextFont {
-                    font_size: theme::fonts::TITLE,
+                    font_size: FontSize::Px(theme::fonts::TITLE),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -156,7 +156,7 @@ fn mode_section(current_mode: GameMode, i18n: &I18n, window: Entity) -> impl Bun
             (
                 Text::new(mode_label),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -236,7 +236,7 @@ fn language_section(
             (
                 Text::new(label),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -272,10 +272,11 @@ fn language_section(
 
 fn handle_language_radio_change(
     event: On<ValueChange<Entity>>,
-    radio_query: Query<&LanguageRadio>,
+    radio_query: Query<(Entity, &LanguageRadio)>,
     mut settings: ResMut<Persistent<GameSettings>>,
+    mut commands: Commands,
 ) {
-    let Ok(lang_radio) = radio_query.get(event.value) else {
+    let Ok((_, lang_radio)) = radio_query.get(event.value) else {
         return;
     };
     let language = lang_radio.0;
@@ -288,6 +289,14 @@ fn handle_language_radio_change(
     settings
         .update(|s| s.language = lang)
         .expect("failed to update game settings");
+
+    for (entity, radio) in radio_query.iter().collect::<Vec<_>>() {
+        if radio.0 == language {
+            commands.entity(entity).insert(Checked);
+        } else {
+            commands.entity(entity).remove::<Checked>();
+        }
+    }
 }
 
 /// Reactively rebuilds the settings UI when [`I18n`] changes (language switch).
@@ -328,7 +337,7 @@ fn map_theme_section(current_theme: MapTheme, i18n: &I18n, window: Entity) -> im
             (
                 Text::new(label),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -430,7 +439,7 @@ fn bool_setting_section(
             parent.spawn((
                 Text::new(label),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -496,7 +505,7 @@ fn volume_section(
             (
                 Text::new(label),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -514,7 +523,7 @@ fn volume_section(
             (
                 Text::new(format!("{percent} %")),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),

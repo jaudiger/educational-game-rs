@@ -124,7 +124,7 @@ fn spawn_save_slots_ui(
             parent.spawn((
                 Text::new(title),
                 TextFont {
-                    font_size: theme::fonts::TITLE,
+                    font_size: FontSize::Px(theme::fonts::TITLE),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -205,7 +205,7 @@ fn spawn_slot_card(
             card.spawn((
                 Text::new(slot_name),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -218,7 +218,7 @@ fn spawn_slot_card(
             card.spawn((
                 Text::new(slot_label),
                 TextFont {
-                    font_size: theme::fonts::SMALL,
+                    font_size: FontSize::Px(theme::fonts::SMALL),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_MUTED),
@@ -257,7 +257,7 @@ fn spawn_slot_card(
             card.spawn((
                 Text::new(empty_label),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_MUTED),
@@ -270,7 +270,7 @@ fn spawn_slot_card(
             card.spawn((
                 Text::new(slot_label),
                 TextFont {
-                    font_size: theme::fonts::SMALL,
+                    font_size: FontSize::Px(theme::fonts::SMALL),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_MUTED),
@@ -383,7 +383,7 @@ fn spawn_creation_form(commands: &mut Commands, slot_index: usize, i18n: &I18n, 
                 (
                     Text::new(title),
                     TextFont {
-                        font_size: theme::fonts::BODY,
+                        font_size: FontSize::Px(theme::fonts::BODY),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_DARK),
@@ -412,7 +412,7 @@ fn creation_name_input(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
             (
                 Text::new(name_label),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),

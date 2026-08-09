@@ -56,11 +56,11 @@ pub fn action_button(
         children![(
             Text::new(label),
             TextFont {
-                font_size: theme::fonts::BUTTON_SMALL,
+                font_size: FontSize::Px(theme::fonts::BUTTON_SMALL),
                 ..default()
             },
             TextColor(text_color),
-            TextLayout::new_with_justify(Justify::Center),
+            TextLayout::justify(Justify::Center),
             DesignFontSize {
                 size: theme::fonts::BUTTON_SMALL,
                 window,
@@ -95,11 +95,11 @@ pub fn icon_button(
         children![(
             Text::new(label),
             TextFont {
-                font_size,
+                font_size: FontSize::Px(font_size),
                 ..default()
             },
             TextColor(text_color),
-            TextLayout::new_with_justify(Justify::Center),
+            TextLayout::justify(Justify::Center),
             DesignFontSize {
                 size: font_size,
                 window,
@@ -138,11 +138,11 @@ pub fn standard_button(
         children![(
             Text::new(label),
             TextFont {
-                font_size: theme::fonts::BUTTON,
+                font_size: FontSize::Px(theme::fonts::BUTTON),
                 ..default()
             },
             TextColor(theme::colors::TEXT_LIGHT),
-            TextLayout::new_with_justify(Justify::Center),
+            TextLayout::justify(Justify::Center),
             DesignFontSize {
                 size: theme::fonts::BUTTON,
                 window,
@@ -184,11 +184,11 @@ pub fn toggle_button(label: &str, active: bool, window: Entity) -> impl Bundle +
         children![(
             Text::new(label),
             TextFont {
-                font_size: theme::fonts::BUTTON_SMALL,
+                font_size: FontSize::Px(theme::fonts::BUTTON_SMALL),
                 ..default()
             },
             TextColor(text_color),
-            TextLayout::new_with_justify(Justify::Center),
+            TextLayout::justify(Justify::Center),
             DesignFontSize {
                 size: theme::fonts::BUTTON_SMALL,
                 window,

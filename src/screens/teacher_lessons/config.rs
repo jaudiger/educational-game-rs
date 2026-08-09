@@ -39,7 +39,7 @@ pub(super) fn spawn_config_view(
     parent.spawn((
         Text::default(),
         TextFont {
-            font_size: theme::fonts::SMALL,
+            font_size: FontSize::Px(theme::fonts::SMALL),
             ..default()
         },
         TextColor(theme::colors::TEXT_MUTED),
@@ -77,7 +77,7 @@ fn spawn_config_header(
             (
                 Text::new(lesson_title_owned),
                 TextFont {
-                    font_size: theme::fonts::HEADING,
+                    font_size: FontSize::Px(theme::fonts::HEADING),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -108,7 +108,7 @@ fn spawn_config_header(
                 children![(
                     Text::new(reset_label_owned),
                     TextFont {
-                        font_size: theme::fonts::SMALL,
+                        font_size: FontSize::Px(theme::fonts::SMALL),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_DARK),
@@ -174,7 +174,7 @@ fn spawn_question_counter_section(
                         col.spawn((
                             Text::new(question_type_label(qt, &i18n_owned)),
                             TextFont {
-                                font_size: theme::fonts::BODY,
+                                font_size: FontSize::Px(theme::fonts::BODY),
                                 ..default()
                             },
                             TextColor(theme::colors::TEXT_DARK),
@@ -204,7 +204,7 @@ fn spawn_question_counter_section(
                 },
                 Text::new("\u{2195}"),
                 TextFont {
-                    font_size: theme::fonts::SMALL,
+                    font_size: FontSize::Px(theme::fonts::SMALL),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_MUTED),
@@ -244,7 +244,7 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &DraftQuestion, wind
             row.spawn((
                 Text::new(format!("\u{2022} {full_prompt}")),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -327,11 +327,11 @@ fn spawn_counter_controls(
         controls.world_mut().entity_mut(text_entity).insert((
             Text::new(count_str_owned),
             TextFont {
-                font_size: theme::fonts::SMALL,
+                font_size: FontSize::Px(theme::fonts::SMALL),
                 ..default()
             },
             TextColor(theme::colors::TEXT_DARK),
-            TextLayout::new_with_justify(Justify::Center),
+            TextLayout::justify(Justify::Center),
             CountText,
             Node {
                 min_width: theme::scaled(24.0),

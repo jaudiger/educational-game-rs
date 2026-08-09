@@ -4,7 +4,7 @@
 //! Enter / Space / Gamepad-South activation to all focusable UI elements.
 
 use bevy::input_focus::directional_navigation::DirectionalNavigationPlugin;
-use bevy::input_focus::{InputDispatchPlugin, InputFocus, InputFocusVisible};
+use bevy::input_focus::{InputFocus, InputFocusVisible};
 use bevy::math::{CompassOctant, Dir2};
 use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigator;
@@ -18,7 +18,7 @@ pub struct FocusNavigationPlugin;
 
 impl Plugin for FocusNavigationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((InputDispatchPlugin, DirectionalNavigationPlugin));
+        app.add_plugins(DirectionalNavigationPlugin);
 
         // Focus ring visibility is managed manually:
         // shown on keyboard/gamepad input, hidden on mouse click.
@@ -142,7 +142,7 @@ fn keyboard_activate_focused(
     if !input.activate {
         return;
     }
-    let Some(entity) = focus.0 else { return };
+    let Some(entity) = focus.get() else { return };
     if let Ok(mut interaction) = buttons.get_mut(entity) {
         *interaction = Interaction::Pressed;
     }
@@ -167,7 +167,7 @@ fn update_focus_ring(
     mut outlines: Query<(Entity, &mut Outline)>,
 ) {
     let show_for = if settings.gamepad_navigation && focus_visible.0 {
-        focus.0
+        focus.get()
     } else {
         None
     };

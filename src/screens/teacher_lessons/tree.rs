@@ -87,7 +87,7 @@ pub(super) fn spawn_tree_view(
                 list.spawn((
                     Text::new(i18n.t(&theme_data.title_key)),
                     TextFont {
-                        font_size: theme::fonts::BODY,
+                        font_size: FontSize::Px(theme::fonts::BODY),
                         ..default()
                     },
                     TextColor(theme_color),
@@ -105,7 +105,7 @@ pub(super) fn spawn_tree_view(
                     list.spawn((
                         Text::new(i18n.t(&TranslationKey::ComingSoon)),
                         TextFont {
-                            font_size: theme::fonts::SMALL,
+                            font_size: FontSize::Px(theme::fonts::SMALL),
                             ..default()
                         },
                         TextColor(theme::colors::TEXT_MUTED),
@@ -186,7 +186,7 @@ fn spawn_lesson_tree_row(
             row.spawn((
                 Text::new(label),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(text_color),

@@ -81,7 +81,7 @@ fn display_node(value: &str, window: Entity) -> impl Bundle {
         children![(
             Text::new(value),
             TextFont {
-                font_size: theme::fonts::HEADING,
+                font_size: FontSize::Px(theme::fonts::HEADING),
                 ..default()
             },
             TextColor(theme::colors::TEXT_DARK),

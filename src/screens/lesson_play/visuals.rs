@@ -85,7 +85,7 @@ fn spawn_fraction_addition_visual(
         (
             Text::new(symbol),
             TextFont {
-                font_size: theme::fonts::HEADING,
+                font_size: FontSize::Px(theme::fonts::HEADING),
                 ..default()
             },
             TextColor(theme::colors::TEXT_DARK),
@@ -242,7 +242,7 @@ fn spawn_labelled_bar(
                 label.spawn((
                     Text::new(format!("{name} :")),
                     TextFont {
-                        font_size: theme::fonts::BODY,
+                        font_size: FontSize::Px(theme::fonts::BODY),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_DARK),
@@ -336,7 +336,7 @@ fn spawn_conversion_row(
             row.spawn((
                 Text::new(format!("{} :", entry.name)),
                 TextFont {
-                    font_size: theme::fonts::BODY,
+                    font_size: FontSize::Px(theme::fonts::BODY),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -393,7 +393,7 @@ fn spawn_multiplication_grid_visual(
         (
             Text::new("+"),
             TextFont {
-                font_size: theme::fonts::HEADING,
+                font_size: FontSize::Px(theme::fonts::HEADING),
                 ..default()
             },
             TextColor(theme::colors::TEXT_DARK),
@@ -529,7 +529,7 @@ fn spawn_pv_header_row(
                     cell.spawn((
                         Text::new(abbr),
                         TextFont {
-                            font_size: theme::fonts::BODY,
+                            font_size: FontSize::Px(theme::fonts::BODY),
                             ..default()
                         },
                         TextColor(theme::colors::TEXT_LIGHT),
@@ -580,7 +580,7 @@ fn spawn_pv_digit_row(
                     cell.spawn((
                         Text::new(text),
                         TextFont {
-                            font_size: theme::fonts::HEADING,
+                            font_size: FontSize::Px(theme::fonts::HEADING),
                             ..default()
                         },
                         TextColor(text_color),
@@ -662,7 +662,7 @@ fn spawn_pv_legend_entries(
                 row.spawn((
                     Text::new(label),
                     TextFont {
-                        font_size: theme::fonts::SMALL,
+                        font_size: FontSize::Px(theme::fonts::SMALL),
                         ..default()
                     },
                     TextColor(color),
@@ -676,7 +676,7 @@ fn spawn_pv_legend_entries(
                     row.spawn((
                         Text::new("\u{00B7}".to_owned()),
                         TextFont {
-                            font_size: theme::fonts::SMALL,
+                            font_size: FontSize::Px(theme::fonts::SMALL),
                             ..default()
                         },
                         TextColor(theme::colors::TEXT_MUTED),

@@ -114,7 +114,7 @@ pub fn spawn_rich_text(
         parent.spawn((
             Text::new(text),
             TextFont {
-                font_size,
+                font_size: FontSize::Px(font_size),
                 ..default()
             },
             TextColor(text_color),
@@ -187,7 +187,7 @@ fn spawn_word(
     row.spawn((
         Text::new(word),
         TextFont {
-            font_size,
+            font_size: FontSize::Px(font_size),
             ..default()
         },
         TextColor(text_color),
@@ -223,7 +223,7 @@ fn spawn_fraction_with_punct(
         group.spawn((
             Text::new(punct),
             TextFont {
-                font_size,
+                font_size: FontSize::Px(font_size),
                 ..default()
             },
             TextColor(text_color),

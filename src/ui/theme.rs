@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::text::{FontSize, FontSource};
 use bevy::ui_widgets::{Checkbox, RadioButton};
 
 use super::components::{CheckboxMark, RadioMark};
@@ -75,9 +76,9 @@ fn override_default_font(
     fonts: Res<GameFonts>,
 ) {
     if let Ok(mut text_font) = query.get_mut(on.event_target())
-        && text_font.font.id() == Handle::<Font>::default().id()
+        && matches!(text_font.font, FontSource::Handle(ref handle) if handle == &Handle::<Font>::default())
     {
-        text_font.font = fonts.regular.clone();
+        text_font.font = FontSource::Handle(fonts.regular.clone());
     }
 }
 
@@ -94,7 +95,7 @@ fn scale_font_on_add(
     {
         let vmin_val = window.width().min(window.height());
         let scale = vmin_val / REFERENCE_VMIN;
-        font.font_size = design.size * scale;
+        font.font_size = FontSize::Px(design.size * scale);
     }
 }
 
@@ -108,7 +109,7 @@ fn scale_fonts_on_window_resize(
         let scale = vmin_val / REFERENCE_VMIN;
         for (design, mut font) in &mut fonts {
             if design.window == window_entity {
-                font.font_size = design.size * scale;
+                font.font_size = FontSize::Px(design.size * scale);
             }
         }
     }

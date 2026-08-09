@@ -58,7 +58,7 @@ pub fn spawn_confirmation_modal(
                 (
                     Text::new(message_owned),
                     TextFont {
-                        font_size: theme::fonts::BODY,
+                        font_size: FontSize::Px(theme::fonts::BODY),
                         ..default()
                     },
                     TextColor(theme::colors::TEXT_DARK),
@@ -120,6 +120,7 @@ pub fn spawn_tooltip_popover(
     let message_owned = message.to_owned();
 
     let (card_n, card_bg, card_border) = card_node(Node {
+        position_type: PositionType::Absolute,
         padding: theme::scaled(theme::spacing::SMALL).all(),
         border_radius: BorderRadius::all(theme::scaled(theme::sizes::TOOLTIP_BORDER_RADIUS)),
         ..default()
@@ -152,7 +153,7 @@ pub fn spawn_tooltip_popover(
             children![(
                 Text::new(message_owned),
                 TextFont {
-                    font_size: theme::fonts::SMALL,
+                    font_size: FontSize::Px(theme::fonts::SMALL),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),

@@ -82,7 +82,7 @@ impl ExplanationRenderer for FractionAdditionRenderer {
                 group.spawn((
                     Text::new("."),
                     TextFont {
-                        font_size,
+                        font_size: FontSize::Px(font_size),
                         ..default()
                     },
                     TextColor(dark),

@@ -1,3 +1,4 @@
+use bevy::color::Luminance;
 use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -8,7 +9,7 @@ use crate::data::{
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, MapView};
-use crate::ui::animation::FloatingCard;
+use crate::ui::animation::{AnimatedButton, FloatingCard};
 use crate::ui::components::{HoverTooltip, button_base, screen_root, standard_button};
 use crate::ui::theme;
 use crate::ui::theme::DesignFontSize;
@@ -26,7 +27,10 @@ impl Plugin for MapExplorationScreenPlugin {
             .add_systems(OnEnter(MapView::ThemeDetail), setup_theme_detail)
             .add_systems(
                 Update,
-                handle_theme_detail.run_if(in_state(MapView::ThemeDetail)),
+                (
+                    handle_theme_detail.run_if(in_state(MapView::ThemeDetail)),
+                    update_map_card_hover.run_if(in_state(AppState::MapExploration)),
+                ),
             );
     }
 }
@@ -42,6 +46,14 @@ struct BackToSaveSlotsButton;
 
 #[derive(Component, Reflect)]
 struct BackToWorldOverviewButton;
+
+/// Colors used by map cards that cannot use transform-based hover animation.
+#[derive(Component, Reflect)]
+struct MapCardHover {
+    base: Color,
+    hovered: Color,
+    pressed: Color,
+}
 
 /// Color parameters for a card-styled map button.
 #[derive(Clone, Copy)]
@@ -193,7 +205,7 @@ fn setup_world_overview(
             let mut title_cmd = parent.spawn((
                 Text::new(title),
                 TextFont {
-                    font_size: theme::fonts::TITLE,
+                    font_size: FontSize::Px(theme::fonts::TITLE),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -363,11 +375,11 @@ fn card_text(text: &str, font_size: f32, color: Color, window: Entity) -> impl B
     (
         Text::new(text),
         TextFont {
-            font_size,
+            font_size: FontSize::Px(font_size),
             ..default()
         },
         TextColor(color),
-        TextLayout::new_with_justify(Justify::Center),
+        TextLayout::justify(Justify::Center),
         DesignFontSize {
             size: font_size,
             window,
@@ -395,6 +407,13 @@ fn spawn_theme_button(
         card_node_layout(&dims),
         ThemeButton(data.id.clone()),
     ));
+    button.remove::<AnimatedButton>();
+
+    button.insert(MapCardHover {
+        base: bg,
+        hovered: bg.lighter(0.08),
+        pressed: bg.darker(0.08),
+    });
 
     if let Some(style) = card_style {
         insert_card_overlay(&mut button, style, data.available, index, &dims);
@@ -461,6 +480,18 @@ fn count_completed_for_theme(
             .count()
     });
     (completed, total)
+}
+
+fn update_map_card_hover(
+    mut query: Query<(&Interaction, &MapCardHover, &mut BackgroundColor), Changed<Interaction>>,
+) {
+    for (interaction, hover, mut background) in &mut query {
+        background.0 = match interaction {
+            Interaction::Hovered => hover.hovered,
+            Interaction::Pressed => hover.pressed,
+            Interaction::None => hover.base,
+        };
+    }
 }
 
 fn handle_world_overview(
@@ -561,7 +592,7 @@ fn setup_theme_detail(
             let mut title_cmd = parent.spawn((
                 Text::new(theme_title),
                 TextFont {
-                    font_size: theme::fonts::TITLE,
+                    font_size: FontSize::Px(theme::fonts::TITLE),
                     ..default()
                 },
                 TextColor(theme::colors::TEXT_DARK),
@@ -633,6 +664,13 @@ fn spawn_lesson_button(
         card_node_layout(&dims),
         LessonButton(data.id.clone()),
     ));
+    button.remove::<AnimatedButton>();
+
+    button.insert(MapCardHover {
+        base: bg,
+        hovered: bg.lighter(0.08),
+        pressed: bg.darker(0.08),
+    });
 
     if let Some(style) = card_style {
         insert_card_overlay(&mut button, style, data.available, index, &dims);

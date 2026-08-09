@@ -106,7 +106,7 @@ fn summary_title(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
     (
         Text::new(i18n.t(&TranslationKey::SummaryTitle)),
         TextFont {
-            font_size: theme::fonts::TITLE,
+            font_size: FontSize::Px(theme::fonts::TITLE),
             ..default()
         },
         TextColor(theme::colors::TEXT_DARK),
@@ -121,7 +121,7 @@ fn summary_score(i18n: &I18n, correct: u32, total: u32, window: Entity) -> impl 
     (
         Text::new(i18n.t(&TranslationKey::SummaryScore(correct, total))),
         TextFont {
-            font_size: theme::fonts::HEADING,
+            font_size: FontSize::Px(theme::fonts::HEADING),
             ..default()
         },
         TextColor(theme::colors::TEXT_DARK),
@@ -136,7 +136,7 @@ fn summary_percentage(i18n: &I18n, percentage: u32, window: Entity) -> impl Bund
     (
         Text::new(i18n.t(&TranslationKey::SummaryPercentage(percentage))),
         TextFont {
-            font_size: theme::fonts::HEADING,
+            font_size: FontSize::Px(theme::fonts::HEADING),
             ..default()
         },
         TextColor(theme::colors::PRIMARY),
@@ -157,7 +157,7 @@ fn summary_message(i18n: &I18n, key: &TranslationKey, window: Entity) -> impl Bu
     (
         Text::new(i18n.t(key)),
         TextFont {
-            font_size: theme::fonts::HEADING,
+            font_size: FontSize::Px(theme::fonts::HEADING),
             ..default()
         },
         TextColor(color),

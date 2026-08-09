@@ -11,6 +11,7 @@ use super::theme::DesignFontSize;
 /// The shared systems handle focus management, keyboard input, border
 /// colour changes, and cursor display automatically.
 #[derive(Component, Reflect)]
+#[require(Button)]
 pub struct TextInputState {
     pub text: String,
     pub focused: bool,
@@ -152,7 +153,7 @@ pub fn text_input(width: f32, state: TextInputState, window: Entity) -> impl Bun
         children![(
             Text::new(initial_text),
             TextFont {
-                font_size: theme::fonts::BODY,
+                font_size: FontSize::Px(theme::fonts::BODY),
                 ..default()
             },
             TextColor(theme::colors::TEXT_DARK),
