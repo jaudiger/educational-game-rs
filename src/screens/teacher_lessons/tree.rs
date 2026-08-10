@@ -5,7 +5,6 @@ use crate::data::{ActiveSlot, SaveData};
 use crate::i18n::{I18n, TranslationKey};
 use crate::ui::components::icon_button;
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 use super::ConfigLessonButton;
 
@@ -86,36 +85,22 @@ pub(super) fn spawn_tree_view(
 
                 list.spawn((
                     Text::new(i18n.t(&theme_data.title_key)),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::BODY),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::BODY, window),
                     TextColor(theme_color),
                     Node {
                         margin: theme::scaled(theme::spacing::SMALL).top(),
                         ..default()
-                    },
-                    DesignFontSize {
-                        size: theme::fonts::BODY,
-                        window,
                     },
                 ));
 
                 if !theme_data.available {
                     list.spawn((
                         Text::new(i18n.t(&TranslationKey::ComingSoon)),
-                        TextFont {
-                            font_size: FontSize::Px(theme::fonts::SMALL),
-                            ..default()
-                        },
+                        theme::typography::text(theme::fonts::SMALL, window),
                         TextColor(theme::colors::TEXT_MUTED),
                         Node {
                             margin: theme::scaled(theme::spacing::MEDIUM).left(),
                             ..default()
-                        },
-                        DesignFontSize {
-                            size: theme::fonts::SMALL,
-                            window,
                         },
                     ));
                     continue;
@@ -185,20 +170,13 @@ fn spawn_lesson_tree_row(
 
             row.spawn((
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(text_color),
                 Node {
                     flex_shrink: 1.0,
                     flex_grow: 1.0,
                     overflow: Overflow::clip(),
                     ..default()
-                },
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
                 },
             ));
 

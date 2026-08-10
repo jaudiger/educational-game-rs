@@ -8,7 +8,6 @@ use bevy::prelude::*;
 
 use super::components::stacked_fraction;
 use super::theme;
-use super::theme::DesignFontSize;
 
 /// A segment of parsed text: either plain text or a fraction.
 pub enum TextSegment {
@@ -113,15 +112,8 @@ pub fn spawn_rich_text(
         // Fast path: no fractions, single Text entity.
         parent.spawn((
             Text::new(text),
-            TextFont {
-                font_size: FontSize::Px(font_size),
-                ..default()
-            },
+            theme::typography::text(font_size, window),
             TextColor(text_color),
-            DesignFontSize {
-                size: font_size,
-                window,
-            },
         ));
         return;
     }
@@ -186,15 +178,8 @@ fn spawn_word(
 ) {
     row.spawn((
         Text::new(word),
-        TextFont {
-            font_size: FontSize::Px(font_size),
-            ..default()
-        },
+        theme::typography::text(font_size, window),
         TextColor(text_color),
-        DesignFontSize {
-            size: font_size,
-            window,
-        },
     ));
 }
 
@@ -222,15 +207,8 @@ fn spawn_fraction_with_punct(
         ));
         group.spawn((
             Text::new(punct),
-            TextFont {
-                font_size: FontSize::Px(font_size),
-                ..default()
-            },
+            theme::typography::text(font_size, window),
             TextColor(text_color),
-            DesignFontSize {
-                size: font_size,
-                window,
-            },
         ));
     });
 }

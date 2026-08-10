@@ -5,7 +5,6 @@ use bevy::prelude::*;
 
 use crate::ui::components::icon_button;
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Marker for a digit button (0-9).
 #[derive(Component, Reflect)]
@@ -80,16 +79,9 @@ fn display_node(value: &str, window: Entity) -> impl Bundle {
         BorderColor::all(theme::colors::INPUT_BORDER),
         children![(
             Text::new(value),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::HEADING),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::HEADING, window),
             TextColor(theme::colors::TEXT_DARK),
             KeypadDisplay,
-            DesignFontSize {
-                size: theme::fonts::HEADING,
-                window,
-            },
         )],
     )
 }

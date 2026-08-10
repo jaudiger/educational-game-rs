@@ -7,7 +7,6 @@
 use bevy::prelude::*;
 
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Maximum width of the grid area in pixels.
 const GRID_MAX_WIDTH: f32 = 350.0;
@@ -84,15 +83,8 @@ pub fn spawn_prompt_and_grid(
         .with_children(|row| {
             row.spawn((
                 Text::new(prompt_text),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ));
             row.spawn(multiplication_grid_visual(rows, cols));
         });

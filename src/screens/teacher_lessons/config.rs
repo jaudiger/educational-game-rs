@@ -8,7 +8,6 @@ use crate::plugins::teacher::{TeacherInDetailView, TeacherTab, tab_header};
 use crate::screens::teacher_shared::question_type_label;
 use crate::ui::components::{button_base, icon_button, standard_button};
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 use super::{
     ConfigHoverText, ConfigLessonButton, CountButton, CountText, DraftQuestion,
@@ -38,10 +37,7 @@ pub(super) fn spawn_config_view(
     // Lives outside the scroll frame to avoid layout-shift flicker.
     parent.spawn((
         Text::default(),
-        TextFont {
-            font_size: FontSize::Px(theme::fonts::SMALL),
-            ..default()
-        },
+        theme::typography::text(theme::fonts::SMALL, window),
         TextColor(theme::colors::TEXT_MUTED),
         Node {
             min_height: theme::scaled(theme::fonts::SMALL + 4.0),
@@ -49,10 +45,6 @@ pub(super) fn spawn_config_view(
             ..default()
         },
         ConfigHoverText,
-        DesignFontSize {
-            size: theme::fonts::SMALL,
-            window,
-        },
     ));
 
     spawn_button_row(parent, i18n, draft, window);
@@ -76,20 +68,13 @@ fn spawn_config_header(
         children![
             (
                 Text::new(lesson_title_owned),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
                 Node {
                     flex_shrink: 1.0,
                     flex_grow: 1.0,
                     overflow: Overflow::clip(),
                     ..default()
-                },
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
                 },
             ),
             (
@@ -107,15 +92,8 @@ fn spawn_config_header(
                 ResetConfigButton,
                 children![(
                     Text::new(reset_label_owned),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::SMALL),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::SMALL, window),
                     TextColor(theme::colors::TEXT_DARK),
-                    DesignFontSize {
-                        size: theme::fonts::SMALL,
-                        window,
-                    },
                 )],
             ),
         ],
@@ -173,18 +151,11 @@ fn spawn_question_counter_section(
 
                         col.spawn((
                             Text::new(question_type_label(qt, &i18n_owned)),
-                            TextFont {
-                                font_size: FontSize::Px(theme::fonts::BODY),
-                                ..default()
-                            },
+                            theme::typography::text(theme::fonts::BODY, window),
                             TextColor(theme::colors::TEXT_DARK),
                             Node {
                                 margin: theme::scaled(theme::spacing::SMALL).top(),
                                 ..default()
-                            },
-                            DesignFontSize {
-                                size: theme::fonts::BODY,
-                                window,
                             },
                         ));
 
@@ -203,17 +174,10 @@ fn spawn_question_counter_section(
                     ..default()
                 },
                 Text::new("\u{2195}"),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::SMALL),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::SMALL, window),
                 TextColor(theme::colors::TEXT_MUTED),
                 ScrollIndicator,
                 Visibility::Hidden,
-                DesignFontSize {
-                    size: theme::fonts::SMALL,
-                    window,
-                },
             ));
         })),
     ));
@@ -243,10 +207,7 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &DraftQuestion, wind
             // Label: dynamically truncated by update_question_labels
             row.spawn((
                 Text::new(format!("\u{2022} {full_prompt}")),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
                 Node {
                     flex_shrink: 1.0,
@@ -255,10 +216,6 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &DraftQuestion, wind
                     ..default()
                 },
                 QuestionLabel(full_prompt),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ));
 
             // Controls: [visual toggle]  [-] count [+]
@@ -326,20 +283,13 @@ fn spawn_counter_controls(
         ));
         controls.world_mut().entity_mut(text_entity).insert((
             Text::new(count_str_owned),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::SMALL),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::SMALL, window),
             TextColor(theme::colors::TEXT_DARK),
             TextLayout::justify(Justify::Center),
             CountText,
             Node {
                 min_width: theme::scaled(24.0),
                 ..default()
-            },
-            DesignFontSize {
-                size: theme::fonts::SMALL,
-                window,
             },
         ));
         controls.world_mut().entity_mut(inc_entity).insert((

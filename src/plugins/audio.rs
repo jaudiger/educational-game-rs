@@ -136,8 +136,8 @@ impl Plugin for GameAudioPlugin {
         app.add_systems(Update, detect_button_clicks);
 
         // Observers for one-shot sounds.
-        app.add_observer(on_answer_submitted);
-        app.add_observer(on_play_click_sound);
+        app.add_observer(on_answer_submitted.run_if(resource_exists::<AudioAssets>));
+        app.add_observer(on_play_click_sound.run_if(resource_exists::<AudioAssets>));
     }
 }
 
@@ -270,18 +270,14 @@ fn on_answer_submitted(
     event: On<AnswerSubmitted>,
     mut commands: Commands,
     settings: Res<Persistent<GameSettings>>,
-    audio_assets: Option<Res<AudioAssets>>,
+    audio_assets: Res<AudioAssets>,
 ) {
-    let Some(assets) = audio_assets else {
-        return;
-    };
-
     let kind = match event.result {
         AnswerResult::Correct => SfxKind::Correct,
         AnswerResult::Incorrect => SfxKind::Incorrect,
     };
 
-    let Some(handle) = assets.sfx.get(&kind) else {
+    let Some(handle) = audio_assets.sfx.get(&kind) else {
         return;
     };
 
@@ -301,13 +297,9 @@ fn on_play_click_sound(
     _event: On<PlayClickSound>,
     mut commands: Commands,
     settings: Res<Persistent<GameSettings>>,
-    audio_assets: Option<Res<AudioAssets>>,
+    audio_assets: Res<AudioAssets>,
 ) {
-    let Some(assets) = audio_assets else {
-        return;
-    };
-
-    let Some(handle) = assets.sfx.get(&SfxKind::Click) else {
+    let Some(handle) = audio_assets.sfx.get(&SfxKind::Click) else {
         return;
     };
 

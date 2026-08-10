@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::data::Language;
 use crate::i18n::{I18n, TranslationKey};
 use crate::ui::components::stacked_fraction;
-use crate::ui::theme::{self, DesignFontSize};
+use crate::ui::theme;
 
 use super::renderer::{ExplanationRenderer, spawn_colored_row, spawn_words};
 
@@ -101,15 +101,8 @@ pub(super) fn spawn_fraction_parts_text(
             ));
             group.spawn((
                 Text::new("."),
-                TextFont {
-                    font_size: FontSize::Px(font_size),
-                    ..default()
-                },
+                theme::typography::text(font_size, window),
                 TextColor(dark),
-                DesignFontSize {
-                    size: font_size,
-                    window,
-                },
             ));
         });
     });

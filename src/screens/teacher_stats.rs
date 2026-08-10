@@ -21,7 +21,6 @@ use crate::ui::components::{
     standard_button,
 };
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Teacher stats tab showing per-student and per-lesson score breakdowns.
 pub struct TeacherStatsScreenPlugin;
@@ -211,15 +210,8 @@ fn spawn_stats_root(
                     } else {
                         content.spawn((
                             Text::new(data.no_lessons_text),
-                            TextFont {
-                                font_size: FontSize::Px(theme::fonts::BODY),
-                                ..default()
-                            },
+                            theme::typography::text(theme::fonts::BODY, window),
                             TextColor(theme::colors::TEXT_MUTED),
-                            DesignFontSize {
-                                size: theme::fonts::BODY,
-                                window,
-                            },
                         ));
                     }
                 })),
@@ -249,15 +241,8 @@ fn spawn_stats_title_row(parent: &mut ChildSpawner, title_text: &str, window: En
         children![
             (
                 Text::new(title_text),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ),
             (
                 reset_icon_button(window),
@@ -423,15 +408,8 @@ fn spawn_stats_frame(parent: &mut ChildSpawner, data: Vec<ThemeStatsData>, windo
                 // Theme header (bold)
                 list.spawn((
                     Text::new(theme_section.theme_title.clone()),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::BODY),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::BODY, window),
                     TextColor(theme::colors::TEXT_DARK),
-                    DesignFontSize {
-                        size: theme::fonts::BODY,
-                        window,
-                    },
                 ));
 
                 for lesson in &theme_section.lessons {
@@ -495,15 +473,8 @@ fn spawn_lesson_header(
         children![
             (
                 Text::new(lesson_name),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ),
             (
                 reset_icon_button(window),
@@ -517,27 +488,13 @@ fn spawn_global_total(parent: &mut ChildSpawner, total: &GlobalTotal, window: En
     parent
         .spawn((
             Text::new(total.label.clone()),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::BODY),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::BODY, window),
             TextColor(theme::colors::TEXT_DARK),
-            DesignFontSize {
-                size: theme::fonts::BODY,
-                window,
-            },
         ))
         .with_child((
             TextSpan::new(total.score.clone()),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::BODY),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::BODY, window),
             TextColor(total.score_color),
-            DesignFontSize {
-                size: theme::fonts::BODY,
-                window,
-            },
         ));
 }
 
@@ -566,35 +523,21 @@ fn spawn_type_row(
             // Type label
             row.spawn((
                 Text::new(type_label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::SMALL),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::SMALL, window),
                 TextColor(theme::colors::TEXT_DARK),
                 Node {
                     flex_grow: 1.0,
                     ..default()
                 },
-                DesignFontSize {
-                    size: theme::fonts::SMALL,
-                    window,
-                },
             ));
             // Score (colored by percentage)
             row.spawn((
                 Text::new(score_text),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::SMALL),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::SMALL, window),
                 TextColor(score_color),
                 Node {
                     margin: UiRect::right(theme::scaled(theme::spacing::MEDIUM)),
                     ..default()
-                },
-                DesignFontSize {
-                    size: theme::fonts::SMALL,
-                    window,
                 },
             ));
             // Reset button for this type

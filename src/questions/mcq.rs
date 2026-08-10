@@ -10,7 +10,6 @@ use crate::i18n::I18n;
 use crate::states::LessonPhase;
 use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Handles multiple-choice question UI and answer submission.
 pub struct McqPlugin;
@@ -155,15 +154,8 @@ fn spawn_prompt_and_fraction_bars(
             ));
             row.spawn((
                 Text::new("+"),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ));
             // Second operand: c/b
             row.spawn(fraction_bar(

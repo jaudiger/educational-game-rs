@@ -15,7 +15,6 @@ use crate::ui::components::{
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Settings screen for volume, language, mode, and theme preferences.
 pub struct SettingsScreenPlugin;
@@ -86,15 +85,8 @@ fn spawn_settings_ui(
             // Title
             (
                 Text::new(title),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::TITLE),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::TITLE, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::TITLE,
-                    window,
-                },
             ),
             // Settings sections group
             (
@@ -155,15 +147,8 @@ fn mode_section(current_mode: GameMode, i18n: &I18n, window: Entity) -> impl Bun
         children![
             (
                 Text::new(mode_label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ),
             (
                 radio_group(),
@@ -235,15 +220,8 @@ fn language_section(
         children![
             (
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ),
             (
                 radio_group(),
@@ -336,15 +314,8 @@ fn map_theme_section(current_theme: MapTheme, i18n: &I18n, window: Entity) -> im
         children![
             (
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ),
             (
                 radio_group(),
@@ -438,15 +409,8 @@ fn bool_setting_section(
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn((
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ));
 
             let mut cmd = parent.spawn((
@@ -504,15 +468,8 @@ fn volume_section(
         children![
             (
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ),
             (
                 slider(0.0, 1.0, volume, 0.05),
@@ -522,16 +479,9 @@ fn volume_section(
             ),
             (
                 Text::new(format!("{percent} %")),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
                 channel,
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ),
         ],
     )

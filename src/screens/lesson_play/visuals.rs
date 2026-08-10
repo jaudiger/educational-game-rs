@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::data::{ExplanationVisual, Language};
 use crate::questions::fraction_bar::{self as fraction_bar_mod, fraction_bar};
 use crate::ui::components::stacked_fraction;
-use crate::ui::theme::{self, DesignFontSize};
+use crate::ui::theme;
 
 /// Spawns the visual element for a given explanation type as a child of the parent node.
 pub fn spawn_explanation_visual(
@@ -84,15 +84,8 @@ fn spawn_fraction_addition_visual(
     let operator_text = |symbol: &'static str| {
         (
             Text::new(symbol),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::HEADING),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::HEADING, window),
             TextColor(theme::colors::TEXT_DARK),
-            DesignFontSize {
-                size: theme::fonts::HEADING,
-                window,
-            },
         )
     };
 
@@ -241,15 +234,8 @@ fn spawn_labelled_bar(
             .with_children(|label| {
                 label.spawn((
                     Text::new(format!("{name} :")),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::BODY),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::BODY, window),
                     TextColor(theme::colors::TEXT_DARK),
-                    DesignFontSize {
-                        size: theme::fonts::BODY,
-                        window,
-                    },
                 ));
                 label.spawn(stacked_fraction(
                     fraction.0,
@@ -335,15 +321,8 @@ fn spawn_conversion_row(
         .with_children(|row| {
             row.spawn((
                 Text::new(format!("{} :", entry.name)),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ));
             row.spawn(fraction_bar(
                 entry.fraction.1,
@@ -392,15 +371,8 @@ fn spawn_multiplication_grid_visual(
     let operator_text = || {
         (
             Text::new("+"),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::HEADING),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::HEADING, window),
             TextColor(theme::colors::TEXT_DARK),
-            DesignFontSize {
-                size: theme::fonts::HEADING,
-                window,
-            },
         )
     };
 
@@ -528,15 +500,8 @@ fn spawn_pv_header_row(
                 .with_children(|cell| {
                     cell.spawn((
                         Text::new(abbr),
-                        TextFont {
-                            font_size: FontSize::Px(theme::fonts::BODY),
-                            ..default()
-                        },
+                        theme::typography::text(theme::fonts::BODY, window),
                         TextColor(theme::colors::TEXT_LIGHT),
-                        DesignFontSize {
-                            size: theme::fonts::BODY,
-                            window,
-                        },
                     ));
                 });
             }
@@ -579,15 +544,8 @@ fn spawn_pv_digit_row(
                     let text = digit.map(|d| d.to_string()).unwrap_or_default();
                     cell.spawn((
                         Text::new(text),
-                        TextFont {
-                            font_size: FontSize::Px(theme::fonts::HEADING),
-                            ..default()
-                        },
+                        theme::typography::text(theme::fonts::HEADING, window),
                         TextColor(text_color),
-                        DesignFontSize {
-                            size: theme::fonts::HEADING,
-                            window,
-                        },
                     ));
                 });
             }
@@ -661,29 +619,15 @@ fn spawn_pv_legend_entries(
                 let label = format!("{abbr} = {}", names[i]);
                 row.spawn((
                     Text::new(label),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::SMALL),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::SMALL, window),
                     TextColor(color),
-                    DesignFontSize {
-                        size: theme::fonts::SMALL,
-                        window,
-                    },
                 ));
                 // Separator dot (except after the last entry).
                 if i + 1 < num_columns {
                     row.spawn((
                         Text::new("\u{00B7}".to_owned()),
-                        TextFont {
-                            font_size: FontSize::Px(theme::fonts::SMALL),
-                            ..default()
-                        },
+                        theme::typography::text(theme::fonts::SMALL, window),
                         TextColor(theme::colors::TEXT_MUTED),
-                        DesignFontSize {
-                            size: theme::fonts::SMALL,
-                            window,
-                        },
                     ));
                 }
             }

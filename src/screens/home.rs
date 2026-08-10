@@ -7,7 +7,6 @@ use crate::states::AppState;
 use crate::ui::components::{screen_root, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Main menu screen with play and settings buttons.
 pub struct HomeScreenPlugin;
@@ -40,15 +39,8 @@ fn setup_home(
             // Title
             (
                 Text::new(title),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HERO),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HERO, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HERO,
-                    window,
-                },
             ),
             // Buttons group
             (

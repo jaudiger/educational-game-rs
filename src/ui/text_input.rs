@@ -3,13 +3,12 @@ use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
 use super::theme;
-use super::theme::DesignFontSize;
 
 /// Stores the state of a text input field.
 ///
 /// Attach to the outer `Button` entity (the clickable input box).
 /// The shared systems handle focus management, keyboard input, border
-/// colour changes, and cursor display automatically.
+/// colour changes, and cursor display automatically for teacher roster fields.
 #[derive(Component, Reflect)]
 #[require(Button)]
 pub struct TextInputState {
@@ -25,12 +24,6 @@ impl TextInputState {
             focused: false,
             max_length,
         }
-    }
-
-    #[must_use]
-    pub const fn focused(mut self) -> Self {
-        self.focused = true;
-        self
     }
 }
 
@@ -152,16 +145,9 @@ pub fn text_input(width: f32, state: TextInputState, window: Entity) -> impl Bun
         state,
         children![(
             Text::new(initial_text),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::BODY),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::BODY, window),
             TextColor(theme::colors::TEXT_DARK),
             TextInputDisplay,
-            DesignFontSize {
-                size: theme::fonts::BODY,
-                window,
-            },
         )],
     )
 }

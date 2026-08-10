@@ -6,7 +6,6 @@ use bevy::ui_widgets::{
 };
 
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 use super::{CheckboxMark, RadioMark};
 
@@ -126,15 +125,8 @@ pub fn checkbox(label: &str, mark_visible: bool, window: Entity) -> impl Bundle 
             // Label
             (
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ),
         ],
     )
@@ -218,15 +210,8 @@ pub fn radio_button(label: &str, mark_visible: bool, window: Entity) -> impl Bun
             // Label
             (
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ),
         ],
     )
@@ -295,15 +280,8 @@ pub fn radio_button_muted(
             // Muted label
             (
                 Text::new(label_text),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_MUTED),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ),
         ],
     )
@@ -339,15 +317,8 @@ pub fn stacked_fraction(
             // Numerator
             (
                 Text::new(numerator.to_string()),
-                TextFont {
-                    font_size: FontSize::Px(fraction_font),
-                    ..default()
-                },
+                theme::typography::text(fraction_font, window),
                 TextColor(numerator_color),
-                DesignFontSize {
-                    size: fraction_font,
-                    window,
-                },
             ),
             // Fraction bar
             (
@@ -361,15 +332,8 @@ pub fn stacked_fraction(
             // Denominator
             (
                 Text::new(denominator.to_string()),
-                TextFont {
-                    font_size: FontSize::Px(fraction_font),
-                    ..default()
-                },
+                theme::typography::text(fraction_font, window),
                 TextColor(denominator_color),
-                DesignFontSize {
-                    size: fraction_font,
-                    window,
-                },
             ),
         ],
     )

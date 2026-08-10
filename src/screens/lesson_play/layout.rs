@@ -9,7 +9,7 @@ use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
 use crate::states::AppState;
 use crate::ui::components::icon_button;
-use crate::ui::theme::{self, DesignFontSize, GameImages};
+use crate::ui::theme::{self, GameImages};
 
 use super::{ProgressText, QuitLessonButton, session};
 
@@ -101,16 +101,9 @@ fn spawn_top_bar(parent: &mut ChildSpawnerCommands, progress: &str, window: Enti
                 BorderColor::all(theme::colors::CARD_BORDER),
                 children![(
                     Text::new(progress),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::HEADING),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::HEADING, window),
                     TextColor(theme::colors::TEXT_DARK),
                     ProgressText,
-                    DesignFontSize {
-                        size: theme::fonts::HEADING,
-                        window,
-                    },
                 )],
             ));
             // Quit button (right, compact icon button matching save-slot style)

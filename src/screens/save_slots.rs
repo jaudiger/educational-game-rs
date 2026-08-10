@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use bevy::input_focus::AutoFocus;
+use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::prelude::*;
+use bevy::text::{EditableText, TextCursorStyle};
 use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::*;
 
@@ -12,13 +13,11 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, StateScopedResourceExt};
 use crate::ui::components::{
-    PopoverCancelButton, PopoverConfirmButton, action_button, button_base, card_node, icon_button,
-    screen_root, spawn_confirmation_modal, standard_button,
+    PopoverCancelButton, PopoverConfirmButton, action_button_scene, button_base, card_node,
+    icon_button, screen_root, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::navigation::NavigateTo;
-use crate::ui::text_input::{TextInputState, text_input};
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 const MAX_NAME_LENGTH: usize = 30;
 
@@ -29,6 +28,7 @@ impl Plugin for SaveSlotsScreenPlugin {
     fn build(&self, app: &mut App) {
         app.register_state_scoped_resource::<AppState, SaveSlotsState>(AppState::SaveSlots)
             .add_systems(OnEnter(AppState::SaveSlots), setup_save_slots)
+            .add_systems(OnExit(AppState::SaveSlots), clear_save_slot_input_focus)
             .add_systems(
                 Update,
                 (
@@ -38,6 +38,7 @@ impl Plugin for SaveSlotsScreenPlugin {
                     handle_cancel_delete,
                     handle_create_confirm,
                     handle_cancel_create,
+                    sync_creation_name_input_border,
                 )
                     .run_if(in_state(AppState::SaveSlots)),
             );
@@ -66,6 +67,10 @@ struct CreationForm;
 
 #[derive(Component, Reflect)]
 struct ConfirmCreateButton;
+
+/// Prototype-only save-slot field using Bevy's headless `EditableText` widget.
+#[derive(Component, Reflect)]
+struct SaveSlotNameInput;
 
 #[derive(Component, Reflect)]
 struct CancelCreateButton;
@@ -123,15 +128,8 @@ fn spawn_save_slots_ui(
             // Title
             parent.spawn((
                 Text::new(title),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::TITLE),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::TITLE, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::TITLE,
-                    window,
-                },
             ));
 
             // Slots row
@@ -204,28 +202,14 @@ fn spawn_slot_card(
             // Filled slot: show name + delete button
             card.spawn((
                 Text::new(slot_name),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ));
 
             card.spawn((
                 Text::new(slot_label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::SMALL),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::SMALL, window),
                 TextColor(theme::colors::TEXT_MUTED),
-                DesignFontSize {
-                    size: theme::fonts::SMALL,
-                    window,
-                },
             ));
 
             // Delete button (icon_button + absolute positioning override)
@@ -256,28 +240,14 @@ fn spawn_slot_card(
             // Empty slot
             card.spawn((
                 Text::new(empty_label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_MUTED),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ));
 
             card.spawn((
                 Text::new(slot_label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::SMALL),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::SMALL, window),
                 TextColor(theme::colors::TEXT_MUTED),
-                DesignFontSize {
-                    size: theme::fonts::SMALL,
-                    window,
-                },
             ));
         }
     });
@@ -382,15 +352,8 @@ fn spawn_creation_form(commands: &mut Commands, slot_index: usize, i18n: &I18n, 
             children![
                 (
                     Text::new(title),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::BODY),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::BODY, window),
                     TextColor(theme::colors::TEXT_DARK),
-                    DesignFontSize {
-                        size: theme::fonts::BODY,
-                        window,
-                    },
                 ),
                 creation_name_input(i18n, window),
                 creation_buttons(i18n, window),
@@ -411,23 +374,54 @@ fn creation_name_input(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
         children![
             (
                 Text::new(name_label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
+                theme::typography::text(theme::fonts::BODY, window),
+                TextColor(theme::colors::TEXT_DARK),
+            ),
+            (
+                Node {
+                    width: theme::scaled(250.0),
+                    height: theme::scaled(theme::sizes::INPUT_FIELD_HEIGHT),
+                    align_items: AlignItems::Center,
+                    padding: theme::scaled(theme::spacing::SMALL).horizontal(),
+                    border: px(2.0).all(),
+                    border_radius: BorderRadius::all(theme::scaled(
+                        theme::sizes::BUTTON_BORDER_RADIUS,
+                    )),
                     ..default()
                 },
-                TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
+                EditableText {
+                    max_characters: Some(MAX_NAME_LENGTH),
+                    ..default()
                 },
-            ),
-            text_input(
-                250.0,
-                TextInputState::new(MAX_NAME_LENGTH).focused(),
-                window
+                TextCursorStyle {
+                    color: theme::colors::TEXT_DARK,
+                    ..default()
+                },
+                TextLayout::no_wrap(),
+                theme::typography::text(theme::fonts::BODY, window),
+                TextColor(theme::colors::TEXT_DARK),
+                BackgroundColor(theme::colors::INPUT_BG),
+                BorderColor::all(theme::colors::PRIMARY),
+                AutoFocus,
+                SaveSlotNameInput,
             ),
         ],
     )
+}
+
+fn sync_creation_name_input_border(
+    input_focus: Res<InputFocus>,
+    mut inputs: Query<(Entity, &mut BorderColor), With<SaveSlotNameInput>>,
+) {
+    let focused_entity = input_focus.get();
+    for (entity, mut border) in &mut inputs {
+        let color = if focused_entity == Some(entity) {
+            theme::colors::PRIMARY
+        } else {
+            theme::colors::INPUT_BORDER
+        };
+        border.set_all(color);
+    }
 }
 
 fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
@@ -439,26 +433,25 @@ fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
             column_gap: theme::scaled(theme::spacing::MEDIUM),
             ..default()
         },
-        children![
-            (
-                action_button(
-                    &create_label,
-                    theme::colors::SUCCESS,
-                    theme::colors::TEXT_LIGHT,
-                    window,
-                ),
-                ConfirmCreateButton,
-            ),
-            (
-                action_button(
-                    &cancel_label,
-                    theme::colors::TOGGLE_INACTIVE,
-                    theme::colors::TEXT_DARK,
-                    window,
-                ),
-                CancelCreateButton,
-            ),
-        ],
+        Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
+            let mut create = row.spawn_empty();
+            create.insert(ConfirmCreateButton);
+            let _ = create.apply_scene(action_button_scene(
+                &create_label,
+                theme::colors::SUCCESS,
+                theme::colors::TEXT_LIGHT,
+                window,
+            ));
+
+            let mut cancel = row.spawn_empty();
+            cancel.insert(CancelCreateButton);
+            let _ = cancel.apply_scene(action_button_scene(
+                &cancel_label,
+                theme::colors::TOGGLE_INACTIVE,
+                theme::colors::TEXT_DARK,
+                window,
+            ));
+        })),
     )
 }
 
@@ -553,27 +546,40 @@ fn handle_cancel_delete(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_create_confirm(
     query: Query<&Interaction, (Changed<Interaction>, With<ConfirmCreateButton>)>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    mut input_focus: ResMut<InputFocus>,
     mut state: ResMut<SaveSlotsState>,
     mut persistence: PersistenceMut<'_>,
     mut commands: Commands,
     mut next_state: ResMut<NextState<AppState>>,
-    input: Single<&TextInputState>,
+    input: Option<Single<(Entity, &EditableText), With<SaveSlotNameInput>>>,
 ) {
     let Some(slot_index) = state.creating_slot else {
         return;
     };
 
+    if keyboard.just_pressed(KeyCode::Escape) {
+        input_focus.clear();
+        return;
+    }
+
+    let Some(input) = input else {
+        return;
+    };
+    let (input_entity, input) = *input;
+    let focused = input_focus.get() == Some(input_entity);
+
     let pressed_button = query.iter().any(|i| *i == Interaction::Pressed);
-    let pressed_enter = input.focused && keyboard.just_pressed(KeyCode::Enter);
+    let pressed_enter = focused && keyboard.just_pressed(KeyCode::Enter);
 
     if !pressed_button && !pressed_enter {
         return;
     }
 
-    let name = input.text.trim().to_owned();
+    let name = input.value().to_string().trim().to_owned();
     if name.is_empty() {
         return;
     }
@@ -600,22 +606,29 @@ fn handle_create_confirm(
 
     commands.insert_resource(ActiveSlot(slot_index));
 
+    input_focus.clear();
     state.creating_slot = None;
     next_state.set(AppState::MapExploration);
 }
 
 fn handle_cancel_create(
     query: Query<&Interaction, (Changed<Interaction>, With<CancelCreateButton>)>,
+    mut input_focus: ResMut<InputFocus>,
     mut state: ResMut<SaveSlotsState>,
     mut commands: Commands,
     form_query: Query<Entity, With<CreationForm>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            input_focus.clear();
             state.creating_slot = None;
             for entity in &form_query {
                 commands.entity(entity).despawn();
             }
         }
     }
+}
+
+fn clear_save_slot_input_focus(mut input_focus: ResMut<InputFocus>) {
+    input_focus.clear();
 }

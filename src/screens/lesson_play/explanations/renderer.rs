@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::i18n::{I18n, TranslationKey};
 use crate::ui::rich_text::spawn_rich_text;
-use crate::ui::theme::{self, DesignFontSize};
+use crate::ui::theme;
 
 /// Renders the text portion of a question explanation. One implementation
 /// per explanation variant; dispatch picks the right one from the question
@@ -78,15 +78,8 @@ pub(super) fn spawn_words(
     for word in text.split_whitespace() {
         row.spawn((
             Text::new(word),
-            TextFont {
-                font_size: FontSize::Px(font_size),
-                ..default()
-            },
+            theme::typography::text(font_size, window),
             TextColor(color),
-            DesignFontSize {
-                size: font_size,
-                window,
-            },
         ));
     }
 }

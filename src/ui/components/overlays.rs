@@ -3,9 +3,8 @@ use bevy::ui::FocusPolicy;
 use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, PopoverSide};
 
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
-use super::buttons::action_button;
+use super::buttons::action_button_scene;
 use super::{PopoverCancelButton, PopoverConfirmButton, TooltipPopover, card_node};
 
 /// Spawns a centered confirmation modal (full-screen overlay + card).
@@ -57,15 +56,8 @@ pub fn spawn_confirmation_modal(
                 // Message text
                 (
                     Text::new(message_owned),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::BODY),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::BODY, window),
                     TextColor(theme::colors::TEXT_DARK),
-                    DesignFontSize {
-                        size: theme::fonts::BODY,
-                        window,
-                    },
                 ),
                 // Button row
                 (
@@ -74,28 +66,25 @@ pub fn spawn_confirmation_modal(
                         column_gap: theme::scaled(theme::spacing::MEDIUM),
                         ..default()
                     },
-                    children![
-                        // Confirm button
-                        (
-                            action_button(
-                                &confirm_owned,
-                                confirm_color,
-                                theme::colors::TEXT_LIGHT,
-                                window,
-                            ),
-                            PopoverConfirmButton,
-                        ),
-                        // Cancel button
-                        (
-                            action_button(
-                                &cancel_owned,
-                                theme::colors::TOGGLE_INACTIVE,
-                                theme::colors::TEXT_DARK,
-                                window,
-                            ),
-                            PopoverCancelButton,
-                        ),
-                    ],
+                    Children::spawn(SpawnWith(move |buttons: &mut ChildSpawner| {
+                        let mut confirm = buttons.spawn_empty();
+                        confirm.insert(PopoverConfirmButton);
+                        let _ = confirm.apply_scene(action_button_scene(
+                            &confirm_owned,
+                            confirm_color,
+                            theme::colors::TEXT_LIGHT,
+                            window,
+                        ));
+
+                        let mut cancel = buttons.spawn_empty();
+                        cancel.insert(PopoverCancelButton);
+                        let _ = cancel.apply_scene(action_button_scene(
+                            &cancel_owned,
+                            theme::colors::TOGGLE_INACTIVE,
+                            theme::colors::TEXT_DARK,
+                            window,
+                        ));
+                    })),
                 ),
             ],
         )],
@@ -152,15 +141,8 @@ pub fn spawn_tooltip_popover(
             TooltipPopover,
             children![(
                 Text::new(message_owned),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::SMALL),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::SMALL, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::SMALL,
-                    window,
-                },
             )],
         ))
         .id();

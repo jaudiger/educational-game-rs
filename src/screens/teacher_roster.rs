@@ -17,7 +17,6 @@ use crate::ui::components::{
 };
 use crate::ui::text_input::{TextInputState, text_input};
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Teacher roster tab for managing student names in a class slot.
 pub struct TeacherRosterScreenPlugin;
@@ -221,15 +220,8 @@ fn rebuild_roster_ui(
 
             parent.spawn((
                 Text::new(title_text),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             ));
 
             spawn_student_list(
@@ -285,15 +277,8 @@ fn spawn_student_list(
             if names.is_empty() {
                 list.spawn((
                     Text::new(no_students_text),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::BODY),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::BODY, window),
                     TextColor(theme::colors::TEXT_MUTED),
-                    DesignFontSize {
-                        size: theme::fonts::BODY,
-                        window,
-                    },
                 ));
             }
         });
@@ -315,15 +300,8 @@ fn spawn_add_student_row(
         children![
             (
                 Text::new(name_label),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ),
             text_input(200.0, TextInputState::new(30), window),
             (
@@ -341,15 +319,8 @@ fn spawn_add_student_row(
                 AddStudentButton,
                 children![(
                     Text::new(add_label),
-                    TextFont {
-                        font_size: FontSize::Px(theme::fonts::SMALL),
-                        ..default()
-                    },
+                    theme::typography::text(theme::fonts::SMALL, window),
                     TextColor(theme::colors::TEXT_LIGHT),
-                    DesignFontSize {
-                        size: theme::fonts::SMALL,
-                        window,
-                    },
                 )],
             ),
         ],
@@ -386,15 +357,8 @@ fn spawn_student_row(
         .with_children(|row| {
             row.spawn((
                 Text::new(name),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BODY),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::BODY,
-                    window,
-                },
             ));
 
             if show_delete {

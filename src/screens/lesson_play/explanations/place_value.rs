@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::data::Language;
 use crate::i18n::{I18n, TranslationKey};
-use crate::ui::theme::{self, DesignFontSize};
+use crate::ui::theme;
 
 use super::super::visuals::{PV_ZERO_COLOR, count_trailing_zeros};
 use super::renderer::ExplanationRenderer;
@@ -52,15 +52,8 @@ impl ExplanationRenderer for PlaceValueRenderer {
         let text_span = |s: &str, color: Color| {
             (
                 Text::new(s),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::HEADING),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(color),
-                DesignFontSize {
-                    size: theme::fonts::HEADING,
-                    window,
-                },
             )
         };
 

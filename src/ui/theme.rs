@@ -21,10 +21,40 @@ pub fn scaled(design_px: f32) -> Val {
 /// Attach next to a [`TextFont`] component.  An observer scales the font
 /// immediately on spawn; a system re-scales whenever the target window is
 /// resized.
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Clone)]
 pub struct DesignFontSize {
     pub size: f32,
     pub window: Entity,
+}
+
+impl Default for DesignFontSize {
+    fn default() -> Self {
+        Self {
+            size: 0.0,
+            window: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+/// Typography components shared by reusable UI constructors.
+///
+/// This keeps the current design-pixel scaling contract in one place while
+/// leaving room for richer Bevy text components without changing every caller.
+pub mod typography {
+    use bevy::prelude::*;
+
+    use super::DesignFontSize;
+
+    /// Returns the current game typography bundle for a target window.
+    ///
+    /// The returned bundle deliberately keeps the font unspecified so the
+    /// theme observer supplies the branded game font.
+    pub fn text(size: f32, window: Entity) -> impl Bundle + use<> {
+        (
+            TextFont::from_font_size(FontSize::Px(size)),
+            DesignFontSize { size, window },
+        )
+    }
 }
 
 /// Preloaded font handles shared across the entire UI.

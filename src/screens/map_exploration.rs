@@ -12,7 +12,6 @@ use crate::states::{AppState, MapView};
 use crate::ui::animation::{AnimatedButton, FloatingCard};
 use crate::ui::components::{HoverTooltip, button_base, screen_root, standard_button};
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Map exploration screen showing available themes and lessons.
 pub struct MapExplorationScreenPlugin;
@@ -204,15 +203,8 @@ fn setup_world_overview(
             // Title
             let mut title_cmd = parent.spawn((
                 Text::new(title),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::TITLE),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::TITLE, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::TITLE,
-                    window,
-                },
             ));
             if let Some(style) = card_style {
                 title_cmd.insert(TextShadow {
@@ -374,16 +366,9 @@ fn insert_card_overlay(
 fn card_text(text: &str, font_size: f32, color: Color, window: Entity) -> impl Bundle + use<> {
     (
         Text::new(text),
-        TextFont {
-            font_size: FontSize::Px(font_size),
-            ..default()
-        },
+        theme::typography::text(font_size, window),
         TextColor(color),
         TextLayout::justify(Justify::Center),
-        DesignFontSize {
-            size: font_size,
-            window,
-        },
     )
 }
 
@@ -591,15 +576,8 @@ fn setup_theme_detail(
             // Title
             let mut title_cmd = parent.spawn((
                 Text::new(theme_title),
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::TITLE),
-                    ..default()
-                },
+                theme::typography::text(theme::fonts::TITLE, window),
                 TextColor(theme::colors::TEXT_DARK),
-                DesignFontSize {
-                    size: theme::fonts::TITLE,
-                    window,
-                },
             ));
             if let Some(style) = card_style {
                 title_cmd.insert(TextShadow {

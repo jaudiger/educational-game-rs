@@ -21,7 +21,7 @@ impl Plugin for UiAnimationPlugin {
 }
 
 /// Marker: opts a `Button` into hover/press scale animation.
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Default, Clone)]
 pub struct AnimatedButton;
 
 /// One-shot scale animation via `UiTransform`.

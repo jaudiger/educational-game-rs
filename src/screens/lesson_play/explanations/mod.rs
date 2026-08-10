@@ -12,7 +12,7 @@ use crate::states::LessonPhase;
 use crate::ui::animation::AnimateScale;
 use crate::ui::components::standard_button;
 use crate::ui::navigation::NavigateTo;
-use crate::ui::theme::{self, DesignFontSize};
+use crate::ui::theme;
 
 use super::FeedbackRoot;
 use super::visuals::spawn_explanation_visual;
@@ -255,17 +255,10 @@ fn spawn_result_text(
 
     parent.spawn((
         Text::new(i18n.t(&key)),
-        TextFont {
-            font_size: FontSize::Px(theme::fonts::TITLE),
-            ..default()
-        },
+        theme::typography::text(theme::fonts::TITLE, window),
         TextColor(color),
         UiTransform::from_scale(Vec2::ZERO),
         AnimateScale::new(0.0, 1.0, ease_fn, duration),
-        DesignFontSize {
-            size: theme::fonts::TITLE,
-            window,
-        },
     ));
 }
 

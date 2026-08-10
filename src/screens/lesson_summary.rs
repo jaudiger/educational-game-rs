@@ -11,7 +11,6 @@ use crate::states::AppState;
 use crate::ui::components::{screen_root, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// End-of-lesson summary screen showing final scores and a return button.
 pub struct LessonSummaryScreenPlugin;
@@ -105,45 +104,24 @@ fn setup_lesson_summary(
 fn summary_title(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
     (
         Text::new(i18n.t(&TranslationKey::SummaryTitle)),
-        TextFont {
-            font_size: FontSize::Px(theme::fonts::TITLE),
-            ..default()
-        },
+        theme::typography::text(theme::fonts::TITLE, window),
         TextColor(theme::colors::TEXT_DARK),
-        DesignFontSize {
-            size: theme::fonts::TITLE,
-            window,
-        },
     )
 }
 
 fn summary_score(i18n: &I18n, correct: u32, total: u32, window: Entity) -> impl Bundle + use<> {
     (
         Text::new(i18n.t(&TranslationKey::SummaryScore(correct, total))),
-        TextFont {
-            font_size: FontSize::Px(theme::fonts::HEADING),
-            ..default()
-        },
+        theme::typography::text(theme::fonts::HEADING, window),
         TextColor(theme::colors::TEXT_DARK),
-        DesignFontSize {
-            size: theme::fonts::HEADING,
-            window,
-        },
     )
 }
 
 fn summary_percentage(i18n: &I18n, percentage: u32, window: Entity) -> impl Bundle + use<> {
     (
         Text::new(i18n.t(&TranslationKey::SummaryPercentage(percentage))),
-        TextFont {
-            font_size: FontSize::Px(theme::fonts::HEADING),
-            ..default()
-        },
+        theme::typography::text(theme::fonts::HEADING, window),
         TextColor(theme::colors::PRIMARY),
-        DesignFontSize {
-            size: theme::fonts::HEADING,
-            window,
-        },
     )
 }
 
@@ -156,15 +134,8 @@ fn summary_message(i18n: &I18n, key: &TranslationKey, window: Entity) -> impl Bu
 
     (
         Text::new(i18n.t(key)),
-        TextFont {
-            font_size: FontSize::Px(theme::fonts::HEADING),
-            ..default()
-        },
+        theme::typography::text(theme::fonts::HEADING, window),
         TextColor(color),
-        DesignFontSize {
-            size: theme::fonts::HEADING,
-            window,
-        },
     )
 }
 

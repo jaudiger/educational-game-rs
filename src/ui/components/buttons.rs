@@ -1,5 +1,6 @@
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
+use bevy::scene::{Scene, SceneComponent, bsn};
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 
 use crate::ui::animation::AnimatedButton;
@@ -31,42 +32,85 @@ pub fn button_base(bg_color: Color) -> impl Bundle {
     )
 }
 
-/// Returns a compact action button for dialogs (popovers, creation forms).
+/// Scene component for the fixed action button hierarchy.
+#[derive(SceneComponent, Default, Clone, Reflect)]
+#[scene(ActionButtonProps)]
+pub struct ActionButton;
+
+pub struct ActionButtonProps {
+    label: String,
+    bg_color: Color,
+    text_color: Color,
+    window: Entity,
+}
+
+impl Default for ActionButtonProps {
+    fn default() -> Self {
+        Self {
+            label: String::new(),
+            bg_color: Color::default(),
+            text_color: Color::default(),
+            window: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+/// Returns the BSN scene for a compact action button.
 ///
-/// Wraps `button_base` with a `Node` (min 120px wide, `BUTTON_HEIGHT` tall) and
-/// centered text at `FONT_SIZE_BUTTON_SMALL`. The button grows to fit its label.
-pub fn action_button(
+/// The scene is applied to an empty entity so callers can compose markers on
+/// the resulting button without changing its parent relationship.
+pub fn action_button_scene(
     label: &str,
     bg_color: Color,
     text_color: Color,
     window: Entity,
-) -> impl Bundle + use<> {
-    (
-        button_base(bg_color),
-        Node {
-            min_width: theme::scaled(120.0),
-            height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
-            padding: UiRect::axes(theme::scaled(theme::spacing::SMALL), theme::scaled(0.0)),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            overflow: Overflow::clip(),
-            border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
-            ..default()
-        },
-        children![(
-            Text::new(label),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::BUTTON_SMALL),
-                ..default()
-            },
-            TextColor(text_color),
-            TextLayout::justify(Justify::Center),
-            DesignFontSize {
-                size: theme::fonts::BUTTON_SMALL,
-                window,
-            },
-        )],
-    )
+) -> impl Scene {
+    bsn! {
+        @ActionButton {
+            @label: {label.to_owned()},
+            @bg_color: {bg_color},
+            @text_color: {text_color},
+            @window: {window},
+        }
+    }
+}
+
+impl ActionButton {
+    fn scene(props: ActionButtonProps) -> impl Scene {
+        bsn! {
+            Button
+            BackgroundColor({props.bg_color})
+            AnimatedButton
+            AutoDirectionalNavigation::default()
+            TabIndex(0)
+            Outline::new(
+                Val::Px(theme::sizes::FOCUS_RING_WIDTH),
+                Val::Px(theme::sizes::FOCUS_RING_OFFSET),
+                Color::NONE,
+            )
+            Node {
+                min_width: theme::scaled(120.0),
+                height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
+                padding: UiRect::axes(theme::scaled(theme::spacing::SMALL), theme::scaled(0.0)),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                overflow: Overflow::clip(),
+                border_radius: {BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS))},
+            }
+            Children [(
+                Text({props.label})
+                TextFont {
+                    font_size: FontSize::Px(theme::fonts::BUTTON_SMALL),
+                }
+                DesignFontSize {
+                    size: theme::fonts::BUTTON_SMALL,
+                    window: {props.window},
+                }
+                TextColor({props.text_color})
+                TextLayout::justify(Justify::Center)
+            )]
+        }
+    }
 }
 
 /// Returns a square icon-style button with centered text.
@@ -94,16 +138,9 @@ pub fn icon_button(
         },
         children![(
             Text::new(label),
-            TextFont {
-                font_size: FontSize::Px(font_size),
-                ..default()
-            },
+            theme::typography::text(font_size, window),
             TextColor(text_color),
             TextLayout::justify(Justify::Center),
-            DesignFontSize {
-                size: font_size,
-                window,
-            },
         )],
     )
 }
@@ -137,16 +174,9 @@ pub fn standard_button(
         },
         children![(
             Text::new(label),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::BUTTON),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::BUTTON, window),
             TextColor(theme::colors::TEXT_LIGHT),
             TextLayout::justify(Justify::Center),
-            DesignFontSize {
-                size: theme::fonts::BUTTON,
-                window,
-            },
         )],
     )
 }
@@ -183,16 +213,9 @@ pub fn toggle_button(label: &str, active: bool, window: Entity) -> impl Bundle +
         },
         children![(
             Text::new(label),
-            TextFont {
-                font_size: FontSize::Px(theme::fonts::BUTTON_SMALL),
-                ..default()
-            },
+            theme::typography::text(theme::fonts::BUTTON_SMALL, window),
             TextColor(text_color),
             TextLayout::justify(Justify::Center),
-            DesignFontSize {
-                size: theme::fonts::BUTTON_SMALL,
-                window,
-            },
         )],
     )
 }
