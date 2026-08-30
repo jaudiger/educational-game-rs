@@ -20,4 +20,4 @@ jobs:
     permissions:
       contents: read
       checks: write
-    uses: jaudiger/reusable-workflows/.github/workflows/audit-rust.yml@8104be620dc861697cf02b53d8fe3119edece0b5
+    uses: jaudiger/reusable-workflows/.github/workflows/audit-rust.yml@0fdb4286768192eacc11e2a71d0ef74fcd1c3195
