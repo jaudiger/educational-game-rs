@@ -260,6 +260,9 @@ struct TypeScoreRow {
 struct LessonStatsData {
     lesson_name: String,
     lesson_id: String,
+    total_label: String,
+    total_score: String,
+    total_color: Color,
     type_rows: Vec<TypeScoreRow>,
 }
 
@@ -301,7 +304,7 @@ fn collect_lesson_type_rows(
             let pct = ts.percentage();
             TypeScoreRow {
                 type_label: question_type_label(*qt, i18n),
-                score_text: format!("{}/{}", ts.correct, ts.total),
+                score_text: format!("{}/{} {} %", ts.correct, ts.total, pct),
                 score_color: pct_color(pct),
                 lesson_id: lesson_id.to_owned(),
                 question_type: *qt,
@@ -341,12 +344,18 @@ fn precompute_stats(
                 continue;
             };
 
-            grand_correct += lp.total_correct();
-            grand_total += lp.total_questions();
+            let lesson_correct = lp.total_correct();
+            let lesson_total = lp.total_questions();
+            let lesson_pct = lp.percentage();
+            grand_correct += lesson_correct;
+            grand_total += lesson_total;
 
             lessons.push(LessonStatsData {
                 lesson_name: i18n.t(&lesson.title_key).into_owned(),
                 lesson_id: lesson.id.clone(),
+                total_label: total_text.clone(),
+                total_score: format!("{lesson_correct}/{lesson_total} {lesson_pct} %"),
+                total_color: pct_color(lesson_pct),
                 type_rows: collect_lesson_type_rows(&lesson.id, lp, i18n),
             });
         }
@@ -426,6 +435,9 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
         Children::spawn(SpawnWith({
             let lesson_name = lesson.lesson_name.clone();
             let lesson_id = lesson.lesson_id.clone();
+            let total_label = lesson.total_label.clone();
+            let total_score = lesson.total_score.clone();
+            let total_color = lesson.total_color;
             let type_rows_data: Vec<_> = lesson
                 .type_rows
                 .iter()
@@ -445,6 +457,7 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
                 for (type_label, score_text, color, lid, qt) in &type_rows_data {
                     spawn_type_row(section, type_label, score_text, *color, lid, *qt, window);
                 }
+                spawn_lesson_total(section, &total_label, &total_score, total_color, window);
             }
         })),
     ));
@@ -474,6 +487,36 @@ fn spawn_lesson_header(
             (
                 reset_icon_button(window),
                 StatsResetButton(StatsResetTarget::Lesson(lesson_id)),
+            ),
+        ],
+    ));
+}
+
+fn spawn_lesson_total(
+    parent: &mut ChildSpawner,
+    label: &str,
+    score: &str,
+    color: Color,
+    window: Entity,
+) {
+    parent.spawn((
+        Node {
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::SpaceBetween,
+            align_items: AlignItems::Center,
+            padding: theme::scaled(theme::spacing::MEDIUM).left(),
+            ..default()
+        },
+        children![
+            (
+                Text::new(label.to_owned()),
+                theme::typography::text(theme::fonts::SMALL, window),
+                TextColor(theme::colors::TEXT_DARK),
+            ),
+            (
+                Text::new(score.to_owned()),
+                theme::typography::text(theme::fonts::SMALL, window),
+                TextColor(color),
             ),
         ],
     ));
