@@ -1,5 +1,6 @@
+use bevy::picking::events::{Pointer, Release};
 use bevy::prelude::*;
-use bevy::ui::Checked;
+use bevy::ui::{Checked, Pressed};
 use bevy::ui_widgets::{
     SliderValue, ValueChange, checkbox_self_update, observe, slider_self_update,
 };
@@ -476,6 +477,7 @@ fn volume_section(
                 channel,
                 observe(slider_self_update),
                 observe(handle_volume_slider_change),
+                observe(persist_volume_on_pointer_release),
             ),
             (
                 Text::new(format!("{percent} %")),
@@ -490,6 +492,7 @@ fn volume_section(
 fn handle_volume_slider_change(
     event: On<ValueChange<f32>>,
     channel_query: Query<&VolumeChannel>,
+    pressed_query: Query<(), With<Pressed>>,
     mut settings: ResMut<Persistent<GameSettings>>,
 ) {
     let volume = event.value;
@@ -497,12 +500,23 @@ fn handle_volume_slider_change(
         return;
     };
     let ch = *channel;
-    settings
-        .update(|s| match ch {
-            VolumeChannel::Music => s.music_volume = volume,
-            VolumeChannel::Sfx => s.sfx_volume = volume,
-        })
-        .expect("failed to update game settings");
+    {
+        let settings = settings.get_mut();
+        match ch {
+            VolumeChannel::Music => settings.music_volume = volume,
+            VolumeChannel::Sfx => settings.sfx_volume = volume,
+        }
+    }
+    if event.is_final && !pressed_query.contains(event.event_target()) {
+        settings.persist().expect("failed to update game settings");
+    }
+}
+
+fn persist_volume_on_pointer_release(
+    _event: On<Pointer<Release>>,
+    settings: ResMut<Persistent<GameSettings>>,
+) {
+    settings.persist().expect("failed to update game settings");
 }
 
 /// Updates the volume percentage label to match the current slider value.
