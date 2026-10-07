@@ -27,12 +27,26 @@ impl Plugin for MapExplorationScreenPlugin {
             .add_systems(
                 Update,
                 (
+                    setup_world_overview.run_if(in_state(MapView::WorldOverview)),
+                    setup_theme_detail.run_if(in_state(MapView::ThemeDetail)),
+                )
+                    .run_if(
+                        resource_changed::<ActiveStudent>
+                            .or_else(resource_removed::<ActiveStudent>),
+                    ),
+            )
+            .add_systems(
+                Update,
+                (
                     handle_theme_detail.run_if(in_state(MapView::ThemeDetail)),
                     update_map_card_hover.run_if(in_state(AppState::MapExploration)),
                 ),
             );
     }
 }
+
+#[derive(Component, Reflect)]
+struct MapScreenRoot;
 
 #[derive(Component, Reflect)]
 struct ThemeButton(String);
@@ -146,6 +160,7 @@ struct ThemeButtonData {
     completed_text: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn setup_world_overview(
     mut commands: Commands,
     content: Res<ContentLibrary>,
@@ -154,12 +169,17 @@ fn setup_world_overview(
     mut next_map_view: ResMut<NextState<MapView>>,
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
+    existing_roots: Query<Entity, With<MapScreenRoot>>,
 ) {
     // If ActiveTheme exists, the user is returning from LessonPlay/LessonSummary.
     // Skip WorldOverview and go directly to ThemeDetail.
     if active_theme.is_some() {
         next_map_view.set(MapView::ThemeDetail);
         return;
+    }
+
+    for root in &existing_roots {
+        commands.entity(root).despawn();
     }
 
     let window = *primary_window;
@@ -197,6 +217,7 @@ fn setup_world_overview(
 
     let mut root = commands.spawn((
         screen_root(),
+        MapScreenRoot,
         DespawnOnExit(AppState::MapExploration),
         DespawnOnEnter(MapView::ThemeDetail),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
@@ -527,10 +548,15 @@ fn setup_theme_detail(
     i18n: Res<I18n>,
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
+    existing_roots: Query<Entity, With<MapScreenRoot>>,
 ) {
     let Some(theme_data) = content.theme(&active_theme) else {
         return;
     };
+
+    for root in &existing_roots {
+        commands.entity(root).despawn();
+    }
 
     let window = *primary_window;
 
@@ -570,6 +596,7 @@ fn setup_theme_detail(
 
     let mut root = commands.spawn((
         screen_root(),
+        MapScreenRoot,
         DespawnOnExit(AppState::MapExploration),
         DespawnOnEnter(MapView::WorldOverview),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
