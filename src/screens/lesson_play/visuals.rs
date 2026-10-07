@@ -541,7 +541,7 @@ fn spawn_pv_digit_row(
                     BorderColor::all(border_color),
                 ))
                 .with_children(|cell| {
-                    let text = digit.map(|d| d.to_string()).unwrap_or_default();
+                    let text = digit.map_or_default(|d| d.to_string());
                     cell.spawn((
                         Text::new(text),
                         theme::typography::text(theme::fonts::HEADING, window),
