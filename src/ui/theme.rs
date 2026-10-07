@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::text::{FontSize, FontSource};
 use bevy::ui_widgets::{Checkbox, RadioButton};
+use bevy::window::WindowResized;
 
 use super::components::{CheckboxMark, RadioMark, dispatch_confirmation_button_actions};
 use super::widget_styles;
@@ -132,14 +133,14 @@ fn scale_font_on_add(
 
 /// Re-scales every [`DesignFontSize`] entity whose target window changed size.
 fn scale_fonts_on_window_resize(
-    changed_windows: Query<(Entity, &Window), Changed<Window>>,
+    mut resized_windows: MessageReader<WindowResized>,
     mut fonts: Query<(&DesignFontSize, &mut TextFont)>,
 ) {
-    for (window_entity, window) in &changed_windows {
-        let vmin_val = window.width().min(window.height());
+    for resized_window in resized_windows.read() {
+        let vmin_val = resized_window.width.min(resized_window.height);
         let scale = vmin_val / REFERENCE_VMIN;
         for (design, mut font) in &mut fonts {
-            if design.window == window_entity {
+            if design.window == resized_window.window {
                 font.font_size = FontSize::Px(design.size * scale);
             }
         }
