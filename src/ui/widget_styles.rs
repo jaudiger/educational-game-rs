@@ -54,7 +54,10 @@ pub fn update_slider_thumb_position(
         let travel_fraction = 1.0 - theme::sizes::SLIDER_THUMB_SIZE / theme::sizes::SLIDER_WIDTH;
         for child in children.iter() {
             if let Ok(mut node) = thumb_query.get_mut(child) {
-                node.left = percent(pct * travel_fraction * 100.0);
+                let left = percent(pct * travel_fraction * 100.0);
+                if node.left != left {
+                    node.left = left;
+                }
             }
         }
     }
