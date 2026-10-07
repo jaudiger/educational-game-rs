@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 use bevy_persistent::prelude::*;
 
@@ -134,21 +136,23 @@ fn spawn_question_counter_section(
                     ScrollContent,
                 ))
                 .with_children(|col| {
-                    let type_order = [
-                        QuestionType::Mcq,
-                        QuestionType::Visualization,
-                        QuestionType::Comparison,
-                        QuestionType::Identification,
-                        QuestionType::NumericInput,
-                    ];
+                    let mut questions_by_type = HashMap::<QuestionType, Vec<&DraftQuestion>>::new();
+                    for question in &questions {
+                        questions_by_type
+                            .entry(question.question_type)
+                            .or_default()
+                            .push(question);
+                    }
+                    let mut question_groups = questions_by_type.into_iter().collect::<Vec<_>>();
+                    question_groups.sort_by_key(|(question_type, _)| match question_type {
+                        QuestionType::Mcq => 0,
+                        QuestionType::Visualization => 1,
+                        QuestionType::Comparison => 2,
+                        QuestionType::Identification => 3,
+                        QuestionType::NumericInput => 4,
+                    });
 
-                    for qt in type_order {
-                        let questions_of_type: Vec<&DraftQuestion> =
-                            questions.iter().filter(|q| q.question_type == qt).collect();
-                        if questions_of_type.is_empty() {
-                            continue;
-                        }
-
+                    for (qt, questions_of_type) in question_groups {
                         col.spawn((
                             Text::new(question_type_label(qt, &i18n_owned)),
                             theme::typography::text(theme::fonts::BODY, window),
