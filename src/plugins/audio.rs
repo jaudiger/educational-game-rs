@@ -315,21 +315,22 @@ fn on_play_click_sound(
 }
 
 /// Keeps the volume of currently playing background music in sync with
-/// `GameSettings::music_volume`. Skips entities that are still fading in
-/// to avoid conflicting with the fade animation.
+/// `GameSettings::music_volume`, including tracks that are still fading in.
 fn sync_music_volume(
     settings: Res<Persistent<GameSettings>>,
     current_music: Option<Res<CurrentMusic>>,
-    mut query: Query<(&mut AudioSink, Option<&FadeIn>), With<BackgroundMusic>>,
+    mut query: Query<(&mut AudioSink, Option<&mut FadeIn>), With<BackgroundMusic>>,
 ) {
     let multiplier = current_music
         .as_ref()
         .map_or(1.0, |cm| cm.0.volume_multiplier());
+    let target = settings.music_volume * multiplier;
     for (mut sink, fade_in) in &mut query {
-        if fade_in.is_some() {
+        if let Some(mut fade_in) = fade_in {
+            fade_in.target = target;
             continue;
         }
-        let target = Volume::Linear(settings.music_volume * multiplier);
+        let target = Volume::Linear(target);
         if sink.volume() != target {
             sink.set_volume(target);
         }
