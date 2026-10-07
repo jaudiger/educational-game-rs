@@ -128,7 +128,7 @@ struct RemoveStudentButton(usize);
 struct StudentRemovePopover;
 
 #[derive(Component, Reflect)]
-struct RemoveStudentTarget(usize);
+struct RemoveStudentTarget(usize, String);
 
 #[derive(Component, Reflect)]
 struct AddStudentButton;
@@ -438,7 +438,7 @@ fn handle_remove_student_click(
 
             let modal_entity = spawn_confirmation_modal(
                 &mut commands,
-                &i18n.t(&TranslationKey::RemoveStudentConfirm(student_name)),
+                &i18n.t(&TranslationKey::RemoveStudentConfirm(student_name.clone())),
                 &i18n.t(&TranslationKey::Delete),
                 &i18n.t(&TranslationKey::Cancel),
                 theme::colors::ERROR,
@@ -449,7 +449,7 @@ fn handle_remove_student_click(
                 .entity(modal_entity)
                 .insert((
                     StudentRemovePopover,
-                    RemoveStudentTarget(student_index),
+                    RemoveStudentTarget(student_index, student_name),
                     DespawnOnExit(AppState::MapExploration),
                 ))
                 .observe(handle_confirm_remove_student);
@@ -472,11 +472,15 @@ fn handle_confirm_remove_student(
         return;
     };
     let student_index = target.0;
+    let student_name = target.1.clone();
 
     save_data
         .update(|data| {
             if let Some(ref mut class_save) = data.class_slots[slot.0]
-                && student_index < class_save.students.len()
+                && class_save
+                    .students
+                    .get(student_index)
+                    .is_some_and(|student| student.name == student_name)
             {
                 class_save.students.remove(student_index);
             }
