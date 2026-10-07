@@ -13,8 +13,8 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, StateScopedResourceExt};
 use crate::ui::components::{
-    PopoverCancelButton, PopoverConfirmButton, action_button_scene, button_base, card_node,
-    icon_button, screen_root, spawn_confirmation_modal, standard_button,
+    ConfirmationDialogAction, ConfirmationDialogActionEvent, action_button_scene, button_base,
+    card_node, icon_button, screen_root, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -34,8 +34,6 @@ impl Plugin for SaveSlotsScreenPlugin {
                 (
                     handle_slot_click,
                     handle_delete_click,
-                    handle_confirm_delete,
-                    handle_cancel_delete,
                     handle_create_confirm,
                     handle_cancel_create,
                     sync_creation_name_input_border,
@@ -486,64 +484,53 @@ fn handle_delete_click(
             );
             commands
                 .entity(modal_entity)
-                .insert((DeletePopover, ConfirmDeleteTarget(slot_index)));
+                .insert((
+                    DeletePopover,
+                    ConfirmDeleteTarget(slot_index),
+                    DespawnOnExit(AppState::SaveSlots),
+                ))
+                .observe(handle_confirm_delete);
         }
     }
 }
 
 fn handle_confirm_delete(
-    query: Query<&Interaction, (Changed<Interaction>, With<PopoverConfirmButton>)>,
-    popover: Single<(Entity, &ConfirmDeleteTarget), With<DeletePopover>>,
+    event: On<ConfirmationDialogActionEvent>,
+    target_query: Query<&ConfirmDeleteTarget>,
     mut persistence: PersistenceMut<'_>,
     mut commands: Commands,
     root_query: Query<Entity, With<SaveSlotsRoot>>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
-    for interaction in &query {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-
-        let (popover_entity, target) = *popover;
-        let index = target.0;
-        let mode = persistence.settings.mode;
-
-        persistence
-            .save_data
-            .update(|data| match mode {
-                GameMode::Individual => data.individual_slots[index] = None,
-                GameMode::Group => data.class_slots[index] = None,
-            })
-            .expect("failed to update save data");
-
-        // Despawn popover and root UI, then rebuild
-        commands.entity(popover_entity).despawn();
-        for entity in &root_query {
-            commands.entity(entity).despawn();
-        }
-        spawn_save_slots_ui(
-            &mut commands,
-            mode,
-            &persistence.save_data,
-            &i18n,
-            *primary_window,
-        );
+    if event.action != ConfirmationDialogAction::Confirm {
+        return;
     }
-}
 
-fn handle_cancel_delete(
-    query: Query<&Interaction, (Changed<Interaction>, With<PopoverCancelButton>)>,
-    mut commands: Commands,
-    popover_query: Query<Entity, With<DeletePopover>>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            for entity in &popover_query {
-                commands.entity(entity).try_despawn();
-            }
-        }
+    let Ok(target) = target_query.get(event.entity) else {
+        return;
+    };
+    let index = target.0;
+    let mode = persistence.settings.mode;
+
+    persistence
+        .save_data
+        .update(|data| match mode {
+            GameMode::Individual => data.individual_slots[index] = None,
+            GameMode::Group => data.class_slots[index] = None,
+        })
+        .expect("failed to update save data");
+
+    for entity in &root_query {
+        commands.entity(entity).despawn();
     }
+    spawn_save_slots_ui(
+        &mut commands,
+        mode,
+        &persistence.save_data,
+        &i18n,
+        *primary_window,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]

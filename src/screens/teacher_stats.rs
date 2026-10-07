@@ -17,7 +17,7 @@ use crate::screens::teacher_roster::TeacherRosterView;
 use crate::screens::teacher_shared::{ViewingStudentStats, question_type_label};
 use crate::states::{AppState, StateScopedResourceExt, cleanup_root};
 use crate::ui::components::{
-    PopoverCancelButton, PopoverConfirmButton, icon_button, spawn_confirmation_modal,
+    ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button, spawn_confirmation_modal,
     standard_button,
 };
 use crate::ui::theme;
@@ -45,12 +45,7 @@ impl Plugin for TeacherStatsScreenPlugin {
         )
         .add_systems(
             Update,
-            (
-                handle_return_to_list,
-                handle_reset_click,
-                handle_confirm_reset,
-                handle_cancel_reset,
-            )
+            (handle_return_to_list, handle_reset_click)
                 .run_if(in_state(AppState::MapExploration))
                 .run_if(resource_exists::<ViewingStudentStats>),
         )
@@ -603,75 +598,59 @@ fn handle_reset_click(
         );
         commands
             .entity(modal_entity)
-            .insert((StatsResetPopover, reset_btn.0.clone()));
+            .insert((
+                StatsResetPopover,
+                reset_btn.0.clone(),
+                DespawnOnExit(AppState::MapExploration),
+            ))
+            .observe(handle_confirm_reset);
     }
 }
 
 fn handle_confirm_reset(
-    query: Query<&Interaction, (Changed<Interaction>, With<PopoverConfirmButton>)>,
-    popover: Query<(Entity, &StatsResetTarget), With<StatsResetPopover>>,
+    event: On<ConfirmationDialogActionEvent>,
+    target_query: Query<&StatsResetTarget>,
     viewing: Res<ViewingStudentStats>,
     active_slot: Option<Res<ActiveSlot>>,
     mut save_data: ResMut<Persistent<SaveData>>,
-    mut commands: Commands,
 ) {
+    if event.action != ConfirmationDialogAction::Confirm {
+        return;
+    }
     let Some(ref slot) = active_slot else { return };
-    let Ok((popover_entity, target)) = popover.single() else {
+    let Ok(target) = target_query.get(event.entity) else {
         return;
     };
 
-    for interaction in &query {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
+    let student_index = viewing.0;
+    let slot_index = slot.0;
+    let target = target.clone();
 
-        let student_index = viewing.0;
-        let slot_index = slot.0;
-        let target = target.clone();
-
-        let _ = save_data.update(|data| {
-            let Some(class_save) = data.class_slots[slot_index].as_mut() else {
-                return;
-            };
-            let Some(student) = class_save.students.get_mut(student_index) else {
-                return;
-            };
-            match target {
-                StatsResetTarget::All => {
-                    student.progress.clear();
-                }
-                StatsResetTarget::Lesson(ref lid) => {
-                    student.progress.remove(lid);
-                }
-                StatsResetTarget::Type(ref lid, qt) => {
-                    if let Some(lp) = student.progress.get_mut(lid) {
-                        lp.type_scores.remove(&qt);
-                        // If no types left, remove the lesson entry entirely
-                        if lp.type_scores.is_empty() {
-                            student.progress.remove(lid);
-                        }
+    let _ = save_data.update(|data| {
+        let Some(class_save) = data.class_slots[slot_index].as_mut() else {
+            return;
+        };
+        let Some(student) = class_save.students.get_mut(student_index) else {
+            return;
+        };
+        match target {
+            StatsResetTarget::All => {
+                student.progress.clear();
+            }
+            StatsResetTarget::Lesson(ref lid) => {
+                student.progress.remove(lid);
+            }
+            StatsResetTarget::Type(ref lid, qt) => {
+                if let Some(lp) = student.progress.get_mut(lid) {
+                    lp.type_scores.remove(&qt);
+                    // If no types left, remove the lesson entry entirely
+                    if lp.type_scores.is_empty() {
+                        student.progress.remove(lid);
                     }
                 }
             }
-        });
-
-        commands.entity(popover_entity).try_despawn();
-        // rebuild_stats_ui reacts to the Persistent<SaveData> change tick.
-    }
-}
-
-fn handle_cancel_reset(
-    query: Query<&Interaction, (Changed<Interaction>, With<PopoverCancelButton>)>,
-    mut commands: Commands,
-    popover_query: Query<Entity, With<StatsResetPopover>>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            for entity in &popover_query {
-                commands.entity(entity).try_despawn();
-            }
         }
-    }
+    });
 }
 
 fn handle_return_to_list(

@@ -13,7 +13,8 @@ use crate::states::{
     AppState, InLessonFlow, LESSON_FLOW_STATES, LessonPhase, StateScopedResourceExt, cleanup_root,
 };
 use crate::ui::components::{
-    PopoverCancelButton, PopoverConfirmButton, button_base, icon_button, spawn_confirmation_modal,
+    ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base, icon_button,
+    spawn_confirmation_modal,
 };
 use crate::ui::text_input::{TextInputState, text_input};
 use crate::ui::theme;
@@ -68,12 +69,7 @@ impl Plugin for TeacherRosterScreenPlugin {
             // Full roster editing (add, remove, input) only during MapExploration
             .add_systems(
                 Update,
-                (
-                    handle_add_student,
-                    handle_remove_student_click,
-                    handle_confirm_remove_student,
-                    handle_cancel_remove_student,
-                )
+                (handle_add_student, handle_remove_student_click)
                     .run_if(in_state(AppState::MapExploration))
                     .run_if(resource_exists::<TeacherRosterSelection>),
             )
@@ -451,54 +447,44 @@ fn handle_remove_student_click(
             );
             commands
                 .entity(modal_entity)
-                .insert((StudentRemovePopover, RemoveStudentTarget(student_index)));
+                .insert((
+                    StudentRemovePopover,
+                    RemoveStudentTarget(student_index),
+                    DespawnOnExit(AppState::MapExploration),
+                ))
+                .observe(handle_confirm_remove_student);
         }
     }
 }
 
 fn handle_confirm_remove_student(
-    query: Query<&Interaction, (Changed<Interaction>, With<PopoverConfirmButton>)>,
-    popover: Single<(Entity, &RemoveStudentTarget), With<StudentRemovePopover>>,
+    event: On<ConfirmationDialogActionEvent>,
+    target_query: Query<&RemoveStudentTarget>,
     active_slot: Option<Res<ActiveSlot>>,
     mut save_data: ResMut<Persistent<SaveData>>,
     mut commands: Commands,
 ) {
+    if event.action != ConfirmationDialogAction::Confirm {
+        return;
+    }
     let Some(ref slot) = active_slot else { return };
+    let Ok(target) = target_query.get(event.entity) else {
+        return;
+    };
+    let student_index = target.0;
 
-    for interaction in &query {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-
-        let student_index = popover.1.0;
-
-        save_data
-            .update(|data| {
-                if let Some(ref mut class_save) = data.class_slots[slot.0]
-                    && student_index < class_save.students.len()
-                {
-                    class_save.students.remove(student_index);
-                }
-            })
-            .expect("failed to update save data");
-
-        // Re-insert the view marker to bump its change tick and request a rebuild.
-        commands.insert_resource(TeacherRosterView);
-    }
-}
-
-fn handle_cancel_remove_student(
-    query: Query<&Interaction, (Changed<Interaction>, With<PopoverCancelButton>)>,
-    mut commands: Commands,
-    popover_query: Query<Entity, With<StudentRemovePopover>>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            for entity in &popover_query {
-                commands.entity(entity).try_despawn();
+    save_data
+        .update(|data| {
+            if let Some(ref mut class_save) = data.class_slots[slot.0]
+                && student_index < class_save.students.len()
+            {
+                class_save.students.remove(student_index);
             }
-        }
-    }
+        })
+        .expect("failed to update save data");
+
+    // Re-insert the view marker to bump its change tick and request a rebuild.
+    commands.insert_resource(TeacherRosterView);
 }
 
 /// Tears down the roster and opens the stats view for `student_index`.

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::text::{FontSize, FontSource};
 use bevy::ui_widgets::{Checkbox, RadioButton};
 
-use super::components::{CheckboxMark, RadioMark};
+use super::components::{CheckboxMark, RadioMark, dispatch_confirmation_button_actions};
 use super::widget_styles;
 
 /// Reference design vmin (min dimension of the 1280x720 default window).
@@ -94,6 +94,7 @@ impl Plugin for ThemePlugin {
                 widget_styles::update_slider_thumb_position,
                 widget_styles::dismiss_tooltip_timer,
                 widget_styles::handle_hover_tooltips,
+                dispatch_confirmation_button_actions,
                 scale_fonts_on_window_resize,
             ),
         );
