@@ -97,7 +97,7 @@ fn handle_text_input_keyboard(
 }
 
 fn update_text_input_display(
-    input_query: Query<(&TextInputState, &Children)>,
+    input_query: Query<(&TextInputState, &Children), Changed<TextInputState>>,
     mut text_query: Query<&mut Text, With<TextInputDisplay>>,
 ) {
     for (state, children) in &input_query {
