@@ -64,7 +64,7 @@ impl SfxKind {
 const fn music_for_state(state: AppState) -> MusicTrack {
     match state {
         AppState::Home | AppState::SaveSlots | AppState::Settings => MusicTrack::Menu,
-        AppState::MapExploration => MusicTrack::Exploration,
+        AppState::ThemeExploration => MusicTrack::Exploration,
         AppState::LessonPlay | AppState::LessonSummary => MusicTrack::Lesson,
     }
 }
@@ -119,7 +119,7 @@ impl Plugin for GameAudioPlugin {
         app.add_systems(OnEnter(AppState::Home), on_state_enter_music);
         app.add_systems(OnEnter(AppState::SaveSlots), on_state_enter_music);
         app.add_systems(OnEnter(AppState::Settings), on_state_enter_music);
-        app.add_systems(OnEnter(AppState::MapExploration), on_state_enter_music);
+        app.add_systems(OnEnter(AppState::ThemeExploration), on_state_enter_music);
         app.add_systems(OnEnter(AppState::LessonPlay), on_state_enter_music);
         app.add_systems(OnEnter(AppState::LessonSummary), on_state_enter_music);
 

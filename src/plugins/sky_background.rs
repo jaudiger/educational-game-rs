@@ -1,7 +1,7 @@
-//! Animated sky background for the `MapTheme::Sky` visual theme.
+//! Animated sky background for the `ExplorationTheme::Sky` visual theme.
 //!
 //! Spawns a gradient sky and multiple layers of drifting clouds during
-//! `AppState::MapExploration` when the sky theme is selected. Clouds are
+//! `AppState::ThemeExploration` when the sky theme is selected. Clouds are
 //! procedurally generated with no external assets required.
 
 use bevy::asset::RenderAssetUsages;
@@ -12,30 +12,30 @@ use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::Persistent;
 use rand::RngExt;
 
-use crate::data::{GameSettings, MapTheme};
+use crate::data::{ExplorationTheme, GameSettings};
 use crate::states::AppState;
 
 /// Renders an animated sky background with parallax clouds.
 ///
-/// Active only during `AppState::MapExploration` when
-/// `GameSettings.map_theme == MapTheme::Sky`.
+/// Active only during `AppState::ThemeExploration` when
+/// `GameSettings.exploration_theme == ExplorationTheme::Sky`.
 ///
 /// # Extensibility
 ///
-/// Each `MapTheme` variant gets its own background plugin. Adding a new
+/// Each `ExplorationTheme` variant gets its own background plugin. Adding a new
 /// background theme means creating a new plugin file with the same pattern:
 /// `OnEnter`/`OnExit` for setup/cleanup, `Update` systems guarded by
-/// `in_state(MapExploration)` and a theme-specific resource run condition.
+/// `in_state(ThemeExploration)` and a theme-specific resource run condition.
 pub struct SkyBackgroundPlugin;
 
 impl Plugin for SkyBackgroundPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::MapExploration), setup_sky_background)
-            .add_systems(OnExit(AppState::MapExploration), cleanup_sky_background)
+        app.add_systems(OnEnter(AppState::ThemeExploration), setup_sky_background)
+            .add_systems(OnExit(AppState::ThemeExploration), cleanup_sky_background)
             .add_systems(
                 Update,
                 (resize_gradient_to_viewport, animate_clouds)
-                    .run_if(in_state(AppState::MapExploration))
+                    .run_if(in_state(AppState::ThemeExploration))
                     .run_if(resource_exists::<SkyBackgroundActive>),
             );
     }
@@ -55,7 +55,7 @@ struct SkyCloud {
 }
 
 /// Inserted when the sky background is active. Used as a run condition so
-/// update systems don't run when another map theme is selected.
+/// update systems don't run when another exploration theme is selected.
 #[derive(Resource, Reflect)]
 struct SkyBackgroundActive;
 
@@ -287,7 +287,7 @@ fn setup_sky_background(
     settings: Res<Persistent<GameSettings>>,
     window: Single<&Window, With<PrimaryWindow>>,
 ) {
-    if settings.map_theme != MapTheme::Sky {
+    if settings.exploration_theme != ExplorationTheme::Sky {
         return;
     }
 
@@ -309,7 +309,7 @@ fn setup_sky_background(
             win_h / grad_h,
             1.0,
         )),
-        DespawnOnExit(AppState::MapExploration),
+        DespawnOnExit(AppState::ThemeExploration),
     ));
 
     // --- Cloud textures (one per shape variant) ---
@@ -353,7 +353,7 @@ fn setup_sky_background(
                     ..default()
                 },
                 Transform::from_xyz(x, y, layer.z).with_scale(Vec3::splat(scale)),
-                DespawnOnExit(AppState::MapExploration),
+                DespawnOnExit(AppState::ThemeExploration),
             ));
         }
     }

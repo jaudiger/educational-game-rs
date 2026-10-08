@@ -131,7 +131,7 @@ fn handle_quit_lesson(
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::MapExploration);
+            next_state.set(AppState::ThemeExploration);
         }
     }
 }

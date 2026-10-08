@@ -252,14 +252,14 @@ fn spawn_slot_card(
     });
 }
 
-/// Load the slot and transition to `MapExploration`.
+/// Load the slot and transition to `ThemeExploration`.
 fn navigate_to_existing_slot(
     commands: &mut Commands,
     index: usize,
     next_state: &mut NextState<AppState>,
 ) {
     commands.insert_resource(PlayerSession { slot_index: index });
-    next_state.set(AppState::MapExploration);
+    next_state.set(AppState::ThemeExploration);
 }
 
 /// Despawn any existing creation form and spawn a new one for `index`.
@@ -596,7 +596,7 @@ fn handle_create_confirm(
 
     input_focus.clear();
     state.creating_slot = None;
-    next_state.set(AppState::MapExploration);
+    next_state.set(AppState::ThemeExploration);
 }
 
 fn handle_cancel_create(

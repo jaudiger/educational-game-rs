@@ -8,7 +8,7 @@ use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::*;
 
 use crate::data::GameSettings;
-use crate::data::progress::{GameMode, Language, MapTheme};
+use crate::data::progress::{ExplorationTheme, GameMode, Language};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
 use crate::ui::components::{
@@ -58,7 +58,7 @@ struct ModeRadio(GameMode);
 struct LanguageRadio(Language);
 
 #[derive(Component, Reflect)]
-struct MapThemeRadio(MapTheme);
+struct ExplorationThemeRadio(ExplorationTheme);
 
 fn setup_settings(
     mut commands: Commands,
@@ -100,7 +100,7 @@ fn spawn_settings_ui(
                 children![
                     mode_section(settings.mode, i18n, window),
                     language_section(settings.language, i18n, window),
-                    map_theme_section(settings.map_theme, i18n, window),
+                    exploration_theme_section(settings.exploration_theme, i18n, window),
                     bool_setting_section(
                         BoolSettingField::ShowExplanations,
                         settings.show_explanations,
@@ -295,14 +295,18 @@ fn rebuild_settings_on_language_change(
     spawn_settings_ui(&mut commands, &settings, &i18n, *primary_window);
 }
 
-fn map_theme_section(current_theme: MapTheme, i18n: &I18n, window: Entity) -> impl Bundle + use<> {
-    let label = i18n.t(&TranslationKey::MapThemeLabel);
-    let sky_checked = current_theme == MapTheme::Sky;
-    let ocean_checked = current_theme == MapTheme::Ocean;
-    let space_checked = current_theme == MapTheme::Space;
-    let sky_label = i18n.t(&TranslationKey::MapThemeSky).into_owned();
-    let ocean_label = i18n.t(&TranslationKey::MapThemeOcean).into_owned();
-    let space_label = i18n.t(&TranslationKey::MapThemeSpace).into_owned();
+fn exploration_theme_section(
+    current_theme: ExplorationTheme,
+    i18n: &I18n,
+    window: Entity,
+) -> impl Bundle + use<> {
+    let label = i18n.t(&TranslationKey::ExplorationThemeLabel);
+    let sky_checked = current_theme == ExplorationTheme::Sky;
+    let ocean_checked = current_theme == ExplorationTheme::Ocean;
+    let space_checked = current_theme == ExplorationTheme::Space;
+    let sky_label = i18n.t(&TranslationKey::ExplorationThemeSky).into_owned();
+    let ocean_label = i18n.t(&TranslationKey::ExplorationThemeOcean).into_owned();
+    let space_label = i18n.t(&TranslationKey::ExplorationThemeSpace).into_owned();
     let coming_soon = i18n.t(&TranslationKey::ComingSoon).into_owned();
 
     (
@@ -324,7 +328,7 @@ fn map_theme_section(current_theme: MapTheme, i18n: &I18n, window: Entity) -> im
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
                     let mut cmd = parent.spawn((
                         radio_button(&sky_label, sky_checked, window),
-                        MapThemeRadio(MapTheme::Sky),
+                        ExplorationThemeRadio(ExplorationTheme::Sky),
                     ));
                     if sky_checked {
                         cmd.insert(Checked);
@@ -332,7 +336,7 @@ fn map_theme_section(current_theme: MapTheme, i18n: &I18n, window: Entity) -> im
 
                     let mut cmd = parent.spawn((
                         radio_button_muted(&ocean_label, &coming_soon, ocean_checked, window),
-                        MapThemeRadio(MapTheme::Ocean),
+                        ExplorationThemeRadio(ExplorationTheme::Ocean),
                     ));
                     if ocean_checked {
                         cmd.insert(Checked);
@@ -340,7 +344,7 @@ fn map_theme_section(current_theme: MapTheme, i18n: &I18n, window: Entity) -> im
 
                     let mut cmd = parent.spawn((
                         radio_button_muted(&space_label, &coming_soon, space_checked, window),
-                        MapThemeRadio(MapTheme::Space),
+                        ExplorationThemeRadio(ExplorationTheme::Space),
                     ));
                     if space_checked {
                         cmd.insert(Checked);
@@ -353,27 +357,27 @@ fn map_theme_section(current_theme: MapTheme, i18n: &I18n, window: Entity) -> im
 
 fn handle_theme_radio_change(
     event: On<ValueChange<Entity>>,
-    radio_query: Query<(Entity, &MapThemeRadio)>,
+    radio_query: Query<(Entity, &ExplorationThemeRadio)>,
     mut settings: ResMut<Persistent<GameSettings>>,
     mut commands: Commands,
 ) {
     let Ok((_, theme_radio)) = radio_query.get(event.value) else {
         return;
     };
-    let map_theme = theme_radio.0;
+    let exploration_theme = theme_radio.0;
 
     // Only allow selecting Sky for now
-    if map_theme != MapTheme::Sky {
+    if exploration_theme != ExplorationTheme::Sky {
         return;
     }
 
     settings
-        .update(|s| s.map_theme = map_theme)
+        .update(|s| s.exploration_theme = exploration_theme)
         .expect("failed to update game settings");
 
     // Update Checked states on all radio buttons
     for (entity, radio) in radio_query.iter().collect::<Vec<_>>() {
-        if radio.0 == map_theme {
+        if radio.0 == exploration_theme {
             commands.entity(entity).insert(Checked);
         } else {
             commands.entity(entity).remove::<Checked>();

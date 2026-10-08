@@ -53,11 +53,11 @@ pub enum TranslationKey {
     LessonMultiplicationTables,
     LessonMultiplyByPowerOf10,
 
-    // Map / Lesson
-    BackToWorldMap,
+    // Theme Exploration
+    BackToThemes,
     BestPercent(u32),
     LessonsCompleted(usize, usize),
-    WorldMap,
+    Themes,
 
     // Save Slots
     CreateSaveSlotN(usize),
@@ -75,10 +75,10 @@ pub enum TranslationKey {
     LanguageEnglish,
     LanguageFrench,
     LanguageLabel,
-    MapThemeLabel,
-    MapThemeOcean,
-    MapThemeSky,
-    MapThemeSpace,
+    ExplorationThemeLabel,
+    ExplorationThemeOcean,
+    ExplorationThemeSky,
+    ExplorationThemeSpace,
     Mode,
     ModeClass,
     ModeIndividual,
@@ -187,9 +187,9 @@ impl TranslationKey {
                 LessonFractions           => ("Les fractions",                             "Fractions"),
                 LessonMultiplicationTables => ("Tables de multiplication",                 "Multiplication Tables"),
                 LessonMultiplyByPowerOf10 => ("Multiplier par 10, 100, 1000",             "Multiply by 10, 100, 1000"),
-                // Map / Lesson
-                BackToWorldMap            => ("Retour \u{00e0} la carte",                  "Back to map"),
-                WorldMap                  => ("Carte du monde",                            "World Map"),
+                // Theme Exploration
+                BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
+                Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
                 // Save Slots
                 Empty                     => ("Vide",                                      "Empty"),
                 SelectClass               => ("Choisir une classe",                        "Select Class"),
@@ -200,10 +200,10 @@ impl TranslationKey {
                 GamepadNavigationLabel    => ("Manette / Clavier",                         "Gamepad / Keyboard"),
                 GamepadNavigationOn       => ("Oui",                                       "Yes"),
                 LanguageLabel             => ("Langue",                                    "Language"),
-                MapThemeLabel             => ("Th\u{00e8}me visuel",                       "Visual Theme"),
-                MapThemeOcean             => ("Oc\u{00e9}an",                              "Ocean"),
-                MapThemeSky               => ("Ciel",                                      "Sky"),
-                MapThemeSpace             => ("Espace",                                    "Space"),
+                ExplorationThemeLabel             => ("Th\u{00e8}me visuel",                       "Visual Theme"),
+                ExplorationThemeOcean             => ("Oc\u{00e9}an",                              "Ocean"),
+                ExplorationThemeSky               => ("Ciel",                                      "Sky"),
+                ExplorationThemeSpace             => ("Espace",                                    "Space"),
                 ModeClass                 => ("Classe",                                    "Class"),
                 ModeIndividual            => ("Individuel",                                "Individual"),
                 MusicVolumeLabel          => ("Musique",                                   "Music"),

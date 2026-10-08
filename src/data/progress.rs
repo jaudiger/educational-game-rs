@@ -16,16 +16,16 @@ pub enum GameMode {
     Group,
 }
 
-/// Visual theme for the map exploration screen.
+/// Visual theme applied to the theme exploration screen.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect, Deserialize, Serialize)]
-pub enum MapTheme {
+pub enum ExplorationTheme {
     #[default]
     Sky,
     Ocean,
     Space,
 }
 
-/// Persistent user preferences (volume, language, mode, theme).
+/// Persistent user preferences (volume, language, mode, exploration theme).
 #[derive(Resource, Clone, Debug, Reflect, Deserialize, Serialize)]
 pub struct GameSettings {
     pub music_volume: f32,
@@ -33,7 +33,7 @@ pub struct GameSettings {
     pub show_explanations: bool,
     pub mode: GameMode,
     pub language: Language,
-    pub map_theme: MapTheme,
+    pub exploration_theme: ExplorationTheme,
     pub gamepad_navigation: bool,
 }
 
@@ -45,7 +45,7 @@ impl Default for GameSettings {
             show_explanations: true,
             mode: GameMode::Individual,
             language: Language::default(),
-            map_theme: MapTheme::default(),
+            exploration_theme: ExplorationTheme::default(),
             gamepad_navigation: false,
         }
     }
@@ -75,7 +75,7 @@ impl LessonSession {
     }
 }
 
-/// Tracks which theme is currently selected when in `MapView::ThemeDetail`.
+/// Tracks which theme is currently selected when in `ExplorationView::ThemeLessons`.
 #[derive(Resource, Clone, Debug, Deref, Reflect)]
 pub struct ActiveTheme(pub String);
 

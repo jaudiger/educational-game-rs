@@ -7,7 +7,7 @@ pub enum AppState {
     #[default]
     Home,
     SaveSlots,
-    MapExploration,
+    ThemeExploration,
     LessonPlay,
     LessonSummary,
     Settings,
@@ -16,13 +16,13 @@ pub enum AppState {
 /// The `AppState` variants where the lesson flow is active.
 /// Used for screen cleanup and view resets on each intra-flow transition.
 pub const LESSON_FLOW_STATES: [AppState; 3] = [
-    AppState::MapExploration,
+    AppState::ThemeExploration,
     AppState::LessonPlay,
     AppState::LessonSummary,
 ];
 
 /// Computed state that is active when the application is in the lesson flow
-/// (map exploration, lesson play, or lesson summary).
+/// (theme exploration, lesson play, or lesson summary).
 ///
 /// Use `in_state(InLessonFlow)` as a run condition instead of chaining
 /// `.or(in_state(...))` for each variant.
@@ -36,7 +36,9 @@ impl ComputedStates for InLessonFlow {
 
     fn compute(sources: AppState) -> Option<Self> {
         match sources {
-            AppState::MapExploration | AppState::LessonPlay | AppState::LessonSummary => Some(Self),
+            AppState::ThemeExploration | AppState::LessonPlay | AppState::LessonSummary => {
+                Some(Self)
+            }
             _ => None,
         }
     }
@@ -45,7 +47,7 @@ impl ComputedStates for InLessonFlow {
 /// Computed state covering the active-lesson cycle (`LessonPlay` and
 /// `LessonSummary`). Used as the cleanup scope for per-lesson runtime
 /// resources so that both normal completion and early exit (quit button)
-/// trigger a single `OnExit` cleanup when returning to `MapExploration`.
+/// trigger a single `OnExit` cleanup when returning to `ThemeExploration`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ActiveLesson;
 

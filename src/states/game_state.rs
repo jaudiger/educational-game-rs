@@ -14,10 +14,10 @@ pub enum LessonPhase {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, SubStates)]
-#[source(AppState = AppState::MapExploration)]
+#[source(AppState = AppState::ThemeExploration)]
 #[states(scoped_entities)]
-pub enum MapView {
+pub enum ExplorationView {
     #[default]
-    WorldOverview,
-    ThemeDetail,
+    Themes,
+    ThemeLessons,
 }

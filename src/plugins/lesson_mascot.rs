@@ -3,11 +3,11 @@
 //! Spawns an animated decorative element on the lesson play screen,
 //! absolutely positioned on the background behind the question container.
 //! The mascot is visible through the card's semi-transparent overlay.
-//! It matches the current [`MapTheme`] from settings.
+//! It matches the current [`ExplorationTheme`] from settings.
 //!
 //! # Extensibility
 //!
-//! Each [`MapTheme`] variant provides its own mascot via a dedicated spawn
+//! Each [`ExplorationTheme`] variant provides its own mascot via a dedicated spawn
 //! function. A new theme mascot needs a spawn function, a match arm in
 //! [`spawn_lesson_mascot`], and any theme-specific systems registered by
 //! [`LessonMascotPlugin`].
@@ -15,7 +15,7 @@
 use bevy::prelude::*;
 use bevy::scene::{EntityCommandsSceneExt, Scene, SceneComponent, bsn};
 
-use crate::data::MapTheme;
+use crate::data::ExplorationTheme;
 use crate::states::AppState;
 use crate::ui::theme;
 
@@ -78,7 +78,7 @@ const BOB_AMPLITUDE: f32 = 2.0;
 /// Vertical bob frequency (rad/s).
 const BOB_FREQUENCY: f32 = 0.8;
 
-/// Spawns the lesson mascot for the current [`MapTheme`].
+/// Spawns the lesson mascot for the current [`ExplorationTheme`].
 ///
 /// Called during lesson play screen setup. The mascot is absolutely
 /// positioned on the background (middle-right, at the grass level) and
@@ -90,13 +90,13 @@ const BOB_FREQUENCY: f32 = 0.8;
 /// without a mascot yet simply spawn nothing.
 pub fn spawn_lesson_mascot(
     parent: &mut ChildSpawnerCommands,
-    map_theme: MapTheme,
+    exploration_theme: ExplorationTheme,
     asset_server: &AssetServer,
 ) {
-    match map_theme {
-        MapTheme::Sky => spawn_sky_balloon_mascot(parent, asset_server),
+    match exploration_theme {
+        ExplorationTheme::Sky => spawn_sky_balloon_mascot(parent, asset_server),
         // Future themes: add a spawn function and match arm here.
-        MapTheme::Ocean | MapTheme::Space => {}
+        ExplorationTheme::Ocean | ExplorationTheme::Space => {}
     }
 }
 

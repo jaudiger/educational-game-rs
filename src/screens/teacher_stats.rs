@@ -29,17 +29,17 @@ impl Plugin for TeacherStatsScreenPlugin {
         app.add_systems(
             Update,
             rebuild_stats_ui
-                .run_if(in_state(AppState::MapExploration))
+                .run_if(in_state(AppState::ThemeExploration))
                 .run_if(teacher_window_exists),
         )
         .add_systems(
             Update,
             (handle_return_to_list, handle_reset_click)
-                .run_if(in_state(AppState::MapExploration))
+                .run_if(in_state(AppState::ThemeExploration))
                 .run_if(teacher_stats_view_active),
         )
         .add_systems(
-            OnExit(AppState::MapExploration),
+            OnExit(AppState::ThemeExploration),
             cleanup_root::<TeacherStatsRoot>,
         );
     }
@@ -647,7 +647,7 @@ fn handle_reset_click(
                     student_index,
                     target: reset_btn.0.clone(),
                 },
-                DespawnOnExit(AppState::MapExploration),
+                DespawnOnExit(AppState::ThemeExploration),
             ))
             .observe(handle_confirm_reset);
     }

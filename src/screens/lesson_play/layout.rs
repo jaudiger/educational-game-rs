@@ -71,7 +71,7 @@ pub(super) fn setup_lesson_play(
         ))
         .with_children(|parent| {
             // Mascot first: absolutely positioned, renders behind siblings.
-            spawn_lesson_mascot(parent, ctx.settings.map_theme, &asset_server);
+            spawn_lesson_mascot(parent, ctx.settings.exploration_theme, &asset_server);
             spawn_top_bar(parent, &progress, window);
             spawn_question_container(parent);
         });

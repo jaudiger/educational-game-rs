@@ -18,11 +18,11 @@ use questions::{
     NumericInputPlugin,
 };
 use screens::{
-    HomeScreenPlugin, LessonPlayScreenPlugin, LessonSummaryScreenPlugin,
-    MapExplorationScreenPlugin, SaveSlotsScreenPlugin, SettingsScreenPlugin,
-    TeacherLessonsScreenPlugin, TeacherRosterScreenPlugin, TeacherStatsScreenPlugin,
+    HomeScreenPlugin, LessonPlayScreenPlugin, LessonSummaryScreenPlugin, SaveSlotsScreenPlugin,
+    SettingsScreenPlugin, TeacherLessonsScreenPlugin, TeacherRosterScreenPlugin,
+    TeacherStatsScreenPlugin, ThemeExplorationScreenPlugin,
 };
-use states::{ActiveLesson, AppState, InLessonFlow, LessonPhase, MapView};
+use states::{ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase};
 use ui::{
     FocusNavigationPlugin, NavigationPlugin, ScrollPlugin, TextInputPlugin, ThemePlugin,
     UiAnimationPlugin,
@@ -46,7 +46,7 @@ fn main() {
         .add_computed_state::<InLessonFlow>()
         .add_computed_state::<ActiveLesson>()
         .add_sub_state::<LessonPhase>()
-        .add_sub_state::<MapView>()
+        .add_sub_state::<ExplorationView>()
         // Plugins
         .add_plugins((
             BalloonCursorPlugin,
@@ -76,7 +76,7 @@ fn main() {
         .add_plugins((
             HomeScreenPlugin,
             SaveSlotsScreenPlugin,
-            MapExplorationScreenPlugin,
+            ThemeExplorationScreenPlugin,
             LessonPlayScreenPlugin,
             LessonSummaryScreenPlugin,
             SettingsScreenPlugin,

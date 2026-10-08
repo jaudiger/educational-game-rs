@@ -113,7 +113,7 @@ pub struct TeacherScreenParam<'w, 's> {
 impl Plugin for TeacherPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            OnEnter(AppState::MapExploration),
+            OnEnter(AppState::ThemeExploration),
             spawn_teacher_window_if_class_mode.in_set(TeacherWindowInit),
         )
         .add_systems(
@@ -124,7 +124,7 @@ impl Plugin for TeacherPlugin {
         );
 
         for &state in &LESSON_FLOW_STATES {
-            if state == AppState::MapExploration {
+            if state == AppState::ThemeExploration {
                 app.add_systems(OnEnter(state), reset_teacher_view.after(TeacherWindowInit));
             } else {
                 app.add_systems(OnEnter(state), reset_teacher_view);

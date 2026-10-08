@@ -34,7 +34,7 @@ impl Plugin for TeacherRosterScreenPlugin {
         .add_systems(
             Update,
             (handle_add_student, handle_remove_student_click)
-                .run_if(in_state(AppState::MapExploration))
+                .run_if(in_state(AppState::ThemeExploration))
                 .run_if(teacher_roster_view_active),
         )
         .add_systems(
@@ -108,7 +108,7 @@ fn rebuild_roster_ui(
     let selected_index = ts.ctx.active_student.as_ref().map(|student| student.0);
 
     let student_names: Vec<String> = class_save.students.iter().map(|s| s.name.clone()).collect();
-    let show_input = *app_state.get() == AppState::MapExploration;
+    let show_input = *app_state.get() == AppState::ThemeExploration;
     let active_tab = state.view.tab();
 
     // Pre-compute all i18n strings before the SpawnWith closure
@@ -367,7 +367,7 @@ fn handle_remove_student_click(
                     StudentRemovePopover,
                     TeacherViewOverlay,
                     RemoveStudentTarget(student_index, student_name),
-                    DespawnOnExit(AppState::MapExploration),
+                    DespawnOnExit(AppState::ThemeExploration),
                 ))
                 .observe(handle_confirm_remove_student);
         }
@@ -474,7 +474,7 @@ fn handle_student_click(
             student.0 == row.0 && row.1.is_some_and(|last_click| now - last_click < 0.4)
         });
 
-        if is_double_click && *app_state.get() == AppState::MapExploration {
+        if is_double_click && *app_state.get() == AppState::ThemeExploration {
             teacher_state.view = TeacherView::StudentStats {
                 student_index: row.0,
             };

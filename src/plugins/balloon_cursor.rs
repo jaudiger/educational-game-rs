@@ -6,32 +6,32 @@ use bevy::window::{CursorOptions, PrimaryWindow};
 use bevy_persistent::prelude::Persistent;
 use rand::RngExt;
 
-use crate::data::{GameSettings, MapTheme};
+use crate::data::{ExplorationTheme, GameSettings};
 use crate::plugins::sky_background::generate_cloud_image;
 use crate::states::AppState;
 
-/// Animated hot-air balloon cursor for the `MapTheme::Sky` theme.
+/// Animated hot-air balloon cursor for the `ExplorationTheme::Sky` theme.
 ///
-/// Active only during `AppState::MapExploration` **and** when
-/// `GameSettings.map_theme == MapTheme::Sky`.
+/// Active only during `AppState::ThemeExploration` **and** when
+/// `GameSettings.exploration_theme == ExplorationTheme::Sky`.
 ///
 /// # Extensibility
 ///
-/// Each `MapTheme` variant gets its own cursor plugin (one file = one cursor).
+/// Each `ExplorationTheme` variant gets its own cursor plugin (one file = one cursor).
 /// Adding a new cursor theme means:
 /// 1. Create a new plugin file (e.g. `ocean_cursor.rs`) with the same
 ///    structure: `OnEnter`/`OnExit` setup/cleanup, `Update` systems guarded
-///    by `in_state(MapExploration)`, and a theme check in setup.
+///    by `in_state(ThemeExploration)`, and a theme check in setup.
 /// 2. Register the new plugin in `main.rs`.
 ///
 /// Cursor plugins don't interfere: each spawns/queries its own marker
-/// components and early-returns when the active `MapTheme` doesn't match.
+/// components and early-returns when the active `ExplorationTheme` doesn't match.
 pub struct BalloonCursorPlugin;
 
 impl Plugin for BalloonCursorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::MapExploration), setup_balloon_cursor)
-            .add_systems(OnExit(AppState::MapExploration), cleanup_balloon_cursor)
+        app.add_systems(OnEnter(AppState::ThemeExploration), setup_balloon_cursor)
+            .add_systems(OnExit(AppState::ThemeExploration), cleanup_balloon_cursor)
             .add_systems(
                 Update,
                 (
@@ -40,7 +40,7 @@ impl Plugin for BalloonCursorPlugin {
                     spawn_cloud_puffs_system,
                     animate_cloud_puffs_system,
                 )
-                    .run_if(in_state(AppState::MapExploration))
+                    .run_if(in_state(AppState::ThemeExploration))
                     .run_if(resource_exists::<BalloonCursorActive>),
             );
     }
@@ -145,7 +145,7 @@ fn setup_balloon_cursor(
     mut cursor_opts: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     // Only activate for the Sky theme; other themes will have their own plugin.
-    if settings.map_theme != MapTheme::Sky {
+    if settings.exploration_theme != ExplorationTheme::Sky {
         return;
     }
 

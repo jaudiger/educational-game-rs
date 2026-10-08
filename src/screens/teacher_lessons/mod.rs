@@ -31,7 +31,7 @@ impl Plugin for TeacherLessonsScreenPlugin {
         .add_systems(
             Update,
             config::handle_config_button_click
-                .run_if(in_state(AppState::MapExploration))
+                .run_if(in_state(AppState::ThemeExploration))
                 .run_if(teacher_lessons_tree_view_active),
         )
         .add_systems(
@@ -46,7 +46,7 @@ impl Plugin for TeacherLessonsScreenPlugin {
                 config::update_question_labels,
                 config::update_config_hover_text,
             )
-                .run_if(in_state(AppState::MapExploration))
+                .run_if(in_state(AppState::ThemeExploration))
                 .run_if(teacher_lesson_config_view_active),
         );
     }
@@ -163,7 +163,7 @@ fn rebuild_lessons_ui(
             ));
         }
         TeacherView::Lessons => {
-            let is_map_exploration = *app_state.get() == AppState::MapExploration;
+            let is_theme_exploration = *app_state.get() == AppState::ThemeExploration;
             let header = tab_header(&ts.i18n, active_tab, window);
             let i18n_owned = I18n::new(ts.i18n.language);
             let tree_specs = tree::build_tree_specs(
@@ -190,7 +190,7 @@ fn rebuild_lessons_ui(
                         parent,
                         &tree_specs,
                         &i18n_owned,
-                        is_map_exploration,
+                        is_theme_exploration,
                         window,
                     );
                 })),

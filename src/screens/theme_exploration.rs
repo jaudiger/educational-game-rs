@@ -5,32 +5,32 @@ use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
-    ActiveStudent, ActiveTheme, ContentLibrary, GameSettings, LessonProgress, MapTheme,
+    ActiveStudent, ActiveTheme, ContentLibrary, ExplorationTheme, GameSettings, LessonProgress,
     PlayerContext, PlayerSession, SaveData, SelectedLesson, get_current_progress,
 };
 use crate::i18n::{I18n, TranslationKey};
-use crate::states::{AppState, InLessonFlow, MapView, StateScopedResourceExt};
+use crate::states::{AppState, ExplorationView, InLessonFlow, StateScopedResourceExt};
 use crate::ui::animation::{AnimatedButton, FloatingCard};
 use crate::ui::components::{HoverTooltip, button_base, screen_root, standard_button};
 use crate::ui::theme;
 
-/// Map exploration screen showing available themes and lessons.
-pub struct MapExplorationScreenPlugin;
+/// Theme exploration screen showing available themes and lessons.
+pub struct ThemeExplorationScreenPlugin;
 
-impl Plugin for MapExplorationScreenPlugin {
+impl Plugin for ThemeExplorationScreenPlugin {
     fn build(&self, app: &mut App) {
         app.register_state_scoped_resource::<InLessonFlow, ActiveStudent>(InLessonFlow)
             .register_state_scoped_resource::<InLessonFlow, ActiveTheme>(InLessonFlow)
-            .add_systems(OnEnter(MapView::WorldOverview), setup_world_overview)
+            .add_systems(OnEnter(ExplorationView::Themes), setup_themes)
             .add_systems(
                 Update,
-                handle_world_overview.run_if(in_state(MapView::WorldOverview)),
+                handle_themes.run_if(in_state(ExplorationView::Themes)),
             )
-            .add_systems(OnEnter(MapView::ThemeDetail), setup_theme_detail)
+            .add_systems(OnEnter(ExplorationView::ThemeLessons), setup_theme_lessons)
             .add_systems(
                 Update,
-                update_map_progress.run_if(
-                    in_state(AppState::MapExploration).and_then(
+                update_exploration_progress.run_if(
+                    in_state(AppState::ThemeExploration).and_then(
                         resource_changed_or_removed::<ActiveStudent>
                             .or_else(resource_changed::<Persistent<SaveData>>),
                     ),
@@ -39,15 +39,15 @@ impl Plugin for MapExplorationScreenPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_theme_detail.run_if(in_state(MapView::ThemeDetail)),
-                    update_map_card_hover.run_if(in_state(AppState::MapExploration)),
+                    handle_theme_lessons.run_if(in_state(ExplorationView::ThemeLessons)),
+                    update_exploration_card_hover.run_if(in_state(AppState::ThemeExploration)),
                 ),
             );
     }
 }
 
 #[derive(Component, Reflect)]
-struct MapScreenRoot;
+struct ExplorationScreenRoot;
 
 #[derive(Component, Reflect)]
 struct ThemeButton(String);
@@ -56,7 +56,7 @@ struct ThemeButton(String);
 struct LessonButton(String);
 
 #[derive(Component, Reflect)]
-enum MapProgressText {
+enum ExplorationProgressText {
     Theme(String),
     Lesson(String),
 }
@@ -65,17 +65,17 @@ enum MapProgressText {
 struct BackToSaveSlotsButton;
 
 #[derive(Component, Reflect)]
-struct BackToWorldOverviewButton;
+struct BackToThemesButton;
 
-/// Colors used by map cards that cannot use transform-based hover animation.
+/// Colors used by exploration cards that cannot use transform-based hover animation.
 #[derive(Component, Reflect)]
-struct MapCardHover {
+struct ExplorationCardHover {
     base: Color,
     hovered: Color,
     pressed: Color,
 }
 
-/// Color parameters for a card-styled map button.
+/// Color parameters for a card-styled exploration button.
 #[derive(Clone, Copy)]
 struct CardColors {
     bg_available: Color,
@@ -90,7 +90,7 @@ struct CardColors {
     back_button_bg: Color,
 }
 
-/// Shadow and floating-animation parameters for a card-styled map button.
+/// Shadow and floating-animation parameters for a card-styled exploration button.
 #[derive(Clone, Copy)]
 struct CardShadowAnim {
     shadow_alpha_available: f32,
@@ -109,23 +109,22 @@ struct CardDimensions {
     radius: f32,
 }
 
-/// Visual parameters for styled map card buttons.
+/// Visual parameters for exploration buttons styled by the selected theme.
 ///
-/// When a `MapTheme` returns `Some(MapCardStyle)` from [`MapCardStyle::for_theme`],
-/// map buttons are rendered as semi-transparent floating cards instead of flat
-/// opaque buttons. Adding a new card-styled theme only requires a new match arm.
+/// The selected theme controls whether buttons use floating cards or the standard
+/// flat style.
 #[derive(Clone, Copy)]
-struct MapCardStyle {
+struct ExplorationCardStyle {
     colors: CardColors,
     dims: CardDimensions,
     shadow_anim: CardShadowAnim,
 }
 
-impl MapCardStyle {
+impl ExplorationCardStyle {
     /// Returns theme-specific card styling, or `None` for default flat buttons.
-    const fn for_theme(map_theme: MapTheme) -> Option<Self> {
-        match map_theme {
-            MapTheme::Sky => Some(Self {
+    const fn for_exploration_theme(exploration_theme: ExplorationTheme) -> Option<Self> {
+        match exploration_theme {
+            ExplorationTheme::Sky => Some(Self {
                 colors: CardColors {
                     bg_available: Color::srgba(0.88, 0.93, 1.0, 0.82),
                     bg_unavailable: Color::srgba(0.78, 0.82, 0.90, 0.45),
@@ -152,7 +151,7 @@ impl MapCardStyle {
                     float_amplitude_unavailable: theme::animation::FLOATING_AMPLITUDE_MUTED,
                 },
             }),
-            MapTheme::Ocean | MapTheme::Space => None,
+            ExplorationTheme::Ocean | ExplorationTheme::Space => None,
         }
     }
 }
@@ -168,20 +167,20 @@ struct ThemeButtonData {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn setup_world_overview(
+fn setup_themes(
     mut commands: Commands,
     content: Res<ContentLibrary>,
     i18n: Res<I18n>,
     active_theme: Option<Res<ActiveTheme>>,
-    mut next_map_view: ResMut<NextState<MapView>>,
+    mut next_exploration_view: ResMut<NextState<ExplorationView>>,
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
-    existing_roots: Query<Entity, With<MapScreenRoot>>,
+    existing_roots: Query<Entity, With<ExplorationScreenRoot>>,
 ) {
     // If ActiveTheme exists, the user is returning from LessonPlay/LessonSummary.
-    // Skip WorldOverview and go directly to ThemeDetail.
+    // Skip Themes and go directly to ThemeLessons.
     if active_theme.is_some() {
-        next_map_view.set(MapView::ThemeDetail);
+        next_exploration_view.set(ExplorationView::ThemeLessons);
         return;
     }
 
@@ -192,10 +191,10 @@ fn setup_world_overview(
     let window = *primary_window;
 
     // Pre-compute all strings before the SpawnWith closure.
-    let title = i18n.t(&TranslationKey::WorldMap).into_owned();
+    let title = i18n.t(&TranslationKey::Themes).into_owned();
     let back_label = i18n.t(&TranslationKey::Back).into_owned();
 
-    let card_style = MapCardStyle::for_theme(ctx.settings.map_theme);
+    let card_style = ExplorationCardStyle::for_exploration_theme(ctx.settings.exploration_theme);
     let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
 
     let theme_buttons: Vec<ThemeButtonData> = content
@@ -224,9 +223,9 @@ fn setup_world_overview(
 
     let mut root = commands.spawn((
         screen_root(),
-        MapScreenRoot,
-        DespawnOnExit(AppState::MapExploration),
-        DespawnOnEnter(MapView::ThemeDetail),
+        ExplorationScreenRoot,
+        DespawnOnExit(AppState::ThemeExploration),
+        DespawnOnEnter(ExplorationView::ThemeLessons),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             // Title
             let mut title_cmd = parent.spawn((
@@ -279,7 +278,7 @@ fn setup_world_overview(
 
 /// Resolves (background, text, progress) colors from an optional card style.
 fn card_colors(
-    card_style: Option<MapCardStyle>,
+    card_style: Option<ExplorationCardStyle>,
     available: bool,
     default_progress: Color,
 ) -> (Color, Color, Color) {
@@ -316,7 +315,7 @@ fn card_colors(
 }
 
 /// Resolves card dimensions from an optional card style.
-fn card_dimensions(card_style: Option<MapCardStyle>) -> CardDimensions {
+fn card_dimensions(card_style: Option<ExplorationCardStyle>) -> CardDimensions {
     card_style.map_or(
         CardDimensions {
             width: theme::sizes::BUTTON_WIDTH,
@@ -329,7 +328,7 @@ fn card_dimensions(card_style: Option<MapCardStyle>) -> CardDimensions {
     )
 }
 
-/// Returns the standard `Node` layout for a map card button.
+/// Returns the standard `Node` layout for an exploration button.
 fn card_node_layout(dims: &CardDimensions) -> Node {
     Node {
         width: theme::scaled(dims.width),
@@ -349,7 +348,7 @@ fn card_node_layout(dims: &CardDimensions) -> Node {
 #[allow(clippy::cast_precision_loss)]
 fn insert_card_overlay(
     button: &mut EntityWorldMut,
-    style: MapCardStyle,
+    style: ExplorationCardStyle,
     available: bool,
     index: usize,
     dims: &CardDimensions,
@@ -405,7 +404,7 @@ fn spawn_theme_button(
     data: &ThemeButtonData,
     auto_focus: bool,
     window: Entity,
-    card_style: Option<MapCardStyle>,
+    card_style: Option<ExplorationCardStyle>,
     index: usize,
 ) {
     let (bg, text_color, progress_color) = card_colors(
@@ -422,7 +421,7 @@ fn spawn_theme_button(
     ));
     button.remove::<AnimatedButton>();
 
-    button.insert(MapCardHover {
+    button.insert(ExplorationCardHover {
         base: bg,
         hovered: bg.lighter(0.08),
         pressed: bg.darker(0.08),
@@ -465,7 +464,7 @@ fn spawn_theme_button(
                     progress_color,
                     window,
                 ),
-                MapProgressText::Theme(data.id.clone()),
+                ExplorationProgressText::Theme(data.id.clone()),
                 Node {
                     display: if data.completed > 0 {
                         Display::Flex
@@ -506,8 +505,11 @@ fn count_completed_for_theme(
     (completed, total)
 }
 
-fn update_map_card_hover(
-    mut query: Query<(&Interaction, &MapCardHover, &mut BackgroundColor), Changed<Interaction>>,
+fn update_exploration_card_hover(
+    mut query: Query<
+        (&Interaction, &ExplorationCardHover, &mut BackgroundColor),
+        Changed<Interaction>,
+    >,
 ) {
     for (interaction, hover, mut background) in &mut query {
         background.0 = match interaction {
@@ -518,13 +520,13 @@ fn update_map_card_hover(
     }
 }
 
-fn handle_world_overview(
+fn handle_themes(
     theme_query: Query<(&Interaction, &ThemeButton), Changed<Interaction>>,
     back_query: Query<&Interaction, (Changed<Interaction>, With<BackToSaveSlotsButton>)>,
     content: Res<ContentLibrary>,
     mut commands: Commands,
     mut next_app_state: ResMut<NextState<AppState>>,
-    mut next_map_view: ResMut<NextState<MapView>>,
+    mut next_exploration_view: ResMut<NextState<ExplorationView>>,
 ) {
     // Handle theme button clicks
     for (interaction, theme_btn) in &theme_query {
@@ -532,7 +534,7 @@ fn handle_world_overview(
             && content.theme(&theme_btn.0).is_some_and(|t| t.available)
         {
             commands.insert_resource(ActiveTheme(theme_btn.0.clone()));
-            next_map_view.set(MapView::ThemeDetail);
+            next_exploration_view.set(ExplorationView::ThemeLessons);
         }
     }
 
@@ -553,14 +555,14 @@ struct LessonButtonData {
     best_percent_text: Option<String>,
 }
 
-fn setup_theme_detail(
+fn setup_theme_lessons(
     mut commands: Commands,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
     i18n: Res<I18n>,
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
-    existing_roots: Query<Entity, With<MapScreenRoot>>,
+    existing_roots: Query<Entity, With<ExplorationScreenRoot>>,
 ) {
     let Some(theme_data) = content.theme(&active_theme) else {
         return;
@@ -574,7 +576,7 @@ fn setup_theme_detail(
 
     // Pre-compute all strings before the SpawnWith closure.
     let theme_title = i18n.t(&theme_data.title_key).into_owned();
-    let back_label = i18n.t(&TranslationKey::BackToWorldMap).into_owned();
+    let back_label = i18n.t(&TranslationKey::BackToThemes).into_owned();
 
     let progress = ctx.session.as_ref().and_then(|slot| {
         get_current_progress(
@@ -585,7 +587,7 @@ fn setup_theme_detail(
         )
     });
 
-    let card_style = MapCardStyle::for_theme(ctx.settings.map_theme);
+    let card_style = ExplorationCardStyle::for_exploration_theme(ctx.settings.exploration_theme);
     let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
 
     let lesson_buttons: Vec<LessonButtonData> = theme_data
@@ -608,9 +610,9 @@ fn setup_theme_detail(
 
     let mut root = commands.spawn((
         screen_root(),
-        MapScreenRoot,
-        DespawnOnExit(AppState::MapExploration),
-        DespawnOnEnter(MapView::WorldOverview),
+        ExplorationScreenRoot,
+        DespawnOnExit(AppState::ThemeExploration),
+        DespawnOnEnter(ExplorationView::Themes),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             // Title
             let mut title_cmd = parent.spawn((
@@ -650,7 +652,7 @@ fn setup_theme_detail(
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
-                BackToWorldOverviewButton,
+                BackToThemesButton,
             ));
         })),
     ));
@@ -661,13 +663,13 @@ fn setup_theme_detail(
     }
 }
 
-fn update_map_progress(
+fn update_exploration_progress(
     ctx: PlayerContext<'_>,
     content: Res<ContentLibrary>,
     i18n: Res<I18n>,
     active_theme: Option<Res<ActiveTheme>>,
-    map_view: Res<State<MapView>>,
-    mut progress_query: Query<(&MapProgressText, &mut Text, &mut Node)>,
+    exploration_view: Res<State<ExplorationView>>,
+    mut progress_query: Query<(&ExplorationProgressText, &mut Text, &mut Node)>,
 ) {
     let theme_data = active_theme
         .as_deref()
@@ -682,8 +684,8 @@ fn update_map_progress(
     });
 
     for (progress_kind, mut text, mut node) in &mut progress_query {
-        let label = match (*map_view.get(), progress_kind) {
-            (MapView::WorldOverview, MapProgressText::Theme(theme_id)) => {
+        let label = match (*exploration_view.get(), progress_kind) {
+            (ExplorationView::Themes, ExplorationProgressText::Theme(theme_id)) => {
                 content.theme(theme_id).and_then(|theme_data| {
                     let (completed, total) = count_completed_for_theme(
                         theme_data,
@@ -698,21 +700,23 @@ fn update_map_progress(
                     })
                 })
             }
-            (MapView::ThemeDetail, MapProgressText::Lesson(lesson_id)) => theme_data
-                .and_then(|theme| theme.lesson(lesson_id))
-                .filter(|lesson| lesson.available)
-                .and_then(|lesson| progress.and_then(|progress| progress.get(&lesson.id)))
-                .map(|progress| {
-                    i18n.t(&TranslationKey::BestPercent(progress.percentage()))
-                        .into_owned()
-                }),
+            (ExplorationView::ThemeLessons, ExplorationProgressText::Lesson(lesson_id)) => {
+                theme_data
+                    .and_then(|theme| theme.lesson(lesson_id))
+                    .filter(|lesson| lesson.available)
+                    .and_then(|lesson| progress.and_then(|progress| progress.get(&lesson.id)))
+                    .map(|progress| {
+                        i18n.t(&TranslationKey::BestPercent(progress.percentage()))
+                            .into_owned()
+                    })
+            }
             _ => continue,
         };
-        set_map_progress_text(&mut text, &mut node, label);
+        set_exploration_progress_text(&mut text, &mut node, label);
     }
 }
 
-fn set_map_progress_text(text: &mut Text, node: &mut Node, label: Option<String>) {
+fn set_exploration_progress_text(text: &mut Text, node: &mut Node, label: Option<String>) {
     if let Some(label) = label {
         if **text != label {
             **text = label;
@@ -735,7 +739,7 @@ fn spawn_lesson_button(
     data: &LessonButtonData,
     auto_focus: bool,
     window: Entity,
-    card_style: Option<MapCardStyle>,
+    card_style: Option<ExplorationCardStyle>,
     index: usize,
 ) {
     let (bg, text_color, progress_color) = card_colors(
@@ -752,7 +756,7 @@ fn spawn_lesson_button(
     ));
     button.remove::<AnimatedButton>();
 
-    button.insert(MapCardHover {
+    button.insert(ExplorationCardHover {
         base: bg,
         hovered: bg.lighter(0.08),
         pressed: bg.darker(0.08),
@@ -792,7 +796,7 @@ fn spawn_lesson_button(
             let text = data.best_percent_text.as_deref().unwrap_or_default();
             btn.spawn((
                 card_text(text, theme::fonts::SMALL, progress_color, window),
-                MapProgressText::Lesson(data.id.clone()),
+                ExplorationProgressText::Lesson(data.id.clone()),
                 Node {
                     display: if has_progress {
                         Display::Flex
@@ -806,14 +810,14 @@ fn spawn_lesson_button(
     });
 }
 
-fn handle_theme_detail(
+fn handle_theme_lessons(
     lesson_query: Query<(&Interaction, &LessonButton), Changed<Interaction>>,
-    back_query: Query<&Interaction, (Changed<Interaction>, With<BackToWorldOverviewButton>)>,
+    back_query: Query<&Interaction, (Changed<Interaction>, With<BackToThemesButton>)>,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
     mut commands: Commands,
     mut next_app_state: ResMut<NextState<AppState>>,
-    mut next_map_view: ResMut<NextState<MapView>>,
+    mut next_exploration_view: ResMut<NextState<ExplorationView>>,
 ) {
     // Handle lesson button clicks
     for (interaction, lesson_btn) in &lesson_query {
@@ -832,7 +836,7 @@ fn handle_theme_detail(
     for interaction in &back_query {
         if *interaction == Interaction::Pressed {
             commands.remove_resource::<ActiveTheme>();
-            next_map_view.set(MapView::WorldOverview);
+            next_exploration_view.set(ExplorationView::Themes);
         }
     }
 }

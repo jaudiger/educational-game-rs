@@ -7,7 +7,7 @@ pub use content::{
     AnswerResult, ContentLibrary, ExplanationVisual, QuestionDefinition, ResolvedQuestion,
 };
 pub use progress::{
-    ActiveTheme, GameMode, GameSettings, Language, LastAnswer, LessonSession, MapTheme,
+    ActiveTheme, ExplorationTheme, GameMode, GameSettings, Language, LastAnswer, LessonSession,
     QuestionContainer, SelectedLesson,
 };
 pub use save::{

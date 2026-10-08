@@ -147,7 +147,7 @@ fn return_button(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
             theme::scaled(theme::sizes::BUTTON_WIDTH),
             window,
         ),
-        NavigateTo(AppState::MapExploration),
+        NavigateTo(AppState::ThemeExploration),
         AutoFocus,
     )
 }
