@@ -2,16 +2,13 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy_persistent::prelude::*;
 
-use crate::data::{ActiveSlot, ActiveStudent, ClassStudent, GameMode, GameSettings, SaveData};
+use crate::data::{ActiveStudent, ClassStudent, GameMode, PlayerSession, SaveData};
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::teacher::{
-    TeacherContentRoot, TeacherInDetailView, TeacherScreenParam, TeacherTab, TeacherTabChanged,
-    TeacherWindowInit, TeacherWindowParam, tab_header,
+    TeacherScreenParam, TeacherView, TeacherViewOverlay, TeacherWindow, TeacherWindowParam,
+    TeacherWindowState, tab_header, teacher_roster_view_active, teacher_window_exists,
 };
-use crate::screens::teacher_shared::ViewingStudentStats;
-use crate::states::{
-    AppState, InLessonFlow, LESSON_FLOW_STATES, LessonPhase, StateScopedResourceExt, cleanup_root,
-};
+use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES, LessonPhase, cleanup_root};
 use crate::ui::components::{
     ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base, icon_button,
     spawn_confirmation_modal,
@@ -22,104 +19,42 @@ use crate::ui::theme;
 /// Teacher roster tab for managing student names in a class slot.
 pub struct TeacherRosterScreenPlugin;
 
-/// Unit marker resource whose presence means the roster UI should be shown.
-/// Callers insert (or re-insert) it to request a rebuild; `rebuild_roster_ui`
-/// runs on any `resource_changed` tick. Removing it triggers cleanup.
-#[derive(Resource, Default, Reflect)]
-pub struct TeacherRosterView;
-
-/// Per-view selection state, mutated by click handlers without bumping the
-/// rebuild resource's change tick.
-#[derive(Resource, Reflect)]
-pub struct TeacherRosterSelection {
-    selected_student: Option<usize>,
-    last_click: Option<(usize, f64)>,
-}
-
 impl Plugin for TeacherRosterScreenPlugin {
     fn build(&self, app: &mut App) {
-        // Per-state registrations: resource scoping and cleanup must fire on
-        // every intra-flow transition (e.g. MapExploration to LessonPlay).
         for &state in &LESSON_FLOW_STATES {
-            app.register_state_scoped_resource::<AppState, TeacherRosterView>(state)
-                .register_state_scoped_resource::<AppState, TeacherRosterSelection>(state)
-                .add_systems(OnExit(state), cleanup_root::<TeacherRosterRoot>);
-
-            if state == AppState::MapExploration {
-                // On first entry the teacher camera may not exist yet;
-                // ensure the view insertion runs after TeacherWindowInit.
-                app.add_systems(
-                    OnEnter(state),
-                    initialize_roster_view.after(TeacherWindowInit),
-                );
-            } else {
-                app.add_systems(OnEnter(state), initialize_roster_view);
-            }
+            app.add_systems(OnExit(state), cleanup_root::<TeacherRosterRoot>);
         }
 
-        app.add_observer(on_teacher_tab_changed)
-            .add_systems(
-                Update,
-                (
-                    rebuild_roster_ui.run_if(resource_exists_and_changed::<TeacherRosterView>),
-                    cleanup_roster_on_view_removed.run_if(resource_removed::<TeacherRosterView>),
-                )
-                    .run_if(in_state(InLessonFlow)),
+        app.add_systems(
+            Update,
+            rebuild_roster_ui
+                .run_if(in_state(InLessonFlow))
+                .run_if(teacher_window_exists),
+        )
+        .add_systems(
+            Update,
+            (handle_add_student, handle_remove_student_click)
+                .run_if(in_state(AppState::MapExploration))
+                .run_if(teacher_roster_view_active),
+        )
+        .add_systems(
+            Update,
+            (
+                sync_roster_selection.run_if(resource_changed_or_removed::<ActiveStudent>),
+                handle_student_click,
             )
-            // Full roster editing (add, remove, input) only during MapExploration
-            .add_systems(
-                Update,
-                (handle_add_student, handle_remove_student_click)
-                    .run_if(in_state(AppState::MapExploration))
-                    .run_if(resource_exists::<TeacherRosterSelection>),
-            )
-            // Student selection available across all lesson-flow states.
-            // sync_roster_selection only runs on the frame ActiveStudent is removed,
-            // and is chained before handle_student_click so a click in that same
-            // frame is not undone.
-            .add_systems(
-                Update,
-                (
-                    sync_roster_selection.run_if(resource_removed::<ActiveStudent>),
-                    handle_student_click,
-                )
-                    .chain()
-                    .run_if(in_state(InLessonFlow))
-                    .run_if(resource_exists::<TeacherRosterSelection>),
-            );
+                .chain()
+                .run_if(in_state(InLessonFlow))
+                .run_if(teacher_roster_view_active),
+        );
     }
-}
-
-/// Inserts [`TeacherRosterView`] on state entry when the teacher window is
-/// showing the Students tab in Group mode. Guards mirror the ones in
-/// [`rebuild_roster_ui`] so we do not insert state that would immediately be
-/// skipped.
-fn initialize_roster_view(
-    mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
-    teacher_tab: Option<Res<TeacherTab>>,
-    viewing_stats: Option<Res<ViewingStudentStats>>,
-) {
-    if settings.mode != GameMode::Group {
-        return;
-    }
-    if teacher_tab
-        .as_ref()
-        .is_some_and(|t| **t != TeacherTab::Students)
-    {
-        return;
-    }
-    if viewing_stats.is_some() {
-        return;
-    }
-    commands.insert_resource(TeacherRosterView);
 }
 
 #[derive(Component, Reflect)]
 pub struct TeacherRosterRoot;
 
 #[derive(Component, Reflect)]
-struct StudentRow(usize);
+struct StudentRow(usize, Option<f64>);
 
 #[derive(Component, Reflect)]
 struct RemoveStudentButton(usize);
@@ -133,59 +68,48 @@ struct RemoveStudentTarget(usize, String);
 #[derive(Component, Reflect)]
 struct AddStudentButton;
 
-/// Builds the roster UI. Runs whenever [`TeacherRosterView`] is inserted or
-/// re-inserted (a no-op insert over an existing resource still bumps the
-/// change tick, which is how callers request a rebuild).
+/// Rebuilds the roster when its view or backing save data changes.
 fn rebuild_roster_ui(
     mut commands: Commands,
     ts: TeacherScreenParam<'_, '_>,
-    viewing_stats: Option<Res<ViewingStudentStats>>,
     app_state: Res<State<AppState>>,
     existing_root: Query<Entity, With<TeacherRosterRoot>>,
 ) {
+    let Ok(state) = ts.teacher.state.single() else {
+        return;
+    };
+    if !state.is_changed() && !ts.ctx.save_data.is_changed() {
+        return;
+    }
+
     for entity in &existing_root {
         commands.entity(entity).despawn();
     }
-    commands.remove_resource::<TeacherRosterSelection>();
 
-    // Don't build while viewing stats
-    if viewing_stats.is_some() {
-        return;
-    }
-    // Tab guard: only build if Students tab is active (or no tab resource = legacy)
-    if ts
-        .teacher_tab
-        .as_ref()
-        .is_some_and(|t| **t != TeacherTab::Students)
-    {
+    if !matches!(&state.view, TeacherView::Students) {
         return;
     }
     if ts.ctx.settings.mode != GameMode::Group {
         return;
     }
-    let camera_entity = *ts.teacher.camera;
-    let window = *ts.teacher.window;
-    let Some(ref slot) = ts.ctx.active_slot else {
+    let Ok(camera_entity) = ts.teacher.camera.single() else {
         return;
     };
-    let Some(ref class_save) = ts.ctx.save_data.class_slots[slot.0] else {
+    let Ok(window) = ts.teacher.window.single() else {
+        return;
+    };
+    let Some(ref session) = ts.ctx.session else {
+        return;
+    };
+    let Some(ref class_save) = ts.ctx.save_data.class_slots[session.slot_index] else {
         return;
     };
 
-    // Preserve ActiveStudent during lessons; only clear on MapExploration entry
     let selected_index = ts.ctx.active_student.as_ref().map(|student| student.0);
-    if *app_state.get() == AppState::MapExploration {
-        commands.remove_resource::<ActiveStudent>();
-    }
-
-    commands.insert_resource(TeacherRosterSelection {
-        selected_student: selected_index,
-        last_click: None,
-    });
 
     let student_names: Vec<String> = class_save.students.iter().map(|s| s.name.clone()).collect();
     let show_input = *app_state.get() == AppState::MapExploration;
-    let active_tab = ts.teacher_tab.map_or(TeacherTab::Students, |t| *t);
+    let active_tab = state.view.tab();
 
     // Pre-compute all i18n strings before the SpawnWith closure
     let tab_header_bundle = tab_header(&ts.i18n, active_tab, window);
@@ -210,7 +134,6 @@ fn rebuild_roster_ui(
         UiTargetCamera(camera_entity),
         TabGroup::new(0),
         TeacherRosterRoot,
-        TeacherContentRoot,
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn(tab_header_bundle);
 
@@ -233,19 +156,6 @@ fn rebuild_roster_ui(
             }
         })),
     ));
-}
-
-/// Despawns the roster UI and drops its selection state when
-/// `TeacherRosterView` is removed (entering stats detail, tab switch away, or
-/// state-scoped cleanup on `OnExit`).
-fn cleanup_roster_on_view_removed(
-    mut commands: Commands,
-    existing_root: Query<Entity, With<TeacherRosterRoot>>,
-) {
-    for entity in &existing_root {
-        commands.entity(entity).despawn();
-    }
-    commands.remove_resource::<TeacherRosterSelection>();
 }
 
 fn spawn_student_list(
@@ -348,7 +258,7 @@ fn spawn_student_row(
                 border_radius: BorderRadius::all(theme::scaled(6.0)),
                 ..default()
             },
-            StudentRow(index),
+            StudentRow(index, None),
         ))
         .with_children(|row| {
             row.spawn((
@@ -377,20 +287,24 @@ fn spawn_student_row(
 fn handle_add_student(
     query: Query<&Interaction, (Changed<Interaction>, With<AddStudentButton>)>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    active_slot: Option<Res<ActiveSlot>>,
+    session: Option<Res<PlayerSession>>,
     mut save_data: ResMut<Persistent<SaveData>>,
-    mut commands: Commands,
-    input: Single<&TextInputState>,
+    input: Query<&TextInputState>,
 ) {
-    let Some(ref slot) = active_slot else { return };
+    let Some(ref session) = session else { return };
 
     let pressed_button = query.iter().any(|i| *i == Interaction::Pressed);
-    let pressed_enter = input.focused && keyboard.just_pressed(KeyCode::Enter);
+    let input = input.single().ok();
+    let pressed_enter =
+        input.is_some_and(|input| input.focused && keyboard.just_pressed(KeyCode::Enter));
 
     if !pressed_button && !pressed_enter {
         return;
     }
 
+    let Some(input) = input else {
+        return;
+    };
     let name = input.text.trim().to_owned();
     if name.is_empty() {
         return;
@@ -398,7 +312,7 @@ fn handle_add_student(
 
     save_data
         .update(|data| {
-            if let Some(ref mut class_save) = data.class_slots[slot.0] {
+            if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
                 class_save.students.push(ClassStudent {
                     name: name.clone(),
                     ..Default::default()
@@ -406,22 +320,24 @@ fn handle_add_student(
             }
         })
         .expect("failed to update save data");
-
-    // Re-insert the view marker to bump its change tick and request a rebuild.
-    commands.insert_resource(TeacherRosterView);
 }
 
 fn handle_remove_student_click(
     query: Query<(&Interaction, &RemoveStudentButton), Changed<Interaction>>,
-    active_slot: Option<Res<ActiveSlot>>,
+    session: Option<Res<PlayerSession>>,
     save_data: Res<Persistent<SaveData>>,
     mut commands: Commands,
     existing_popover: Query<Entity, With<StudentRemovePopover>>,
     i18n: Res<I18n>,
     teacher: TeacherWindowParam<'_, '_>,
 ) {
-    let Some(ref slot) = active_slot else { return };
-    let window = *teacher.window;
+    let Some(ref session) = session else { return };
+    let Ok(window) = teacher.window.single() else {
+        return;
+    };
+    let Ok(camera) = teacher.camera.single() else {
+        return;
+    };
 
     for (interaction, remove_btn) in &query {
         if *interaction == Interaction::Pressed {
@@ -431,7 +347,7 @@ fn handle_remove_student_click(
             }
 
             let student_index = remove_btn.0;
-            let student_name = save_data.class_slots[slot.0]
+            let student_name = save_data.class_slots[session.slot_index]
                 .as_ref()
                 .and_then(|cs| cs.students.get(student_index))
                 .map_or_else(String::new, |s| s.name.clone());
@@ -443,12 +359,13 @@ fn handle_remove_student_click(
                 &i18n.t(&TranslationKey::Cancel),
                 theme::colors::ERROR,
                 window,
-                Some(*teacher.camera),
+                Some(camera),
             );
             commands
                 .entity(modal_entity)
                 .insert((
                     StudentRemovePopover,
+                    TeacherViewOverlay,
                     RemoveStudentTarget(student_index, student_name),
                     DespawnOnExit(AppState::MapExploration),
                 ))
@@ -460,44 +377,46 @@ fn handle_remove_student_click(
 fn handle_confirm_remove_student(
     event: On<ConfirmationDialogActionEvent>,
     target_query: Query<&RemoveStudentTarget>,
-    active_slot: Option<Res<ActiveSlot>>,
+    session: Option<Res<PlayerSession>>,
+    active_student: Option<Res<ActiveStudent>>,
     mut save_data: ResMut<Persistent<SaveData>>,
     mut commands: Commands,
 ) {
     if event.action != ConfirmationDialogAction::Confirm {
         return;
     }
-    let Some(ref slot) = active_slot else { return };
+    let Some(ref session) = session else { return };
     let Ok(target) = target_query.get(event.entity) else {
         return;
     };
     let student_index = target.0;
     let student_name = target.1.clone();
+    let Some(class_save) = save_data.class_slots[session.slot_index].as_ref() else {
+        return;
+    };
+    if class_save
+        .students
+        .get(student_index)
+        .is_none_or(|student| student.name != student_name)
+    {
+        return;
+    }
 
     save_data
         .update(|data| {
-            if let Some(ref mut class_save) = data.class_slots[slot.0]
-                && class_save
-                    .students
-                    .get(student_index)
-                    .is_some_and(|student| student.name == student_name)
-            {
+            if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
                 class_save.students.remove(student_index);
             }
         })
         .expect("failed to update save data");
 
-    // Re-insert the view marker to bump its change tick and request a rebuild.
-    commands.insert_resource(TeacherRosterView);
-}
-
-/// Tears down the roster and opens the stats view for `student_index`.
-/// Removing `TeacherRosterView` triggers `cleanup_roster_on_view_removed`;
-/// inserting `ViewingStudentStats` triggers the stats rebuild.
-fn enter_student_stats(commands: &mut Commands, student_index: usize) {
-    commands.insert_resource(ViewingStudentStats(student_index));
-    commands.insert_resource(TeacherInDetailView);
-    commands.remove_resource::<TeacherRosterView>();
+    match active_student.as_deref().map(|student| student.0) {
+        Some(index) if index == student_index => commands.remove_resource::<ActiveStudent>(),
+        Some(index) if index > student_index => {
+            commands.insert_resource(ActiveStudent(index - 1));
+        }
+        _ => {}
+    }
 }
 
 /// Highlight the selected row and clear all others.
@@ -514,16 +433,19 @@ fn update_roster_selection(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn handle_student_click(
-    query: Query<(&Interaction, &StudentRow), Changed<Interaction>>,
-    mut state: ResMut<TeacherRosterSelection>,
-    mut bg_query: Query<(&StudentRow, &mut BackgroundColor)>,
+    mut row_queries: ParamSet<(
+        Query<(&Interaction, &mut StudentRow), Changed<Interaction>>,
+        Query<(&StudentRow, &mut BackgroundColor)>,
+    )>,
     mut commands: Commands,
+    active_student: Option<Res<ActiveStudent>>,
     time: Res<Time>,
     popover_query: Query<Entity, With<StudentRemovePopover>>,
     app_state: Res<State<AppState>>,
     lesson_phase: Option<Res<State<LessonPhase>>>,
+    mut teacher_state: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
     // Freeze selection during feedback / transition (answer already attributed)
     if let Some(ref phase) = lesson_phase
@@ -538,47 +460,49 @@ fn handle_student_click(
     if !popover_query.is_empty() {
         return;
     }
+    let Ok(mut teacher_state) = teacher_state.single_mut() else {
+        return;
+    };
 
-    for (interaction, row) in &query {
-        if *interaction == Interaction::Pressed {
-            let now = time.elapsed_secs_f64();
-            let is_double_click = state
-                .last_click
-                .is_some_and(|(idx, t)| idx == row.0 && now - t < 0.4);
-
-            if is_double_click && *app_state.get() == AppState::MapExploration {
-                enter_student_stats(&mut commands, row.0);
-                return;
-            }
-
-            // Single click (or double-click during lesson): select student
-            state.last_click = Some((row.0, now));
-            state.selected_student = Some(row.0);
-            commands.insert_resource(ActiveStudent(row.0));
-            update_roster_selection(&mut bg_query, row.0);
+    let mut selected_student = None;
+    for (interaction, mut row) in &mut row_queries.p0() {
+        if *interaction != Interaction::Pressed {
+            continue;
         }
+        let now = time.elapsed_secs_f64();
+        let is_double_click = active_student.as_deref().is_some_and(|student| {
+            student.0 == row.0 && row.1.is_some_and(|last_click| now - last_click < 0.4)
+        });
+
+        if is_double_click && *app_state.get() == AppState::MapExploration {
+            teacher_state.view = TeacherView::StudentStats {
+                student_index: row.0,
+            };
+            return;
+        }
+
+        row.1 = Some(now);
+        selected_student = Some(row.0);
+    }
+
+    if let Some(student_index) = selected_student {
+        if active_student.as_deref().map(|student| student.0) != Some(student_index) {
+            commands.insert_resource(ActiveStudent(student_index));
+        }
+        update_roster_selection(&mut row_queries.p1(), student_index);
     }
 }
 
-/// Clears the roster's visual selection when `ActiveStudent` is removed externally.
-/// Gated by `resource_removed` so it runs only on the transition frame.
 fn sync_roster_selection(
-    mut state: ResMut<TeacherRosterSelection>,
+    active_student: Option<Res<ActiveStudent>>,
     mut bg_query: Query<(&StudentRow, &mut BackgroundColor)>,
 ) {
-    state.selected_student = None;
-    for (_row, mut bg) in &mut bg_query {
-        *bg = theme::colors::CARD_BG.into();
-    }
-}
-
-/// On any tab switch, drop the roster view marker (and its selection). When
-/// the new tab is Students, insert a fresh view so `rebuild_roster_ui` runs on
-/// the next `Update` frame.
-fn on_teacher_tab_changed(event: On<TeacherTabChanged>, mut commands: Commands) {
-    commands.remove_resource::<TeacherRosterView>();
-    commands.remove_resource::<ViewingStudentStats>();
-    if event.event().0 == TeacherTab::Students {
-        commands.insert_resource(TeacherRosterView);
+    let selected_index = active_student.as_deref().map(|student| student.0);
+    for (row, mut bg) in &mut bg_query {
+        *bg = if selected_index == Some(row.0) {
+            theme::colors::PRIMARY_HOVER.into()
+        } else {
+            theme::colors::CARD_BG.into()
+        };
     }
 }

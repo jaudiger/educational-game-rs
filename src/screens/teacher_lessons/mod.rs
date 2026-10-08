@@ -3,18 +3,14 @@ mod tree;
 
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
-use bevy_persistent::prelude::*;
 
-use crate::data::content::QuestionType;
-use crate::data::{ContentLibrary, GameMode, GameSettings};
+use crate::data::{ContentLibrary, GameMode};
 use crate::i18n::I18n;
 use crate::plugins::teacher::{
-    TeacherContentRoot, TeacherScreenParam, TeacherTab, TeacherTabChanged, TeacherWindowInit,
-    tab_header,
+    TeacherQuestionDraft, TeacherScreenParam, TeacherView, tab_header,
+    teacher_lesson_config_view_active, teacher_lessons_tree_view_active, teacher_window_exists,
 };
-use crate::states::{
-    AppState, InLessonFlow, LESSON_FLOW_STATES, StateScopedResourceExt, cleanup_root,
-};
+use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES, cleanup_root};
 use crate::ui::theme;
 
 /// Teacher lessons tab for configuring per-lesson question selection.
@@ -23,110 +19,37 @@ pub struct TeacherLessonsScreenPlugin;
 impl Plugin for TeacherLessonsScreenPlugin {
     fn build(&self, app: &mut App) {
         for &state in &LESSON_FLOW_STATES {
-            app.register_state_scoped_resource::<AppState, TeacherLessonsState>(state)
-                .register_state_scoped_resource::<AppState, LessonConfigDraftRes>(state)
-                .add_systems(OnExit(state), cleanup_root::<TeacherLessonsRoot>);
-
-            if state == AppState::MapExploration {
-                app.add_systems(
-                    OnEnter(state),
-                    initialize_lessons_state.after(TeacherWindowInit),
-                );
-            } else {
-                app.add_systems(OnEnter(state), initialize_lessons_state);
-            }
+            app.add_systems(OnExit(state), cleanup_root::<TeacherLessonsRoot>);
         }
 
-        app.add_observer(on_teacher_tab_changed)
-            .add_systems(
-                Update,
-                rebuild_lessons_ui
-                    .run_if(in_state(InLessonFlow))
-                    .run_if(resource_exists_and_changed::<TeacherLessonsState>),
+        app.add_systems(
+            Update,
+            rebuild_lessons_ui
+                .run_if(in_state(InLessonFlow))
+                .run_if(teacher_window_exists),
+        )
+        .add_systems(
+            Update,
+            config::handle_config_button_click
+                .run_if(in_state(AppState::MapExploration))
+                .run_if(teacher_lessons_tree_view_active),
+        )
+        .add_systems(
+            Update,
+            (
+                config::handle_count_change,
+                config::handle_visual_toggle,
+                config::handle_reset_config,
+                config::handle_save_config,
+                config::handle_return_to_tree,
+                config::update_scroll_indicator,
+                config::update_question_labels,
+                config::update_config_hover_text,
             )
-            .add_systems(
-                Update,
-                (
-                    config::handle_config_button_click,
-                    config::handle_count_change.run_if(resource_exists::<LessonConfigDraftRes>),
-                    config::handle_visual_toggle.run_if(resource_exists::<LessonConfigDraftRes>),
-                    config::handle_reset_config.run_if(resource_exists::<LessonConfigDraftRes>),
-                    config::handle_save_config.run_if(resource_exists::<LessonConfigDraftRes>),
-                    config::handle_return_to_tree,
-                    config::update_scroll_indicator,
-                    config::update_question_labels,
-                    config::update_config_hover_text,
-                )
-                    .run_if(in_state(AppState::MapExploration))
-                    .run_if(resource_exists::<TeacherLessonsState>),
-            );
+                .run_if(in_state(AppState::MapExploration))
+                .run_if(teacher_lesson_config_view_active),
+        );
     }
-}
-
-/// Inserts [`TeacherLessonsState`] on state entry when the teacher window is
-/// showing the Lessons tab. Guards mirror the ones in [`rebuild_lessons_ui`]
-/// so we do not insert state that would immediately be skipped.
-fn initialize_lessons_state(
-    mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
-    teacher_tab: Option<Res<TeacherTab>>,
-) {
-    if settings.mode != GameMode::Group {
-        return;
-    }
-    if teacher_tab
-        .as_ref()
-        .is_none_or(|t| **t != TeacherTab::Lessons)
-    {
-        return;
-    }
-    commands.insert_resource(TeacherLessonsState {
-        view: LessonsView::Tree,
-    });
-}
-
-#[derive(Resource, Reflect)]
-pub struct TeacherLessonsState {
-    #[reflect(ignore)]
-    pub(super) view: LessonsView,
-}
-
-#[derive(Clone, Default)]
-pub(super) enum LessonsView {
-    #[default]
-    Tree,
-    Config {
-        lesson_id: String,
-        lesson_title: String,
-    },
-}
-
-/// Holds the per-question draft while the Config view is open.
-/// Inserted alongside [`LessonsView::Config`] and removed on return/save.
-#[derive(Resource, Clone, Debug)]
-pub(super) struct LessonConfigDraftRes {
-    pub questions: Vec<DraftQuestion>,
-}
-
-impl LessonConfigDraftRes {
-    /// Returns `true` if at least one question has a count > 0.
-    pub(super) fn has_any_selected(&self) -> bool {
-        self.questions.iter().any(|q| q.count > 0)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(super) struct DraftQuestion {
-    pub index: usize,
-    pub question_type: QuestionType,
-    pub full_prompt: String,
-    pub count: usize,
-    /// Whether this question has an optional visual at all.
-    pub has_visual: bool,
-    /// Whether the optional visual is currently enabled.
-    pub show_visual: bool,
-    /// The default visibility for the optional visual (used by reset).
-    pub default_show_visual: bool,
 }
 
 #[derive(Component, Reflect)]
@@ -172,13 +95,9 @@ struct ScrollContent;
 #[derive(Component, Reflect)]
 struct ScrollIndicator;
 
-/// Marker + storage for the full prompt text on question label entities.
-/// Used by [`config::update_question_labels`] to dynamically truncate with "...".
 #[derive(Component, Reflect)]
 struct QuestionLabel(String);
 
-/// Marker for the hover detail text shown outside the scroll frame.
-/// Displays the full prompt of the currently hovered question row.
 #[derive(Component, Reflect)]
 struct ConfigHoverText;
 
@@ -186,40 +105,37 @@ fn rebuild_lessons_ui(
     mut commands: Commands,
     ts: TeacherScreenParam<'_, '_>,
     existing_root: Query<Entity, With<TeacherLessonsRoot>>,
-    state: Res<TeacherLessonsState>,
-    draft_res: Option<Res<LessonConfigDraftRes>>,
     content: Res<ContentLibrary>,
     app_state: Res<State<AppState>>,
 ) {
-    // Always tear down before rebuilding.
+    let Ok(state) = ts.teacher.state.single() else {
+        return;
+    };
+    if !state.is_changed() && !ts.ctx.save_data.is_changed() {
+        return;
+    }
+
     for entity in &existing_root {
         commands.entity(entity).despawn();
     }
-
-    // Tab guard: Lessons tab must be active.
-    if ts
-        .teacher_tab
-        .as_ref()
-        .is_none_or(|t| **t != TeacherTab::Lessons)
-    {
-        commands.remove_resource::<TeacherLessonsState>();
-        commands.remove_resource::<LessonConfigDraftRes>();
-        return;
-    }
     if ts.ctx.settings.mode != GameMode::Group {
-        commands.remove_resource::<TeacherLessonsState>();
-        commands.remove_resource::<LessonConfigDraftRes>();
         return;
     }
-
-    let camera_entity = *ts.teacher.camera;
-    let window = *ts.teacher.window;
-    let active_tab = ts.teacher_tab.map_or(TeacherTab::Lessons, |t| *t);
+    let Ok(camera_entity) = ts.teacher.camera.single() else {
+        return;
+    };
+    let Ok(window) = ts.teacher.window.single() else {
+        return;
+    };
+    let active_tab = state.view.tab();
 
     match &state.view {
-        LessonsView::Config { lesson_title, .. } => {
-            let Some(draft_res) = draft_res else { return };
-            let draft = draft_res.clone();
+        TeacherView::LessonConfig {
+            lesson_title,
+            questions,
+            ..
+        } => {
+            let questions = questions.clone();
             let title = lesson_title.clone();
             let i18n_owned = I18n::new(ts.i18n.language);
             commands.spawn((
@@ -234,27 +150,26 @@ fn rebuild_lessons_ui(
                 BackgroundColor(theme::colors::BACKGROUND),
                 UiTargetCamera(camera_entity),
                 TeacherLessonsRoot,
-                TeacherContentRoot,
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
                     config::spawn_config_view(
                         parent,
                         &i18n_owned,
                         &title,
-                        &draft,
+                        &questions,
                         active_tab,
                         window,
                     );
                 })),
             ));
         }
-        LessonsView::Tree => {
+        TeacherView::Lessons => {
             let is_map_exploration = *app_state.get() == AppState::MapExploration;
             let header = tab_header(&ts.i18n, active_tab, window);
             let i18n_owned = I18n::new(ts.i18n.language);
             let tree_specs = tree::build_tree_specs(
                 &content.themes,
                 &ts.ctx.save_data,
-                ts.ctx.active_slot.as_deref(),
+                ts.ctx.session.as_deref(),
             );
             commands.spawn((
                 Node {
@@ -269,7 +184,6 @@ fn rebuild_lessons_ui(
                 UiTargetCamera(camera_entity),
                 TabGroup::new(0),
                 TeacherLessonsRoot,
-                TeacherContentRoot,
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
                     parent.spawn(header);
                     tree::spawn_tree_view(
@@ -282,18 +196,10 @@ fn rebuild_lessons_ui(
                 })),
             ));
         }
+        TeacherView::Students | TeacherView::StudentStats { .. } => {}
     }
 }
 
-/// On any tab switch, drop Lessons state (and its draft). When the new tab is
-/// Lessons, insert a fresh state so [`rebuild_lessons_ui`] runs on the next
-/// `Update` frame via the `resource_changed` run condition.
-fn on_teacher_tab_changed(event: On<TeacherTabChanged>, mut commands: Commands) {
-    commands.remove_resource::<TeacherLessonsState>();
-    commands.remove_resource::<LessonConfigDraftRes>();
-    if event.event().0 == TeacherTab::Lessons {
-        commands.insert_resource(TeacherLessonsState {
-            view: LessonsView::Tree,
-        });
-    }
+pub(super) fn has_any_selected(questions: &[TeacherQuestionDraft]) -> bool {
+    questions.iter().any(|question| question.count > 0)
 }

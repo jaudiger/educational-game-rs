@@ -11,7 +11,7 @@ pub use progress::{
     QuestionContainer, SelectedLesson,
 };
 pub use save::{
-    ActiveSlot, ActiveStudent, ClassSave, ClassStudent, IndividualSave, LessonProgress,
-    LessonSessionConfig, SaveData, get_current_progress,
+    ActiveStudent, ClassSave, ClassStudent, IndividualSave, LessonProgress, LessonSessionConfig,
+    PlayerSession, SaveData, get_current_progress,
 };
 pub use system_params::{PersistenceMut, PlayerContext};

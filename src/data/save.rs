@@ -97,9 +97,11 @@ pub struct SaveData {
     pub class_slots: [Option<ClassSave>; 3],
 }
 
-/// Runtime resource tracking the selected slot index (0 to 2).
-#[derive(Resource, Clone, Debug, Deref, Reflect)]
-pub struct ActiveSlot(pub usize);
+/// Runtime context for the selected save slot during the lesson flow.
+#[derive(Resource, Clone, Debug, Reflect)]
+pub struct PlayerSession {
+    pub slot_index: usize,
+}
 
 /// Runtime resource tracking which student is answering in class mode.
 ///

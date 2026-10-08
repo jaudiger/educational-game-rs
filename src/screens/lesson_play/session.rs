@@ -6,8 +6,8 @@ use rand::seq::SliceRandom;
 
 use crate::data::content::QuestionDefinition;
 use crate::data::{
-    ActiveSlot, ActiveStudent, ActiveTheme, AnswerResult, ContentLibrary, LessonSession,
-    LessonSessionConfig, ResolvedQuestion, SaveData, SelectedLesson,
+    ActiveStudent, ActiveTheme, AnswerResult, ContentLibrary, LessonSession, LessonSessionConfig,
+    PlayerSession, ResolvedQuestion, SaveData, SelectedLesson,
 };
 
 /// Maximum re-roll attempts when deduplicating resolved template questions.
@@ -158,14 +158,16 @@ pub(super) fn record_class_answer(
     session: &LessonSession,
     last_answer: &AnswerResult,
     active_student: Option<&ActiveStudent>,
-    active_slot: Option<&ActiveSlot>,
+    player_session: Option<&PlayerSession>,
     selected_lesson: Option<&SelectedLesson>,
     save_data: &mut Persistent<SaveData>,
 ) {
     let Some(student) = active_student else {
         return;
     };
-    let Some(slot) = active_slot else { return };
+    let Some(player_session) = player_session else {
+        return;
+    };
     let Some(selected) = selected_lesson else {
         return;
     };
@@ -179,7 +181,7 @@ pub(super) fn record_class_answer(
     let is_correct = matches!(last_answer, AnswerResult::Correct);
     let qt = question.definition.question_type();
     let lesson_id = lesson_id.clone();
-    let slot_index = slot.0;
+    let slot_index = player_session.slot_index;
     let student_index = student.0;
 
     let _ = save_data.update(|data| {

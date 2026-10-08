@@ -7,11 +7,11 @@ use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::*;
 
 use crate::data::{
-    ActiveSlot, ClassSave, GameMode, GameSettings, IndividualSave, PersistenceMut, PlayerContext,
-    SaveData,
+    ClassSave, GameMode, GameSettings, IndividualSave, PersistenceMut, PlayerContext,
+    PlayerSession, SaveData,
 };
 use crate::i18n::{I18n, TranslationKey};
-use crate::states::{AppState, StateScopedResourceExt};
+use crate::states::{AppState, InLessonFlow, StateScopedResourceExt};
 use crate::ui::components::{
     ConfirmationDialogAction, ConfirmationDialogActionEvent, action_button_scene, button_base,
     card_node, icon_button, screen_root, spawn_confirmation_modal, standard_button,
@@ -27,6 +27,7 @@ pub struct SaveSlotsScreenPlugin;
 impl Plugin for SaveSlotsScreenPlugin {
     fn build(&self, app: &mut App) {
         app.register_state_scoped_resource::<AppState, SaveSlotsState>(AppState::SaveSlots)
+            .register_state_scoped_resource::<InLessonFlow, PlayerSession>(InLessonFlow)
             .add_systems(OnEnter(AppState::SaveSlots), setup_save_slots)
             .add_systems(OnExit(AppState::SaveSlots), clear_save_slot_input_focus)
             .add_systems(
@@ -257,7 +258,7 @@ fn navigate_to_existing_slot(
     index: usize,
     next_state: &mut NextState<AppState>,
 ) {
-    commands.insert_resource(ActiveSlot(index));
+    commands.insert_resource(PlayerSession { slot_index: index });
     next_state.set(AppState::MapExploration);
 }
 
@@ -591,7 +592,7 @@ fn handle_create_confirm(
         })
         .expect("failed to update save data");
 
-    commands.insert_resource(ActiveSlot(slot_index));
+    commands.insert_resource(PlayerSession { slot_index });
 
     input_focus.clear();
     state.creating_slot = None;

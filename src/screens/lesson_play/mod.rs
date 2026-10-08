@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
-    ActiveSlot, ActiveStudent, GameMode, GameSettings, LastAnswer, LessonSession, PersistenceMut,
-    SelectedLesson,
+    ActiveStudent, GameMode, GameSettings, LastAnswer, LessonSession, PersistenceMut,
+    PlayerSession, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
@@ -84,7 +84,7 @@ fn record_answer(
     mut session: ResMut<LessonSession>,
     mut persistence: PersistenceMut<'_>,
     active_student: Option<Res<ActiveStudent>>,
-    active_slot: Option<Res<ActiveSlot>>,
+    player_session: Option<Res<PlayerSession>>,
     selected_lesson: Option<Res<SelectedLesson>>,
 ) {
     session::update_session_score(&mut session, &last_answer);
@@ -94,7 +94,7 @@ fn record_answer(
             &session,
             &last_answer,
             active_student.as_deref(),
-            active_slot.as_deref(),
+            player_session.as_deref(),
             selected_lesson.as_deref(),
             &mut persistence.save_data,
         );

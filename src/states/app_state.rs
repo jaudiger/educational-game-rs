@@ -14,8 +14,7 @@ pub enum AppState {
 }
 
 /// The `AppState` variants where the lesson flow is active.
-/// Used for per-state `OnEnter`/`OnExit` registrations that must fire
-/// on every intra-flow transition (roster rebuild, cleanup, resource scoping).
+/// Used for screen cleanup and view resets on each intra-flow transition.
 pub const LESSON_FLOW_STATES: [AppState; 3] = [
     AppState::MapExploration,
     AppState::LessonPlay,
@@ -31,6 +30,8 @@ pub const LESSON_FLOW_STATES: [AppState; 3] = [
 pub struct InLessonFlow;
 
 impl ComputedStates for InLessonFlow {
+    const ALLOW_SAME_STATE_TRANSITIONS: bool = false;
+
     type SourceStates = AppState;
 
     fn compute(sources: AppState) -> Option<Self> {
@@ -49,6 +50,8 @@ impl ComputedStates for InLessonFlow {
 pub struct ActiveLesson;
 
 impl ComputedStates for ActiveLesson {
+    const ALLOW_SAME_STATE_TRANSITIONS: bool = false;
+
     type SourceStates = AppState;
 
     fn compute(sources: AppState) -> Option<Self> {

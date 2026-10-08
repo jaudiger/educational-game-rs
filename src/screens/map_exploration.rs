@@ -2,13 +2,14 @@ use bevy::color::Luminance;
 use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
-    ActiveSlot, ActiveStudent, ActiveTheme, ContentLibrary, GameSettings, LessonProgress, MapTheme,
-    PlayerContext, SaveData, SelectedLesson, get_current_progress,
+    ActiveStudent, ActiveTheme, ContentLibrary, GameSettings, LessonProgress, MapTheme,
+    PlayerContext, PlayerSession, SaveData, SelectedLesson, get_current_progress,
 };
 use crate::i18n::{I18n, TranslationKey};
-use crate::states::{AppState, MapView};
+use crate::states::{AppState, InLessonFlow, MapView, StateScopedResourceExt};
 use crate::ui::animation::{AnimatedButton, FloatingCard};
 use crate::ui::components::{HoverTooltip, button_base, screen_root, standard_button};
 use crate::ui::theme;
@@ -18,7 +19,9 @@ pub struct MapExplorationScreenPlugin;
 
 impl Plugin for MapExplorationScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(MapView::WorldOverview), setup_world_overview)
+        app.register_state_scoped_resource::<InLessonFlow, ActiveStudent>(InLessonFlow)
+            .register_state_scoped_resource::<InLessonFlow, ActiveTheme>(InLessonFlow)
+            .add_systems(OnEnter(MapView::WorldOverview), setup_world_overview)
             .add_systems(
                 Update,
                 handle_world_overview.run_if(in_state(MapView::WorldOverview)),
@@ -26,14 +29,12 @@ impl Plugin for MapExplorationScreenPlugin {
             .add_systems(OnEnter(MapView::ThemeDetail), setup_theme_detail)
             .add_systems(
                 Update,
-                (
-                    setup_world_overview.run_if(in_state(MapView::WorldOverview)),
-                    setup_theme_detail.run_if(in_state(MapView::ThemeDetail)),
-                )
-                    .run_if(
-                        resource_changed::<ActiveStudent>
-                            .or_else(resource_removed::<ActiveStudent>),
+                update_map_progress.run_if(
+                    in_state(AppState::MapExploration).and_then(
+                        resource_changed_or_removed::<ActiveStudent>
+                            .or_else(resource_changed::<Persistent<SaveData>>),
                     ),
+                ),
             )
             .add_systems(
                 Update,
@@ -53,6 +54,12 @@ struct ThemeButton(String);
 
 #[derive(Component, Reflect)]
 struct LessonButton(String);
+
+#[derive(Component, Reflect)]
+enum MapProgressText {
+    Theme(String),
+    Lesson(String),
+}
 
 #[derive(Component, Reflect)]
 struct BackToSaveSlotsButton;
@@ -199,7 +206,7 @@ fn setup_world_overview(
                 theme_data,
                 &ctx.save_data,
                 &ctx.settings,
-                ctx.active_slot.as_deref(),
+                ctx.session.as_deref(),
                 ctx.active_student.as_deref(),
             );
             ThemeButtonData {
@@ -450,12 +457,23 @@ fn spawn_theme_button(
             });
         }
 
-        if data.completed > 0 && data.available {
-            btn.spawn(card_text(
-                &data.completed_text,
-                theme::fonts::SMALL,
-                progress_color,
-                window,
+        if data.available {
+            btn.spawn((
+                card_text(
+                    &data.completed_text,
+                    theme::fonts::SMALL,
+                    progress_color,
+                    window,
+                ),
+                MapProgressText::Theme(data.id.clone()),
+                Node {
+                    display: if data.completed > 0 {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
+                    ..default()
+                },
             ));
         }
     });
@@ -465,17 +483,17 @@ fn count_completed_for_theme(
     theme_data: &crate::data::content::Theme,
     save_data: &SaveData,
     settings: &GameSettings,
-    active_slot: Option<&ActiveSlot>,
+    session: Option<&PlayerSession>,
     active_student: Option<&ActiveStudent>,
 ) -> (usize, usize) {
     let total = theme_data.lessons.iter().filter(|l| l.available).count();
-    let Some(slot) = active_slot else {
+    let Some(session) = session else {
         return (0, total);
     };
     let progress = get_current_progress(
         save_data,
         settings.mode,
-        **slot,
+        session.slot_index,
         active_student.map(|s| **s),
     );
     let completed = progress.map_or(0, |p| {
@@ -521,12 +539,6 @@ fn handle_world_overview(
     // Handle back button
     for interaction in &back_query {
         if *interaction == Interaction::Pressed {
-            // ActiveTheme is intentionally persistent across lesson states to enable
-            // direct return to ThemeDetail. Removed only by explicit back-navigation.
-            commands.remove_resource::<ActiveTheme>();
-            // ActiveStudent is intentionally persistent across lesson states for class
-            // mode progress tracking. Removed only when returning to SaveSlots.
-            commands.remove_resource::<ActiveStudent>();
             next_app_state.set(AppState::SaveSlots);
         }
     }
@@ -564,11 +576,11 @@ fn setup_theme_detail(
     let theme_title = i18n.t(&theme_data.title_key).into_owned();
     let back_label = i18n.t(&TranslationKey::BackToWorldMap).into_owned();
 
-    let progress = ctx.active_slot.as_ref().and_then(|slot| {
+    let progress = ctx.session.as_ref().and_then(|slot| {
         get_current_progress(
             &ctx.save_data,
             ctx.settings.mode,
-            slot.0,
+            slot.slot_index,
             ctx.active_student.as_ref().map(|s| s.0),
         )
     });
@@ -649,6 +661,75 @@ fn setup_theme_detail(
     }
 }
 
+fn update_map_progress(
+    ctx: PlayerContext<'_>,
+    content: Res<ContentLibrary>,
+    i18n: Res<I18n>,
+    active_theme: Option<Res<ActiveTheme>>,
+    map_view: Res<State<MapView>>,
+    mut progress_query: Query<(&MapProgressText, &mut Text, &mut Node)>,
+) {
+    let theme_data = active_theme
+        .as_deref()
+        .and_then(|theme| content.theme(&theme.0));
+    let progress = ctx.session.as_deref().and_then(|session| {
+        get_current_progress(
+            &ctx.save_data,
+            ctx.settings.mode,
+            session.slot_index,
+            ctx.active_student.as_deref().map(|student| student.0),
+        )
+    });
+
+    for (progress_kind, mut text, mut node) in &mut progress_query {
+        let label = match (*map_view.get(), progress_kind) {
+            (MapView::WorldOverview, MapProgressText::Theme(theme_id)) => {
+                content.theme(theme_id).and_then(|theme_data| {
+                    let (completed, total) = count_completed_for_theme(
+                        theme_data,
+                        &ctx.save_data,
+                        &ctx.settings,
+                        ctx.session.as_deref(),
+                        ctx.active_student.as_deref(),
+                    );
+                    (completed > 0).then(|| {
+                        i18n.t(&TranslationKey::LessonsCompleted(completed, total))
+                            .into_owned()
+                    })
+                })
+            }
+            (MapView::ThemeDetail, MapProgressText::Lesson(lesson_id)) => theme_data
+                .and_then(|theme| theme.lesson(lesson_id))
+                .filter(|lesson| lesson.available)
+                .and_then(|lesson| progress.and_then(|progress| progress.get(&lesson.id)))
+                .map(|progress| {
+                    i18n.t(&TranslationKey::BestPercent(progress.percentage()))
+                        .into_owned()
+                }),
+            _ => continue,
+        };
+        set_map_progress_text(&mut text, &mut node, label);
+    }
+}
+
+fn set_map_progress_text(text: &mut Text, node: &mut Node, label: Option<String>) {
+    if let Some(label) = label {
+        if **text != label {
+            **text = label;
+        }
+        if node.display != Display::Flex {
+            node.display = Display::Flex;
+        }
+    } else {
+        if !text.is_empty() {
+            **text = String::new();
+        }
+        if node.display != Display::None {
+            node.display = Display::None;
+        }
+    }
+}
+
 fn spawn_lesson_button(
     parent: &mut ChildSpawner,
     data: &LessonButtonData,
@@ -706,10 +787,21 @@ fn spawn_lesson_button(
             });
         }
 
-        if data.available
-            && let Some(ref text) = data.best_percent_text
-        {
-            btn.spawn(card_text(text, theme::fonts::SMALL, progress_color, window));
+        if data.available {
+            let has_progress = data.best_percent_text.is_some();
+            let text = data.best_percent_text.as_deref().unwrap_or_default();
+            btn.spawn((
+                card_text(text, theme::fonts::SMALL, progress_color, window),
+                MapProgressText::Lesson(data.id.clone()),
+                Node {
+                    display: if has_progress {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
+                    ..default()
+                },
+            ));
         }
     });
 }
@@ -739,8 +831,6 @@ fn handle_theme_detail(
     // Handle back button
     for interaction in &back_query {
         if *interaction == Interaction::Pressed {
-            // ActiveTheme is intentionally persistent across lesson states to enable
-            // direct return to ThemeDetail. Removed only by explicit back-navigation.
             commands.remove_resource::<ActiveTheme>();
             next_map_view.set(MapView::WorldOverview);
         }

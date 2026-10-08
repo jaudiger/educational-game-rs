@@ -4,25 +4,26 @@ use bevy::prelude::*;
 use bevy_persistent::prelude::*;
 
 use crate::data::content::{ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, QuestionType};
-use crate::data::{ActiveSlot, Language, LessonSessionConfig, PlayerContext, SaveData};
+use crate::data::{Language, LessonSessionConfig, PlayerContext, PlayerSession, SaveData};
 use crate::i18n::{I18n, TranslationKey};
-use crate::plugins::teacher::{TeacherInDetailView, TeacherTab, tab_header};
+use crate::plugins::teacher::{
+    TeacherQuestionDraft, TeacherTab, TeacherView, TeacherWindow, TeacherWindowState, tab_header,
+};
 use crate::screens::teacher_shared::question_type_label;
 use crate::ui::components::{button_base, icon_button, standard_button};
 use crate::ui::theme;
 
 use super::{
-    ConfigHoverText, ConfigLessonButton, CountButton, CountText, DraftQuestion,
-    LessonConfigDraftRes, LessonsView, QuestionLabel, QuestionRow, ResetConfigButton,
-    ReturnToTreeButton, SaveConfigButton, ScrollContent, ScrollFrame, ScrollIndicator,
-    TeacherLessonsState, VisualToggleButton,
+    ConfigHoverText, ConfigLessonButton, CountButton, CountText, QuestionLabel, QuestionRow,
+    ResetConfigButton, ReturnToTreeButton, SaveConfigButton, ScrollContent, ScrollFrame,
+    ScrollIndicator, VisualToggleButton, has_any_selected,
 };
 
 pub(super) fn spawn_config_view(
     parent: &mut ChildSpawner,
     i18n: &I18n,
     lesson_title: &str,
-    draft: &LessonConfigDraftRes,
+    draft: &[TeacherQuestionDraft],
     active_tab: TeacherTab,
     window: Entity,
 ) {
@@ -105,11 +106,11 @@ fn spawn_config_header(
 fn spawn_question_counter_section(
     parent: &mut ChildSpawner,
     i18n: &I18n,
-    draft: &LessonConfigDraftRes,
+    draft: &[TeacherQuestionDraft],
     window: Entity,
 ) {
     let i18n_owned = I18n::new(i18n.language);
-    let questions = draft.questions.clone();
+    let questions = draft.to_vec();
 
     parent.spawn((
         Node {
@@ -136,7 +137,8 @@ fn spawn_question_counter_section(
                     ScrollContent,
                 ))
                 .with_children(|col| {
-                    let mut questions_by_type = HashMap::<QuestionType, Vec<&DraftQuestion>>::new();
+                    let mut questions_by_type =
+                        HashMap::<QuestionType, Vec<&TeacherQuestionDraft>>::new();
                     for question in &questions {
                         questions_by_type
                             .entry(question.question_type)
@@ -187,7 +189,7 @@ fn spawn_question_counter_section(
     ));
 }
 
-fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &DraftQuestion, window: Entity) {
+fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &TeacherQuestionDraft, window: Entity) {
     let full_prompt = q.full_prompt.clone();
     let count_str = q.count.to_string();
     let idx = q.index;
@@ -310,10 +312,10 @@ fn spawn_counter_controls(
 fn spawn_button_row(
     parent: &mut ChildSpawner,
     i18n: &I18n,
-    draft: &LessonConfigDraftRes,
+    draft: &[TeacherQuestionDraft],
     window: Entity,
 ) {
-    let can_save = draft.has_any_selected();
+    let can_save = has_any_selected(draft);
 
     let save_bg = if can_save {
         theme::colors::SUCCESS
@@ -370,7 +372,7 @@ pub(super) fn build_draft_questions(
     lesson: &Lesson,
     language: Language,
     existing_config: Option<&LessonSessionConfig>,
-) -> Vec<DraftQuestion> {
+) -> Vec<TeacherQuestionDraft> {
     lesson
         .questions
         .iter()
@@ -385,7 +387,7 @@ pub(super) fn build_draft_questions(
             let show_visual = existing_config
                 .and_then(|c| c.show_visuals.get(i).copied())
                 .unwrap_or(default_show_visual);
-            DraftQuestion {
+            TeacherQuestionDraft {
                 index: i,
                 question_type: q.question_type(),
                 full_prompt,
@@ -401,11 +403,10 @@ pub(super) fn build_draft_questions(
 /// Opens the config view for a lesson when the gear button is clicked.
 pub(super) fn handle_config_button_click(
     query: Query<(&Interaction, &ConfigLessonButton), Changed<Interaction>>,
-    mut commands: Commands,
     content: Res<ContentLibrary>,
     ctx: PlayerContext<'_>,
     i18n: Res<I18n>,
-    mut lessons_state: ResMut<TeacherLessonsState>,
+    mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
     for (interaction, config_btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -419,23 +420,27 @@ pub(super) fn handle_config_button_click(
             continue;
         };
 
-        let existing_config = ctx.active_slot.as_ref().and_then(|slot| {
-            ctx.save_data.class_slots[slot.0]
+        let existing_config = ctx.session.as_ref().and_then(|session| {
+            ctx.save_data.class_slots[session.slot_index]
                 .as_ref()
-                .and_then(|cs| cs.lesson_configs.get(&config_btn.lesson_id))
+                .and_then(|class_save| class_save.lesson_configs.get(&config_btn.lesson_id))
         });
 
         let questions = build_draft_questions(lesson, i18n.language, existing_config);
         let lesson_title = i18n.t(&lesson.title_key).into_owned();
 
-        lessons_state.view = LessonsView::Config {
+        let Ok(mut state) = teacher_states.single_mut() else {
+            return;
+        };
+        if !matches!(&state.view, TeacherView::Lessons) {
+            return;
+        }
+        state.view = TeacherView::LessonConfig {
             lesson_id: config_btn.lesson_id.clone(),
             lesson_title,
+            questions,
         };
-        commands.insert_resource(LessonConfigDraftRes { questions });
-        commands.insert_resource(TeacherInDetailView);
-
-        return; // Only handle first press
+        return;
     }
 }
 
@@ -443,20 +448,23 @@ pub(super) fn handle_config_button_click(
 /// The direction and magnitude come from the `delta` field on the button component.
 pub(super) fn handle_count_change(
     query: Query<(&Interaction, &CountButton), Changed<Interaction>>,
-    lessons_state: Res<TeacherLessonsState>,
-    mut draft: ResMut<LessonConfigDraftRes>,
+    mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
 ) {
-    if !matches!(lessons_state.view, LessonsView::Config { .. }) {
+    let Ok(mut state) = teacher_states.single_mut() else {
         return;
-    }
+    };
+    let state = state.bypass_change_detection();
+    let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
+        return;
+    };
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
         let idx = btn.index;
-        let Some(q) = draft.questions.iter_mut().find(|q| q.index == idx) else {
+        let Some(q) = questions.iter_mut().find(|q| q.index == idx) else {
             continue;
         };
         if let Some(new_count) = q.count.checked_add_signed(btn.delta) {
@@ -467,7 +475,7 @@ pub(super) fn handle_count_change(
             if let Ok(mut text) = text_query.get_mut(btn.count_text) {
                 **text = q.count.to_string();
             }
-            update_save_button_state(&mut save_btn_query, &draft);
+            update_save_button_state(&mut save_btn_query, questions);
         }
     }
 }
@@ -475,19 +483,22 @@ pub(super) fn handle_count_change(
 /// Toggles the optional visual for a specific question on/off.
 pub(super) fn handle_visual_toggle(
     query: Query<(&Interaction, &VisualToggleButton), Changed<Interaction>>,
-    lessons_state: Res<TeacherLessonsState>,
-    mut draft: ResMut<LessonConfigDraftRes>,
+    mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut bg_query: Query<(&mut BackgroundColor, &VisualToggleButton)>,
 ) {
-    if !matches!(lessons_state.view, LessonsView::Config { .. }) {
+    let Ok(mut state) = teacher_states.single_mut() else {
         return;
-    }
+    };
+    let state = state.bypass_change_detection();
+    let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
+        return;
+    };
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
         let idx = btn.0;
-        let Some(q) = draft.questions.iter_mut().find(|q| q.index == idx) else {
+        let Some(q) = questions.iter_mut().find(|q| q.index == idx) else {
             continue;
         };
         q.show_visual = !q.show_visual;
@@ -517,7 +528,7 @@ fn reset_visual_toggles(
         (&mut BackgroundColor, &VisualToggleButton),
         Without<SaveConfigButton>,
     >,
-    questions: &[DraftQuestion],
+    questions: &[TeacherQuestionDraft],
 ) {
     for (mut bg, toggle) in toggle_bg_query {
         if let Some(q) = questions
@@ -536,8 +547,7 @@ fn reset_visual_toggles(
 /// Resets all question counts to the default value (1) and visual toggles to their defaults.
 pub(super) fn handle_reset_config(
     query: Query<&Interaction, (Changed<Interaction>, With<ResetConfigButton>)>,
-    lessons_state: Res<TeacherLessonsState>,
-    mut draft: ResMut<LessonConfigDraftRes>,
+    mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
     mut toggle_bg_query: Query<
@@ -545,31 +555,41 @@ pub(super) fn handle_reset_config(
         Without<SaveConfigButton>,
     >,
 ) {
-    if !matches!(lessons_state.view, LessonsView::Config { .. }) {
+    let Ok(mut state) = teacher_states.single_mut() else {
         return;
-    }
+    };
+    let state = state.bypass_change_detection();
+    let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
+        return;
+    };
     for interaction in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        for q in &mut draft.questions {
+        for q in questions.iter_mut() {
             q.count = 1;
             if q.has_visual {
                 q.show_visual = q.default_show_visual;
             }
         }
         reset_count_texts(&mut text_query);
-        reset_visual_toggles(&mut toggle_bg_query, &draft.questions);
-        update_save_button_state(&mut save_btn_query, &draft);
+        reset_visual_toggles(&mut toggle_bg_query, questions);
+        update_save_button_state(&mut save_btn_query, questions);
     }
 }
 
 /// Shows/hides the scroll indicator based on content overflow.
 pub(super) fn update_scroll_indicator(
-    frame_node: Single<&ComputedNode, With<ScrollFrame>>,
-    content_node: Single<&ComputedNode, With<ScrollContent>>,
+    frame_node: Query<&ComputedNode, With<ScrollFrame>>,
+    content_node: Query<&ComputedNode, With<ScrollContent>>,
     mut indicator_query: Query<&mut Visibility, With<ScrollIndicator>>,
 ) {
+    let Ok(frame_node) = frame_node.single() else {
+        return;
+    };
+    let Ok(content_node) = content_node.single() else {
+        return;
+    };
     let has_overflow = content_node.unrounded_size().y > frame_node.unrounded_size().y;
     for mut vis in &mut indicator_query {
         *vis = if has_overflow {
@@ -659,9 +679,9 @@ pub(super) fn update_config_hover_text(
 
 fn update_save_button_state(
     query: &mut Query<&mut BackgroundColor, With<SaveConfigButton>>,
-    draft: &LessonConfigDraftRes,
+    draft: &[TeacherQuestionDraft],
 ) {
-    let can_save = draft.has_any_selected();
+    let can_save = has_any_selected(draft);
     let bg = if can_save {
         theme::colors::SUCCESS
     } else {
@@ -675,40 +695,47 @@ fn update_save_button_state(
 /// Saves the current config draft to persistence and returns to tree view.
 pub(super) fn handle_save_config(
     query: Query<&Interaction, (Changed<Interaction>, With<SaveConfigButton>)>,
-    mut commands: Commands,
-    mut lessons_state: ResMut<TeacherLessonsState>,
-    draft: Res<LessonConfigDraftRes>,
+    mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut save_data: ResMut<Persistent<SaveData>>,
-    active_slot: Option<Res<ActiveSlot>>,
+    session: Option<Res<PlayerSession>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
-
-        let LessonsView::Config { ref lesson_id, .. } = lessons_state.view else {
+        let Some(ref session) = session else {
             continue;
         };
-
-        // Don't save if all counts are zero
-        if !draft.has_any_selected() {
-            continue;
-        }
-
-        let counts: Vec<usize> = draft.questions.iter().map(|q| q.count).collect();
-        let show_visuals: Vec<bool> = draft.questions.iter().map(|q| q.show_visual).collect();
-        let config = LessonSessionConfig {
-            counts,
-            show_visuals,
+        let Ok(mut state) = teacher_states.single_mut() else {
+            return;
+        };
+        let (lesson_id, config) = {
+            let TeacherView::LessonConfig {
+                lesson_id,
+                questions,
+                ..
+            } = &state.view
+            else {
+                continue;
+            };
+            if !has_any_selected(questions) {
+                continue;
+            }
+            (
+                lesson_id.clone(),
+                LessonSessionConfig {
+                    counts: questions.iter().map(|question| question.count).collect(),
+                    show_visuals: questions
+                        .iter()
+                        .map(|question| question.show_visual)
+                        .collect(),
+                },
+            )
         };
 
-        let Some(ref slot) = active_slot else {
-            continue;
-        };
-        let lesson_id = lesson_id.clone();
         save_data
             .update(|data| {
-                if let Some(ref mut class_save) = data.class_slots[slot.0] {
+                if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
                     class_save
                         .lesson_configs
                         .insert(lesson_id.clone(), config.clone());
@@ -716,22 +743,23 @@ pub(super) fn handle_save_config(
             })
             .expect("failed to update save data");
 
-        lessons_state.view = LessonsView::Tree;
-        commands.remove_resource::<LessonConfigDraftRes>();
-        commands.remove_resource::<TeacherInDetailView>();
+        state.view = TeacherView::Lessons;
     }
 }
 
 pub(super) fn handle_return_to_tree(
     query: Query<&Interaction, (Changed<Interaction>, With<ReturnToTreeButton>)>,
-    mut commands: Commands,
-    mut lessons_state: ResMut<TeacherLessonsState>,
+    mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            lessons_state.view = LessonsView::Tree;
-            commands.remove_resource::<LessonConfigDraftRes>();
-            commands.remove_resource::<TeacherInDetailView>();
-        }
+    if !query
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        return;
+    }
+    if let Ok(mut state) = teacher_states.single_mut()
+        && matches!(&state.view, TeacherView::LessonConfig { .. })
+    {
+        state.view = TeacherView::Lessons;
     }
 }

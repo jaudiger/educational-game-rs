@@ -28,13 +28,15 @@ pub(super) fn setup_lesson_play(
     let window = *primary_window;
     // Look up teacher config for class mode
     let lesson_config = if ctx.settings.mode == GameMode::Group {
-        ctx.active_slot.as_ref().and_then(|slot| {
-            ctx.save_data.class_slots[slot.0].as_ref().and_then(|cs| {
-                selected_lesson
-                    .0
-                    .as_ref()
-                    .and_then(|lid| cs.lesson_configs.get(lid))
-            })
+        ctx.session.as_ref().and_then(|slot| {
+            ctx.save_data.class_slots[slot.slot_index]
+                .as_ref()
+                .and_then(|cs| {
+                    selected_lesson
+                        .0
+                        .as_ref()
+                        .and_then(|lid| cs.lesson_configs.get(lid))
+                })
         })
     } else {
         None

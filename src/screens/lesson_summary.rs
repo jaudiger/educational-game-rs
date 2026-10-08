@@ -4,7 +4,7 @@ use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
-    ActiveSlot, GameMode, GameSettings, LessonProgress, LessonSession, SaveData, SelectedLesson,
+    GameMode, GameSettings, LessonProgress, LessonSession, PlayerSession, SaveData, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
@@ -27,7 +27,7 @@ impl Plugin for LessonSummaryScreenPlugin {
 fn save_lesson_progress(
     session: Res<LessonSession>,
     selected_lesson: Option<Res<SelectedLesson>>,
-    active_slot: Option<Res<ActiveSlot>>,
+    player_session: Option<Res<PlayerSession>>,
     settings: Res<Persistent<GameSettings>>,
     mut save_data: ResMut<Persistent<SaveData>>,
 ) {
@@ -43,7 +43,7 @@ fn save_lesson_progress(
     let Some(ref lesson_id) = selected.0 else {
         return;
     };
-    let Some(ref slot) = active_slot else {
+    let Some(ref slot) = player_session else {
         return;
     };
 
@@ -56,7 +56,7 @@ fn save_lesson_progress(
         type_scores: session.type_scores.clone(),
     };
     let lesson_id = lesson_id.clone();
-    let slot_index = slot.0;
+    let slot_index = slot.slot_index;
 
     save_data
         .update(|data| {

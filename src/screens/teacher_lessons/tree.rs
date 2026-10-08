@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::content::{Lesson, Theme};
-use crate::data::{ActiveSlot, SaveData};
+use crate::data::{PlayerSession, SaveData};
 use crate::i18n::{I18n, TranslationKey};
 use crate::ui::components::icon_button;
 use crate::ui::theme;
@@ -32,7 +32,7 @@ pub(super) struct ThemeTreeSpec {
 pub(super) fn build_tree_specs(
     themes: &[Theme],
     save_data: &SaveData,
-    active_slot: Option<&ActiveSlot>,
+    session: Option<&PlayerSession>,
 ) -> Vec<ThemeTreeSpec> {
     themes
         .iter()
@@ -45,7 +45,7 @@ pub(super) fn build_tree_specs(
                         lesson_id: lesson.id.clone(),
                         title_key: lesson.title_key.clone(),
                         available: lesson.available,
-                        has_custom_config: lesson_has_custom_config(lesson, save_data, active_slot),
+                        has_custom_config: lesson_has_custom_config(lesson, save_data, session),
                     })
                     .collect()
             } else {
@@ -116,10 +116,10 @@ pub(super) fn spawn_tree_view(
 fn lesson_has_custom_config(
     lesson: &Lesson,
     save_data: &SaveData,
-    active_slot: Option<&ActiveSlot>,
+    session: Option<&PlayerSession>,
 ) -> bool {
-    active_slot
-        .and_then(|slot| save_data.class_slots[slot.0].as_ref())
+    session
+        .and_then(|player_session| save_data.class_slots[player_session.slot_index].as_ref())
         .and_then(|cs| cs.lesson_configs.get(&lesson.id))
         .is_some_and(|config| {
             let count_changed = config.counts.iter().any(|&c| c != 1);

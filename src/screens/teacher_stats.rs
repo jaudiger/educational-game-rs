@@ -6,16 +6,15 @@ use bevy_persistent::prelude::Persistent;
 
 use crate::data::content::QuestionType;
 use crate::data::{
-    ActiveSlot, ContentLibrary, GameMode, Language, LessonProgress, PlayerContext, SaveData,
+    ContentLibrary, GameMode, Language, LessonProgress, PlayerContext, PlayerSession, SaveData,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::teacher::{
-    TeacherContentRoot, TeacherInDetailView, TeacherScreenParam, TeacherTab, TeacherWindowParam,
-    tab_header,
+    TeacherScreenParam, TeacherView, TeacherViewOverlay, TeacherWindow, TeacherWindowParam,
+    TeacherWindowState, tab_header, teacher_stats_view_active, teacher_window_exists,
 };
-use crate::screens::teacher_roster::TeacherRosterView;
-use crate::screens::teacher_shared::{ViewingStudentStats, question_type_label};
-use crate::states::{AppState, StateScopedResourceExt, cleanup_root};
+use crate::screens::teacher_shared::question_type_label;
+use crate::states::{AppState, cleanup_root};
 use crate::ui::components::{
     ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button, spawn_confirmation_modal,
     standard_button,
@@ -27,27 +26,17 @@ pub struct TeacherStatsScreenPlugin;
 
 impl Plugin for TeacherStatsScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.register_state_scoped_resource::<AppState, ViewingStudentStats>(
-            AppState::MapExploration,
-        )
-        .add_systems(
+        app.add_systems(
             Update,
-            (
-                rebuild_stats_ui.run_if(
-                    resource_exists::<ViewingStudentStats>.and_then(
-                        resource_changed::<ViewingStudentStats>
-                            .or_else(resource_changed::<Persistent<SaveData>>),
-                    ),
-                ),
-                cleanup_stats_on_view_removed.run_if(resource_removed::<ViewingStudentStats>),
-            )
-                .run_if(in_state(AppState::MapExploration)),
+            rebuild_stats_ui
+                .run_if(in_state(AppState::MapExploration))
+                .run_if(teacher_window_exists),
         )
         .add_systems(
             Update,
             (handle_return_to_list, handle_reset_click)
                 .run_if(in_state(AppState::MapExploration))
-                .run_if(resource_exists::<ViewingStudentStats>),
+                .run_if(teacher_stats_view_active),
         )
         .add_systems(
             OnExit(AppState::MapExploration),
@@ -70,6 +59,12 @@ struct StatsResetButton(StatsResetTarget);
 #[derive(Component, Reflect)]
 struct StatsResetPopover;
 
+#[derive(Component, Reflect)]
+struct StatsResetRequest {
+    student_index: usize,
+    target: StatsResetTarget,
+}
+
 /// What to reset when the confirmation is accepted.
 #[derive(Component, Clone, Debug, Reflect)]
 enum StatsResetTarget {
@@ -81,44 +76,48 @@ enum StatsResetTarget {
     Type(String, QuestionType),
 }
 
-/// Builds the stats UI. Runs when `ViewingStudentStats` is first inserted
-/// (entering the detail view), replaced with a different student, or when
-/// the underlying save data changes (e.g. progress reset).
+/// Builds the stats UI when its view or backing save data changes.
 fn rebuild_stats_ui(
     mut commands: Commands,
-    viewing: Res<ViewingStudentStats>,
     ts: TeacherScreenParam<'_, '_>,
     content: Res<ContentLibrary>,
     existing_root: Query<Entity, With<TeacherStatsRoot>>,
 ) {
+    let Ok(state) = ts.teacher.state.single() else {
+        return;
+    };
+    if !state.is_changed() && !ts.ctx.save_data.is_changed() {
+        return;
+    }
+
     for entity in &existing_root {
         commands.entity(entity).despawn();
     }
-    if ts
-        .teacher_tab
-        .as_ref()
-        .is_some_and(|t| **t != TeacherTab::Students)
-    {
+    let TeacherView::StudentStats { student_index } = &state.view else {
         return;
-    }
+    };
+    let student_index = *student_index;
     if ts.ctx.settings.mode != GameMode::Group {
         return;
     }
-    let camera_entity = *ts.teacher.camera;
-    let window = *ts.teacher.window;
-    let Some(ref slot) = ts.ctx.active_slot else {
+    let Ok(camera_entity) = ts.teacher.camera.single() else {
         return;
     };
-    let Some(ref class_save) = ts.ctx.save_data.class_slots[slot.0] else {
+    let Ok(window) = ts.teacher.window.single() else {
         return;
     };
-    let student_index = viewing.0;
+    let Some(ref session) = ts.ctx.session else {
+        return;
+    };
+    let Some(ref class_save) = ts.ctx.save_data.class_slots[session.slot_index] else {
+        return;
+    };
     let Some(student) = class_save.students.get(student_index) else {
         return;
     };
 
     let has_any_progress = !student.progress.is_empty();
-    let active_tab = ts.teacher_tab.map_or(TeacherTab::Students, |t| *t);
+    let active_tab = state.view.tab();
 
     let tab = tab_header(&ts.i18n, active_tab, window);
     let title_text = ts
@@ -143,17 +142,6 @@ fn rebuild_stats_ui(
             global_total,
         },
     );
-}
-
-/// Despawns the stats UI when `ViewingStudentStats` is removed (returning to
-/// the roster list or exiting `MapExploration`).
-fn cleanup_stats_on_view_removed(
-    mut commands: Commands,
-    existing_root: Query<Entity, With<TeacherStatsRoot>>,
-) {
-    for entity in &existing_root {
-        commands.entity(entity).despawn();
-    }
 }
 
 struct StatsViewData {
@@ -185,7 +173,6 @@ fn spawn_stats_root(
         UiTargetCamera(camera_entity),
         TabGroup::new(0),
         TeacherStatsRoot,
-        TeacherContentRoot,
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn(tab);
 
@@ -592,20 +579,32 @@ fn handle_reset_click(
     mut commands: Commands,
     existing_popover: Query<Entity, With<StatsResetPopover>>,
     i18n: Res<I18n>,
-    viewing: Res<ViewingStudentStats>,
     ctx: PlayerContext<'_>,
     teacher: TeacherWindowParam<'_, '_>,
+    teacher_state: Query<&TeacherWindowState, With<TeacherWindow>>,
 ) {
-    let Some(ref slot) = ctx.active_slot else {
+    let Some(ref session) = ctx.session else {
         return;
     };
-    let Some(ref class_save) = ctx.save_data.class_slots[slot.0] else {
+    let Some(ref class_save) = ctx.save_data.class_slots[session.slot_index] else {
         return;
     };
-    if class_save.students.get(viewing.0).is_none() {
+    let Ok(state) = teacher_state.single() else {
+        return;
+    };
+    let TeacherView::StudentStats { student_index } = &state.view else {
+        return;
+    };
+    let student_index = *student_index;
+    if class_save.students.get(student_index).is_none() {
         return;
     }
-    let window = *teacher.window;
+    let Ok(window) = teacher.window.single() else {
+        return;
+    };
+    let Ok(camera) = teacher.camera.single() else {
+        return;
+    };
 
     for (interaction, reset_btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -637,13 +636,17 @@ fn handle_reset_click(
             &i18n.t(&TranslationKey::Cancel),
             theme::colors::ERROR,
             window,
-            Some(*teacher.camera),
+            Some(camera),
         );
         commands
             .entity(modal_entity)
             .insert((
                 StatsResetPopover,
-                reset_btn.0.clone(),
+                TeacherViewOverlay,
+                StatsResetRequest {
+                    student_index,
+                    target: reset_btn.0.clone(),
+                },
                 DespawnOnExit(AppState::MapExploration),
             ))
             .observe(handle_confirm_reset);
@@ -652,22 +655,21 @@ fn handle_reset_click(
 
 fn handle_confirm_reset(
     event: On<ConfirmationDialogActionEvent>,
-    target_query: Query<&StatsResetTarget>,
-    viewing: Res<ViewingStudentStats>,
-    active_slot: Option<Res<ActiveSlot>>,
+    target_query: Query<&StatsResetRequest>,
+    session: Option<Res<PlayerSession>>,
     mut save_data: ResMut<Persistent<SaveData>>,
 ) {
     if event.action != ConfirmationDialogAction::Confirm {
         return;
     }
-    let Some(ref slot) = active_slot else { return };
-    let Ok(target) = target_query.get(event.entity) else {
+    let Some(ref session) = session else { return };
+    let Ok(request) = target_query.get(event.entity) else {
         return;
     };
 
-    let student_index = viewing.0;
-    let slot_index = slot.0;
-    let target = target.clone();
+    let student_index = request.student_index;
+    let slot_index = session.slot_index;
+    let target = request.target.clone();
 
     let _ = save_data.update(|data| {
         let Some(class_save) = data.class_slots[slot_index].as_mut() else {
@@ -698,15 +700,15 @@ fn handle_confirm_reset(
 
 fn handle_return_to_list(
     query: Query<&Interaction, (Changed<Interaction>, With<ReturnToListButton>)>,
-    mut commands: Commands,
+    mut states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            commands.remove_resource::<ViewingStudentStats>();
-            commands.remove_resource::<TeacherInDetailView>();
-            // Roster rebuild is handled reactively by `rebuild_roster_ui`
-            // via the `resource_removed::<ViewingStudentStats>` run condition.
-            commands.insert_resource(TeacherRosterView);
-        }
+    if !query
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        return;
+    }
+    if let Ok(mut state) = states.single_mut() {
+        state.view = TeacherView::Students;
     }
 }

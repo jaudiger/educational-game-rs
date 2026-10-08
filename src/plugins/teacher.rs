@@ -7,9 +7,10 @@ use bevy::window::{
 };
 use bevy_persistent::prelude::*;
 
+use crate::data::content::QuestionType;
 use crate::data::{GameMode, GameSettings, PlayerContext};
 use crate::i18n::{I18n, TranslationKey};
-use crate::states::{AppState, InLessonFlow};
+use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES};
 use crate::ui::components::toggle_button;
 use crate::ui::theme;
 
@@ -22,57 +23,91 @@ pub struct TeacherWindow;
 #[derive(Component, Reflect)]
 pub struct TeacherCamera;
 
-/// Marker component added to every teacher tab content root entity.
-/// `handle_tab_click` queries this to despawn all tab content on a tab switch
-/// without knowing which screen owns the root.
 #[derive(Component, Reflect)]
-pub struct TeacherContentRoot;
+pub struct TeacherViewOverlay;
 
-/// Resource inserted by screens when they enter a drill-down (detail) view,
-/// and removed when they return to the top-level list. Lets `handle_tab_click`
-/// detect whether re-clicking the active tab should navigate back.
-#[derive(Resource, Reflect)]
-pub struct TeacherInDetailView;
+#[derive(Component, Reflect)]
+pub struct TeacherWindowState {
+    #[reflect(ignore)]
+    pub view: TeacherView,
+}
 
-/// Event triggered on every tab switch, after all content roots are despawned.
-/// Screens observe this event to clean up their own resources and trigger
-/// their rebuild events.
-#[derive(Event, Clone, Copy)]
-pub struct TeacherTabChanged(pub TeacherTab);
+impl Default for TeacherWindowState {
+    fn default() -> Self {
+        Self {
+            view: TeacherView::Students,
+        }
+    }
+}
 
-/// System set for the initial teacher window spawn.
-/// Other plugins that need the teacher camera to exist should order
-/// their `OnEnter(MapExploration)` systems after this set.
-#[derive(SystemSet, Clone, Debug, Eq, Hash, PartialEq)]
-pub struct TeacherWindowInit;
+#[derive(Clone, Debug, Default)]
+pub enum TeacherView {
+    #[default]
+    Students,
+    StudentStats {
+        student_index: usize,
+    },
+    Lessons,
+    LessonConfig {
+        lesson_id: String,
+        lesson_title: String,
+        questions: Vec<TeacherQuestionDraft>,
+    },
+}
 
-/// Which tab is currently active in the teacher window.
-#[derive(Resource, Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
+impl TeacherView {
+    pub const fn tab(&self) -> TeacherTab {
+        match self {
+            Self::Students | Self::StudentStats { .. } => TeacherTab::Students,
+            Self::Lessons | Self::LessonConfig { .. } => TeacherTab::Lessons,
+        }
+    }
+
+    pub const fn is_detail(&self) -> bool {
+        matches!(self, Self::StudentStats { .. } | Self::LessonConfig { .. })
+    }
+
+    pub const fn base(tab: TeacherTab) -> Self {
+        match tab {
+            TeacherTab::Students => Self::Students,
+            TeacherTab::Lessons => Self::Lessons,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TeacherQuestionDraft {
+    pub index: usize,
+    pub question_type: QuestionType,
+    pub full_prompt: String,
+    pub count: usize,
+    pub has_visual: bool,
+    pub show_visual: bool,
+    pub default_show_visual: bool,
+}
+
+#[derive(Component, Reflect)]
+pub struct TeacherTabButton(pub TeacherTab);
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
 pub enum TeacherTab {
     #[default]
     Students,
     Lessons,
 }
 
-/// Marker component on each tab header button, storing which tab it represents.
-#[derive(Component, Reflect)]
-pub struct TeacherTabButton(pub TeacherTab);
-
-/// Groups the teacher camera and window entities into a single system parameter.
 #[derive(SystemParam)]
 pub struct TeacherWindowParam<'w, 's> {
-    pub camera: Single<'w, 's, Entity, With<TeacherCamera>>,
-    pub window: Single<'w, 's, Entity, With<TeacherWindow>>,
+    pub camera: Query<'w, 's, Entity, With<TeacherCamera>>,
+    pub window: Query<'w, 's, Entity, With<TeacherWindow>>,
+    pub state: Query<'w, 's, Ref<'static, TeacherWindowState>, With<TeacherWindow>>,
 }
 
-/// Groups the four params shared by every teacher-tab rebuild observer:
-/// player context, teacher window handles, i18n, and the active tab.
 #[derive(SystemParam)]
 pub struct TeacherScreenParam<'w, 's> {
     pub ctx: PlayerContext<'w>,
     pub teacher: TeacherWindowParam<'w, 's>,
     pub i18n: Res<'w, I18n>,
-    pub teacher_tab: Option<Res<'w, TeacherTab>>,
 }
 
 impl Plugin for TeacherPlugin {
@@ -81,10 +116,56 @@ impl Plugin for TeacherPlugin {
             OnEnter(AppState::MapExploration),
             spawn_teacher_window_if_class_mode.in_set(TeacherWindowInit),
         )
-        .add_systems(OnEnter(AppState::Home), despawn_teacher_window)
-        .add_systems(OnEnter(AppState::SaveSlots), despawn_teacher_window)
-        .add_systems(Update, handle_tab_click.run_if(in_state(InLessonFlow)));
+        .add_systems(
+            Update,
+            (handle_tab_click, cleanup_teacher_view_overlays)
+                .run_if(in_state(InLessonFlow))
+                .run_if(teacher_window_exists),
+        );
+
+        for &state in &LESSON_FLOW_STATES {
+            if state == AppState::MapExploration {
+                app.add_systems(OnEnter(state), reset_teacher_view.after(TeacherWindowInit));
+            } else {
+                app.add_systems(OnEnter(state), reset_teacher_view);
+            }
+        }
     }
+}
+
+#[derive(SystemSet, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct TeacherWindowInit;
+
+pub fn teacher_window_exists(query: Query<(), With<TeacherWindow>>) -> bool {
+    query.single().is_ok()
+}
+
+pub fn teacher_roster_view_active(query: Query<&TeacherWindowState, With<TeacherWindow>>) -> bool {
+    query
+        .single()
+        .is_ok_and(|state| matches!(state.view, TeacherView::Students))
+}
+
+pub fn teacher_lessons_tree_view_active(
+    query: Query<&TeacherWindowState, With<TeacherWindow>>,
+) -> bool {
+    query
+        .single()
+        .is_ok_and(|state| matches!(state.view, TeacherView::Lessons))
+}
+
+pub fn teacher_lesson_config_view_active(
+    query: Query<&TeacherWindowState, With<TeacherWindow>>,
+) -> bool {
+    query
+        .single()
+        .is_ok_and(|state| matches!(state.view, TeacherView::LessonConfig { .. }))
+}
+
+pub fn teacher_stats_view_active(query: Query<&TeacherWindowState, With<TeacherWindow>>) -> bool {
+    query
+        .single()
+        .is_ok_and(|state| matches!(state.view, TeacherView::StudentStats { .. }))
 }
 
 fn spawn_teacher_window_if_class_mode(
@@ -106,8 +187,6 @@ fn spawn_teacher_window_if_class_mode(
         teacher_logical_width,
     );
 
-    commands.insert_resource(TeacherTab::Students);
-
     let window = commands
         .spawn((
             Window {
@@ -127,6 +206,8 @@ fn spawn_teacher_window_if_class_mode(
                 ..default()
             },
             TeacherWindow,
+            TeacherWindowState::default(),
+            DespawnOnExit(InLessonFlow),
         ))
         .id();
 
@@ -134,7 +215,14 @@ fn spawn_teacher_window_if_class_mode(
         Camera2d,
         RenderTarget::Window(WindowRef::Entity(window)),
         TeacherCamera,
+        DespawnOnExit(InLessonFlow),
     ));
+}
+
+fn reset_teacher_view(mut states: Query<&mut TeacherWindowState, With<TeacherWindow>>) {
+    if let Ok(mut state) = states.single_mut() {
+        state.view = TeacherView::base(state.view.tab());
+    }
 }
 
 /// Compute a [`WindowPosition`] that places a window of the given logical
@@ -175,20 +263,6 @@ fn compute_left_of_primary(
     WindowPosition::At(IVec2::new(x, primary_y))
 }
 
-fn despawn_teacher_window(
-    mut commands: Commands,
-    window_query: Query<Entity, With<TeacherWindow>>,
-    camera_query: Query<Entity, With<TeacherCamera>>,
-) {
-    for entity in &window_query {
-        commands.entity(entity).despawn();
-    }
-    for entity in &camera_query {
-        commands.entity(entity).despawn();
-    }
-    commands.remove_resource::<TeacherTab>();
-}
-
 /// Returns a tab header bundle (horizontal row with two tab buttons).
 /// Active tab gets `COLOR_PRIMARY` bg; inactive gets `COLOR_TOGGLE_INACTIVE`.
 pub fn tab_header(i18n: &I18n, active_tab: TeacherTab, window: Entity) -> impl Bundle {
@@ -214,44 +288,38 @@ pub fn tab_header(i18n: &I18n, active_tab: TeacherTab, window: Entity) -> impl B
     )
 }
 
-/// Returns a single tab button bundle.
 fn tab_button(label: &str, active: bool, window: Entity) -> impl Bundle + use<> {
     toggle_button(label, active, window)
 }
 
-/// Switches tabs when a tab header button is pressed, or navigates back to
-/// the list view when re-clicking the active tab from a detail view.
-///
-/// Despawns all content roots (via `TeacherContentRoot`) and clears
-/// `TeacherInDetailView`, then triggers `TeacherTabChanged` so each screen
-/// can clean up its own state resources and request a rebuild.
+fn cleanup_teacher_view_overlays(
+    mut commands: Commands,
+    states: Query<Ref<TeacherWindowState>, With<TeacherWindow>>,
+    overlays: Query<Entity, With<TeacherViewOverlay>>,
+) {
+    if !states.single().is_ok_and(|state| state.is_changed()) {
+        return;
+    }
+    for entity in &overlays {
+        commands.entity(entity).despawn();
+    }
+}
+
 fn handle_tab_click(
     query: Query<(&Interaction, &TeacherTabButton), Changed<Interaction>>,
-    current_tab: Option<Res<TeacherTab>>,
-    in_detail: Option<Res<TeacherInDetailView>>,
-    mut commands: Commands,
-    roots: Query<Entity, With<TeacherContentRoot>>,
+    mut states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
-    let Some(current) = current_tab else { return };
+    let Ok(mut state) = states.single_mut() else {
+        return;
+    };
 
     for (interaction, tab_btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
-
-        // Re-clicking the active tab only acts when a detail view is open,
-        // so the button brings the user back to the top-level list.
-        if tab_btn.0 == *current && in_detail.is_none() {
+        if tab_btn.0 == state.view.tab() && !state.view.is_detail() {
             continue;
         }
-
-        commands.insert_resource(tab_btn.0);
-        commands.remove_resource::<TeacherInDetailView>();
-
-        for entity in &roots {
-            commands.entity(entity).despawn();
-        }
-
-        commands.trigger(TeacherTabChanged(tab_btn.0));
+        state.view = TeacherView::base(tab_btn.0);
     }
 }
