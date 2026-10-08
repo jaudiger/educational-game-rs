@@ -8,6 +8,7 @@ use crate::data::content::QuestionVisual;
 use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
 use crate::i18n::I18n;
 use crate::states::LessonPhase;
+use crate::ui::components::operator_visual_group;
 use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
 
@@ -143,7 +144,6 @@ fn spawn_prompt_and_fraction_bars(
             ..default()
         })
         .with_children(|row| {
-            // First operand: a/b
             row.spawn(fraction_bar(
                 b,
                 a,
@@ -152,19 +152,19 @@ fn spawn_prompt_and_fraction_bars(
                 MINI_BAR_WIDTH,
                 MINI_BAR_HEIGHT,
             ));
-            row.spawn((
-                Text::new("+"),
-                theme::typography::text(theme::fonts::HEADING, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ));
-            // Second operand: c/b
-            row.spawn(fraction_bar(
-                b,
-                c,
-                theme::colors::SECONDARY,
-                false,
-                MINI_BAR_WIDTH,
-                MINI_BAR_HEIGHT,
+            row.spawn(operator_visual_group(
+                "+",
+                theme::fonts::HEADING,
+                theme::colors::TEXT_DARK,
+                window,
+                fraction_bar(
+                    b,
+                    c,
+                    theme::colors::SECONDARY,
+                    false,
+                    MINI_BAR_WIDTH,
+                    MINI_BAR_HEIGHT,
+                ),
             ));
         });
 }

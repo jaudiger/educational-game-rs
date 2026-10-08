@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::data::{ExplanationVisual, Language};
 use crate::questions::fraction_bar::{self as fraction_bar_mod, fraction_bar};
-use crate::ui::components::stacked_fraction;
+use crate::ui::components::{operator_visual_group, stacked_fraction};
 use crate::ui::theme;
 
 /// Spawns the visual element for a given explanation type as a child of the parent node.
@@ -81,14 +81,6 @@ fn spawn_fraction_addition_visual(
     /// Height of each mini-bar in the addition visual.
     const MINI_BAR_HEIGHT: f32 = 40.0;
 
-    let operator_text = |symbol: &'static str| {
-        (
-            Text::new(symbol),
-            theme::typography::text(theme::fonts::HEADING, window),
-            TextColor(theme::colors::TEXT_DARK),
-        )
-    };
-
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -100,7 +92,6 @@ fn spawn_fraction_addition_visual(
             ..default()
         })
         .with_children(|row| {
-            // First operand: a/b
             row.spawn(fraction_bar(
                 b,
                 a,
@@ -109,25 +100,33 @@ fn spawn_fraction_addition_visual(
                 MINI_BAR_WIDTH,
                 MINI_BAR_HEIGHT,
             ));
-            row.spawn(operator_text("+"));
-            // Second operand: c/b
-            row.spawn(fraction_bar(
-                b,
-                c,
-                theme::colors::SECONDARY,
-                false,
-                MINI_BAR_WIDTH,
-                MINI_BAR_HEIGHT,
+            row.spawn(operator_visual_group(
+                "+",
+                theme::fonts::HEADING,
+                theme::colors::TEXT_DARK,
+                window,
+                fraction_bar(
+                    b,
+                    c,
+                    theme::colors::SECONDARY,
+                    false,
+                    MINI_BAR_WIDTH,
+                    MINI_BAR_HEIGHT,
+                ),
             ));
-            row.spawn(operator_text("="));
-            // Result: (a+c)/b
-            row.spawn(fraction_bar(
-                b,
-                a + c,
-                theme::colors::SUCCESS,
-                false,
-                MINI_BAR_WIDTH,
-                MINI_BAR_HEIGHT,
+            row.spawn(operator_visual_group(
+                "=",
+                theme::fonts::HEADING,
+                theme::colors::TEXT_DARK,
+                window,
+                fraction_bar(
+                    b,
+                    a + c,
+                    theme::colors::SUCCESS,
+                    false,
+                    MINI_BAR_WIDTH,
+                    MINI_BAR_HEIGHT,
+                ),
             ));
         });
 }
@@ -306,16 +305,13 @@ fn spawn_conversion_row(
     height: f32,
     window: Entity,
 ) {
-    use crate::ui::rich_text::spawn_rich_text;
-
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
+            width: percent(100.0),
             column_gap: theme::scaled(theme::spacing::SMALL),
-            row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
         })
         .with_children(|row| {
@@ -324,32 +320,51 @@ fn spawn_conversion_row(
                 theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
             ));
-            row.spawn(fraction_bar(
-                entry.fraction.1,
-                entry.fraction.0,
-                color,
-                false,
-                width,
-                height,
-            ));
-            spawn_rich_text(
-                row,
-                &format!(
-                    "{}/{}  =>  {}/{}",
-                    entry.fraction.0, entry.fraction.1, entry.converted.0, entry.converted.1
-                ),
-                theme::fonts::BODY,
-                theme::colors::TEXT_MUTED,
-                window,
-            );
-            row.spawn(fraction_bar(
-                entry.converted.1,
-                entry.converted.0,
-                color,
-                false,
-                width,
-                height,
-            ));
+            row.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: theme::scaled(theme::spacing::SMALL),
+                ..default()
+            })
+            .with_children(|conversion| {
+                conversion.spawn(fraction_bar(
+                    entry.fraction.1,
+                    entry.fraction.0,
+                    color,
+                    false,
+                    width,
+                    height,
+                ));
+                conversion.spawn(stacked_fraction(
+                    entry.fraction.0,
+                    entry.fraction.1,
+                    theme::fonts::BODY,
+                    theme::colors::TEXT_MUTED,
+                    theme::colors::TEXT_MUTED,
+                    window,
+                ));
+                conversion.spawn((
+                    Text::new("=>"),
+                    theme::typography::text(theme::fonts::BODY, window),
+                    TextColor(theme::colors::TEXT_MUTED),
+                ));
+                conversion.spawn(stacked_fraction(
+                    entry.converted.0,
+                    entry.converted.1,
+                    theme::fonts::BODY,
+                    theme::colors::TEXT_MUTED,
+                    theme::colors::TEXT_MUTED,
+                    window,
+                ));
+                conversion.spawn(fraction_bar(
+                    entry.converted.1,
+                    entry.converted.0,
+                    color,
+                    false,
+                    width,
+                    height,
+                ));
+            });
         });
 }
 
@@ -368,14 +383,6 @@ fn spawn_multiplication_grid_visual(
     /// Cell colour.
     const CELL_COLOR: Color = Color::srgb(0.4, 0.7, 0.95);
 
-    let operator_text = || {
-        (
-            Text::new("+"),
-            theme::typography::text(theme::fonts::HEADING, window),
-            TextColor(theme::colors::TEXT_DARK),
-        )
-    };
-
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -388,18 +395,7 @@ fn spawn_multiplication_grid_visual(
         })
         .with_children(|row| {
             for g in 0..groups {
-                if g > 0 {
-                    row.spawn(operator_text());
-                }
-                row.spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    flex_wrap: FlexWrap::Wrap,
-                    column_gap: px(CELL_GAP),
-                    row_gap: px(CELL_GAP),
-                    max_width: px(CELL_SIZE.mul_add(6.0, CELL_GAP * 5.0)),
-                    ..default()
-                })
-                .with_children(|group| {
+                let cells = Children::spawn(SpawnWith(move |group: &mut ChildSpawner| {
                     for _ in 0..items {
                         group.spawn((
                             Node {
@@ -411,7 +407,29 @@ fn spawn_multiplication_grid_visual(
                             BackgroundColor(CELL_COLOR),
                         ));
                     }
-                });
+                }));
+                let grid = (
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        flex_wrap: FlexWrap::Wrap,
+                        column_gap: px(CELL_GAP),
+                        row_gap: px(CELL_GAP),
+                        max_width: px(CELL_SIZE.mul_add(6.0, CELL_GAP * 5.0)),
+                        ..default()
+                    },
+                    cells,
+                );
+                if g == 0 {
+                    row.spawn(grid);
+                } else {
+                    row.spawn(operator_visual_group(
+                        "+",
+                        theme::fonts::HEADING,
+                        theme::colors::TEXT_DARK,
+                        window,
+                        grid,
+                    ));
+                }
             }
         });
 }

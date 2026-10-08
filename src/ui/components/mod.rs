@@ -93,3 +93,30 @@ pub fn card_node(mut node: Node) -> (Node, BackgroundColor, BorderColor) {
         BorderColor::all(theme::colors::INPUT_BORDER),
     )
 }
+
+/// Keeps an operator with its following visual when the parent row wraps.
+pub fn operator_visual_group<B: Bundle>(
+    operator: &'static str,
+    font_size: f32,
+    color: Color,
+    window: Entity,
+    visual: B,
+) -> impl Bundle + use<B> {
+    (
+        Node {
+            flex_direction: FlexDirection::Row,
+            flex_shrink: 0.0,
+            align_items: AlignItems::Center,
+            column_gap: theme::scaled(theme::spacing::SMALL),
+            ..default()
+        },
+        children![
+            (
+                Text::new(operator),
+                theme::typography::text(font_size, window),
+                TextColor(color),
+            ),
+            visual,
+        ],
+    )
+}

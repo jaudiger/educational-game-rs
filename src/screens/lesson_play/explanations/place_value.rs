@@ -39,48 +39,43 @@ impl ExplanationRenderer for PlaceValueRenderer {
         let (before_mult, between) = match i18n.language {
             Language::French => (
                 "Multiplier par ",
-                format!(" c'est ajouter des zéros : {number_str} × {mult_prefix}"),
+                format!(" c'est ajouter des zéros : {number_str} × "),
             ),
             Language::English => (
                 "Multiplying by ",
-                format!(" means adding zeros: {number_str} × {mult_prefix}"),
+                format!(" means adding zeros: {number_str} × "),
             ),
         };
 
         let text_span = |s: &str, color: Color| {
             (
-                Text::new(s),
+                TextSpan::new(s),
                 theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(color),
             )
         };
 
-        parent
-            .spawn(Node {
+        parent.spawn((
+            Node {
                 align_self: AlignSelf::Stretch,
-                flex_direction: FlexDirection::Row,
-                justify_content: JustifyContent::Center,
+                width: percent(100.0),
                 ..default()
-            })
-            .with_children(|wrapper| {
-                wrapper
-                    .spawn(Node {
-                        flex_direction: FlexDirection::Row,
-                        flex_wrap: FlexWrap::Wrap,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    })
-                    .with_children(|row| {
-                        row.spawn(text_span(before_mult, theme::colors::TEXT_DARK));
-                        row.spawn(text_span(mult_prefix, theme::colors::TEXT_DARK));
-                        row.spawn(text_span(mult_zeros, PV_ZERO_COLOR));
-                        row.spawn(text_span(&between, theme::colors::TEXT_DARK));
-                        row.spawn(text_span(mult_zeros, PV_ZERO_COLOR));
-                        row.spawn(text_span(" = ", theme::colors::TEXT_DARK));
-                        row.spawn(text_span(result_prefix, theme::colors::TEXT_DARK));
-                        row.spawn(text_span(result_zeros, PV_ZERO_COLOR));
-                        row.spawn(text_span(".", theme::colors::TEXT_DARK));
-                    });
-            });
+            },
+            Text::new(before_mult),
+            theme::typography::text(theme::fonts::HEADING, window),
+            TextColor(theme::colors::TEXT_DARK),
+            TextLayout::justify(Justify::Center),
+            children![
+                text_span(mult_prefix, theme::colors::TEXT_DARK),
+                text_span(mult_zeros, PV_ZERO_COLOR),
+                text_span(&between, theme::colors::TEXT_DARK),
+                text_span(mult_prefix, theme::colors::TEXT_DARK),
+                text_span(mult_zeros, PV_ZERO_COLOR),
+                text_span(" = ", theme::colors::TEXT_DARK),
+                text_span(result_prefix, theme::colors::TEXT_DARK),
+                text_span(result_zeros, PV_ZERO_COLOR),
+                text_span(".", theme::colors::TEXT_DARK),
+            ],
+        ));
     }
 }
