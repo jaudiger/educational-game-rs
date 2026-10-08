@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::Language;
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::I18n;
 use crate::ui::components::stacked_fraction;
 use crate::ui::theme;
 
@@ -35,13 +35,13 @@ impl ExplanationRenderer for FractionValueRenderer {
 
         let (intro, mid1, mid2, conclusion) = match i18n.language {
             Language::French => (
-                format!("{} Si on partage", i18n.t(&TranslationKey::Explanation)),
+                "Si on partage",
                 "parts en groupes de",
                 ", on obtient",
                 "groupes. Donc",
             ),
             Language::English => (
-                format!("{} If we share", i18n.t(&TranslationKey::Explanation)),
+                "If we share",
                 "parts into groups of",
                 ", we get",
                 "groups. So",
@@ -49,7 +49,7 @@ impl ExplanationRenderer for FractionValueRenderer {
         };
 
         spawn_colored_row(parent, font_size, |row| {
-            spawn_words(row, &intro, dark, font_size, window);
+            spawn_words(row, intro, dark, font_size, window);
             spawn_words(row, &a_str, a_color, font_size, window);
             spawn_words(row, mid1, dark, font_size, window);
             spawn_words(row, &b_str, b_color, font_size, window);

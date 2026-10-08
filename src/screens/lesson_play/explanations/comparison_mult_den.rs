@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::Language;
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::I18n;
 use crate::ui::components::stacked_fraction;
 use crate::ui::theme;
 
@@ -29,19 +29,19 @@ impl ExplanationRenderer for ComparisonMultDenRenderer {
 
         let (intro, middle, conclusion) = match i18n.language {
             Language::French => (
-                format!("{} Pour comparer", i18n.t(&TranslationKey::Explanation)),
+                "Pour comparer",
                 "et",
                 "il faut couper les gâteaux en parts de la même taille.",
             ),
             Language::English => (
-                format!("{} To compare", i18n.t(&TranslationKey::Explanation)),
+                "To compare",
                 "and",
                 "we need to cut the pies into same-sized slices.",
             ),
         };
 
         spawn_colored_row(parent, font_size, |row| {
-            spawn_words(row, &intro, dark, font_size, window);
+            spawn_words(row, intro, dark, font_size, window);
             row.spawn(stacked_fraction(
                 self.na, self.da, font_size, dark, dark, window,
             ));

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::Language;
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::I18n;
 use crate::ui::components::stacked_fraction;
 use crate::ui::theme;
 
@@ -38,17 +38,15 @@ impl ExplanationRenderer for FractionAdditionRenderer {
         let (intro, conclusion) = match i18n.language {
             Language::French => (
                 format!(
-                    "{} Les deux fractions ont le même dénominateur ({b_str}), on additionne les numérateurs :",
-                    i18n.t(&TranslationKey::Explanation)
+                    "Les deux fractions ont le même dénominateur ({b_str}), on additionne les numérateurs :"
                 ),
-                "Donc",
+                ". Donc",
             ),
             Language::English => (
                 format!(
-                    "{} Both fractions have the same denominator ({b_str}), so we add the numerators:",
-                    i18n.t(&TranslationKey::Explanation)
+                    "Both fractions have the same denominator ({b_str}), so we add the numerators:"
                 ),
-                "So",
+                ". So",
             ),
         };
 
@@ -59,7 +57,6 @@ impl ExplanationRenderer for FractionAdditionRenderer {
             spawn_words(row, &c_str, c_color, font_size, window);
             spawn_words(row, "=", dark, font_size, window);
             spawn_words(row, &sum_str, sum_color, font_size, window);
-            spawn_words(row, ".", dark, font_size, window);
             spawn_words(row, conclusion, dark, font_size, window);
             row.spawn(stacked_fraction(
                 self.a, self.b, font_size, a_color, dark, window,

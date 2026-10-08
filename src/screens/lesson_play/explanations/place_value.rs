@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::Language;
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::I18n;
 use crate::ui::theme;
 
 use super::super::visuals::{PV_ZERO_COLOR, count_trailing_zeros};
@@ -36,16 +36,14 @@ impl ExplanationRenderer for PlaceValueRenderer {
 
         let number_str = self.number.to_string();
 
-        let (before_mult, between, after_eq) = match i18n.language {
+        let (before_mult, between) = match i18n.language {
             Language::French => (
-                format!("{} Multiplier par ", i18n.t(&TranslationKey::Explanation)),
+                "Multiplier par ",
                 format!(" c'est ajouter des zéros : {number_str} × {mult_prefix}"),
-                ".".to_owned(),
             ),
             Language::English => (
-                format!("{} Multiplying by ", i18n.t(&TranslationKey::Explanation)),
+                "Multiplying by ",
                 format!(" means adding zeros: {number_str} × {mult_prefix}"),
-                ".".to_owned(),
             ),
         };
 
@@ -73,7 +71,7 @@ impl ExplanationRenderer for PlaceValueRenderer {
                         ..default()
                     })
                     .with_children(|row| {
-                        row.spawn(text_span(&before_mult, theme::colors::TEXT_DARK));
+                        row.spawn(text_span(before_mult, theme::colors::TEXT_DARK));
                         row.spawn(text_span(mult_prefix, theme::colors::TEXT_DARK));
                         row.spawn(text_span(mult_zeros, PV_ZERO_COLOR));
                         row.spawn(text_span(&between, theme::colors::TEXT_DARK));
@@ -81,7 +79,7 @@ impl ExplanationRenderer for PlaceValueRenderer {
                         row.spawn(text_span(" = ", theme::colors::TEXT_DARK));
                         row.spawn(text_span(result_prefix, theme::colors::TEXT_DARK));
                         row.spawn(text_span(result_zeros, PV_ZERO_COLOR));
-                        row.spawn(text_span(&after_eq, theme::colors::TEXT_DARK));
+                        row.spawn(text_span(".", theme::colors::TEXT_DARK));
                     });
             });
     }

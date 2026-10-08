@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::Language;
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::I18n;
 use crate::ui::components::stacked_fraction;
 use crate::ui::theme;
 
@@ -56,34 +56,26 @@ pub(super) fn spawn_fraction_parts_text(
     let den_str = denominator.to_string();
 
     let (before_den, between, after_num) = match (i18n.language, is_visualization) {
-        (Language::French, false) => (
-            format!("{} Il y a", i18n.t(&TranslationKey::Explanation)),
-            "parts et".to_owned(),
-            "sont coloriées : c'est".to_owned(),
-        ),
+        (Language::French, false) => ("Il y a", "parts et", "sont coloriées : c'est"),
         (Language::French, true) => (
-            format!("{} Il y a", i18n.t(&TranslationKey::Explanation)),
-            "parts au total et".to_owned(),
-            "sont coloriées : c'est la fraction".to_owned(),
+            "Il y a",
+            "parts au total et",
+            "sont coloriées : c'est la fraction",
         ),
-        (Language::English, false) => (
-            format!("{} There are", i18n.t(&TranslationKey::Explanation)),
-            "parts and".to_owned(),
-            "are colored: that's".to_owned(),
-        ),
+        (Language::English, false) => ("There are", "parts and", "are colored: that's"),
         (Language::English, true) => (
-            format!("{} There are", i18n.t(&TranslationKey::Explanation)),
-            "parts in total and".to_owned(),
-            "are colored: that's the fraction".to_owned(),
+            "There are",
+            "parts in total and",
+            "are colored: that's the fraction",
         ),
     };
 
     spawn_colored_row(parent, font_size, |row| {
-        spawn_words(row, &before_den, dark, font_size, window);
+        spawn_words(row, before_den, dark, font_size, window);
         spawn_words(row, &den_str, den_color, font_size, window);
-        spawn_words(row, &between, dark, font_size, window);
+        spawn_words(row, between, dark, font_size, window);
         spawn_words(row, &num_str, num_color, font_size, window);
-        spawn_words(row, &after_num, dark, font_size, window);
+        spawn_words(row, after_num, dark, font_size, window);
         row.spawn(Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,

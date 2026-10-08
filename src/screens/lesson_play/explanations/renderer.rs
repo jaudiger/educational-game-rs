@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::I18n;
 use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
 
@@ -25,11 +25,10 @@ impl PlainRenderer {
 }
 
 impl ExplanationRenderer for PlainRenderer {
-    fn spawn(&self, parent: &mut ChildSpawnerCommands, i18n: &I18n, window: Entity) {
-        let text = format!("{} {}", i18n.t(&TranslationKey::Explanation), self.text);
+    fn spawn(&self, parent: &mut ChildSpawnerCommands, _i18n: &I18n, window: Entity) {
         spawn_rich_text(
             parent,
-            &text,
+            &self.text,
             theme::fonts::HEADING,
             theme::colors::TEXT_DARK,
             window,

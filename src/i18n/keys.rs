@@ -35,7 +35,6 @@ pub enum TranslationKey {
 
     // Lesson Play
     CorrectAnswer,
-    Explanation,
     FinishLesson,
     IncorrectAnswer,
     NextQuestion,
@@ -176,7 +175,6 @@ impl TranslationKey {
                 Validate                  => ("Valider",                                   "Validate"),
                 // Lesson Play
                 CorrectAnswer             => ("Bonne r\u{00e9}ponse !",                    "Correct!"),
-                Explanation               => ("Explication :",                             "Explanation:"),
                 FinishLesson              => ("Terminer la le\u{00e7}on",                  "Finish lesson"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
                 NextQuestion              => ("Question suivante",                          "Next question"),

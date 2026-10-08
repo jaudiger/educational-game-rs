@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::Language;
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::I18n;
 use crate::ui::theme;
 
 use super::renderer::{ExplanationRenderer, spawn_colored_row, spawn_words};
@@ -38,23 +38,17 @@ impl ExplanationRenderer for ComparisonSameDenRenderer {
         let nb_str = self.nb.to_string();
         let den_str = self.denominator.to_string();
 
-        let (intro, middle, end) = match i18n.language {
-            Language::French => (
-                format!(
-                    "{} Les gâteaux ont les mêmes parts ({den_str}), on compare juste le nombre de parts :",
-                    i18n.t(&TranslationKey::Explanation)
-                ),
-                "et",
-                ".",
+        let intro = match i18n.language {
+            Language::French => format!(
+                "Les gâteaux ont les mêmes parts ({den_str}), on compare juste le nombre de parts :"
             ),
-            Language::English => (
-                format!(
-                    "{} The pies have the same slices ({den_str}), so we compare how many slices:",
-                    i18n.t(&TranslationKey::Explanation)
-                ),
-                "and",
-                ".",
-            ),
+            Language::English => {
+                format!("The pies have the same slices ({den_str}), so we compare how many slices:")
+            }
+        };
+        let (middle, end) = match i18n.language {
+            Language::French => ("et", "."),
+            Language::English => ("and", "."),
         };
 
         spawn_colored_row(parent, font_size, |row| {
