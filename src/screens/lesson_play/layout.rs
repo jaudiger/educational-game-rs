@@ -63,6 +63,7 @@ pub(super) fn setup_lesson_play(
             ImageNode {
                 image: images.question_background.clone(),
                 image_mode: NodeImageMode::Stretch,
+                visual_box: VisualBox::BorderBox,
                 ..default()
             },
             DespawnOnExit(AppState::LessonPlay),
