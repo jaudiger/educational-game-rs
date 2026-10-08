@@ -1,141 +1,174 @@
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
+use bevy::scene::{Scene, SceneComponent, bsn};
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 use bevy::ui_widgets::{
-    Checkbox, RadioButton, RadioGroup, Slider, SliderRange, SliderStep, SliderThumb, SliderValue,
+    Checkbox, RadioButton, RadioGroup, Slider as SliderWidget, SliderRange, SliderStep,
+    SliderThumb, SliderValue,
 };
 
 use crate::ui::theme;
 
 use super::{CheckboxMark, RadioMark};
 
-/// Returns a styled horizontal slider bundle with track + thumb.
-///
-/// The caller should attach `.observe(slider_self_update)` and their own
-/// persistence observer for `ValueChange<f32>`.
-pub fn slider(min: f32, max: f32, value: f32, step: f32) -> impl Bundle {
-    (
-        Slider::default(),
-        SliderValue(value),
-        SliderRange::new(min, max),
-        SliderStep(step),
-        AutoDirectionalNavigation::default(),
-        TabIndex(0),
-        Outline::new(
-            Val::Px(theme::sizes::FOCUS_RING_WIDTH),
-            Val::Px(theme::sizes::FOCUS_RING_OFFSET),
-            Color::NONE,
-        ),
-        Node {
-            width: theme::scaled(theme::sizes::SLIDER_WIDTH),
-            height: theme::scaled(theme::sizes::SLIDER_HEIGHT),
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        children![
-            // Track background
-            (
-                Node {
-                    width: percent(100.0),
-                    height: theme::scaled(theme::sizes::SLIDER_TRACK_HEIGHT),
-                    border_radius: BorderRadius::all(theme::scaled(
-                        theme::sizes::SLIDER_TRACK_HEIGHT / 2.0
-                    )),
-                    position_type: PositionType::Absolute,
-                    ..default()
-                },
-                BackgroundColor(theme::colors::TOGGLE_INACTIVE),
-            ),
-            // Thumb (absolutely positioned; left is set by update_slider_thumb_position)
-            (
-                SliderThumb,
-                Node {
-                    width: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
-                    height: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
-                    border_radius: BorderRadius::all(theme::scaled(
-                        theme::sizes::SLIDER_THUMB_SIZE / 2.0
-                    )),
-                    position_type: PositionType::Absolute,
-                    ..default()
-                },
-                BackgroundColor(theme::colors::PRIMARY),
-            ),
-        ],
-    )
+#[derive(SceneComponent, Default, Clone, Reflect)]
+#[scene(StyledSliderProps)]
+struct StyledSlider;
+
+#[derive(Default)]
+struct StyledSliderProps {
+    min: f32,
+    max: f32,
+    value: f32,
+    step: f32,
 }
 
-/// Returns a styled checkbox bundle with a label.
+/// Returns a styled horizontal slider scene with a track and thumb.
 ///
-/// **Does not include `Checked`**. The caller must conditionally insert it:
-/// ```ignore
-/// let mut cmd = parent.spawn(checkbox("label", true, window));
-/// if checked { cmd.insert(Checked); }
-/// ```
-///
-/// The caller should also attach `.insert(observe(checkbox_self_update))` and
-/// their own persistence observer for `ValueChange<bool>`.
-pub fn checkbox(label: &str, mark_visible: bool, window: Entity) -> impl Bundle + use<> {
-    let mark_visibility = if mark_visible {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
-    (
-        Checkbox,
-        AutoDirectionalNavigation::default(),
-        TabIndex(0),
-        Outline::new(
-            Val::Px(theme::sizes::FOCUS_RING_WIDTH),
-            Val::Px(theme::sizes::FOCUS_RING_OFFSET),
-            Color::NONE,
-        ),
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        },
-        children![
-            // Checkbox box
-            (
-                Node {
-                    width: theme::scaled(theme::sizes::CHECKBOX_SIZE),
-                    height: theme::scaled(theme::sizes::CHECKBOX_SIZE),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: px(2.0).all(),
-                    border_radius: BorderRadius::all(theme::scaled(6.0)),
-                    ..default()
-                },
-                BackgroundColor(theme::colors::CARD_BG),
-                BorderColor::all(theme::colors::INPUT_BORDER),
-                // Check mark (inner square)
-                children![(
+/// The caller should attach `.observe(slider_self_update)` and its persistence
+/// observer for `ValueChange<f32>` to the spawned entity.
+pub fn slider_scene(min: f32, max: f32, value: f32, step: f32) -> impl Scene {
+    bsn! {
+        @StyledSlider {
+            @min: {min},
+            @max: {max},
+            @value: {value},
+            @step: {step},
+        }
+    }
+}
+
+impl StyledSlider {
+    fn scene(props: StyledSliderProps) -> impl Scene {
+        bsn! {
+            SliderWidget::default()
+            SliderValue({props.value})
+            SliderRange::new(props.min, props.max)
+            SliderStep({props.step})
+            AutoDirectionalNavigation::default()
+            TabIndex(0)
+            Outline::new(
+                Val::Px(theme::sizes::FOCUS_RING_WIDTH),
+                Val::Px(theme::sizes::FOCUS_RING_OFFSET),
+                Color::NONE,
+            )
+            Node {
+                width: theme::scaled(theme::sizes::SLIDER_WIDTH),
+                height: theme::scaled(theme::sizes::SLIDER_HEIGHT),
+                align_items: AlignItems::Center,
+            }
+            Children [
+                (
                     Node {
-                        width: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
-                        height: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
-                        border_radius: BorderRadius::all(theme::scaled(3.0)),
-                        ..default()
-                    },
-                    BackgroundColor(theme::colors::PRIMARY),
-                    mark_visibility,
-                    CheckboxMark,
-                )],
-            ),
-            // Label
-            (
-                Text::new(label),
-                theme::typography::text(theme::fonts::BODY, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ),
-        ],
-    )
+                        width: percent(100.0),
+                        height: theme::scaled(theme::sizes::SLIDER_TRACK_HEIGHT),
+                        border_radius: BorderRadius::all(theme::scaled(
+                            theme::sizes::SLIDER_TRACK_HEIGHT / 2.0
+                        )),
+                        position_type: PositionType::Absolute,
+                    }
+                    BackgroundColor(theme::colors::TOGGLE_INACTIVE)
+                ),
+                (
+                    SliderThumb
+                    Node {
+                        width: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
+                        height: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
+                        border_radius: BorderRadius::all(theme::scaled(
+                            theme::sizes::SLIDER_THUMB_SIZE / 2.0
+                        )),
+                        position_type: PositionType::Absolute,
+                    }
+                    BackgroundColor(theme::colors::PRIMARY)
+                ),
+            ]
+        }
+    }
 }
 
-/// Returns a styled radio group bundle (flex row).
+#[derive(SceneComponent, Default, Clone, Reflect)]
+#[scene(StyledCheckboxProps)]
+struct StyledCheckbox;
+
+struct StyledCheckboxProps {
+    label: String,
+    window: Entity,
+}
+
+impl Default for StyledCheckboxProps {
+    fn default() -> Self {
+        Self {
+            label: String::new(),
+            window: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+/// Returns a styled checkbox scene with a label.
 ///
-/// The caller adds radio button children via `Children::spawn(SpawnWith(...))`
-/// and attaches an observer for `ValueChange<Entity>` to handle selection.
+/// The caller adds `Checked` when selected and attaches the widget and
+/// persistence observers for `ValueChange<bool>`.
+pub fn checkbox_scene(label: &str, window: Entity) -> impl Scene {
+    bsn! {
+        @StyledCheckbox {
+            @label: {label.to_owned()},
+            @window: {window},
+        }
+    }
+}
+
+impl StyledCheckbox {
+    fn scene(props: StyledCheckboxProps) -> impl Scene {
+        bsn! {
+            Checkbox
+            AutoDirectionalNavigation::default()
+            TabIndex(0)
+            Outline::new(
+                Val::Px(theme::sizes::FOCUS_RING_WIDTH),
+                Val::Px(theme::sizes::FOCUS_RING_OFFSET),
+                Color::NONE,
+            )
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: theme::scaled(theme::spacing::SMALL),
+            }
+            Children [
+                (
+                    Node {
+                        width: theme::scaled(theme::sizes::CHECKBOX_SIZE),
+                        height: theme::scaled(theme::sizes::CHECKBOX_SIZE),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: {px(2.0).all()},
+                        border_radius: BorderRadius::all(theme::scaled(6.0)),
+                    }
+                    BackgroundColor(theme::colors::CARD_BG)
+                    BorderColor::all(theme::colors::INPUT_BORDER)
+                    Children [(
+                        Node {
+                            width: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
+                            height: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
+                            border_radius: BorderRadius::all(theme::scaled(3.0)),
+                        }
+                        BackgroundColor(theme::colors::PRIMARY)
+                        Visibility::Hidden
+                        CheckboxMark
+                    )]
+                ),
+                (
+                    Text({props.label})
+                    theme::typography::text_scene(theme::fonts::BODY, props.window)
+                    TextColor(theme::colors::TEXT_DARK)
+                ),
+            ]
+        }
+    }
+}
+
+/// Returns a styled radio group bundle.
+///
+/// The caller adds radio-button scenes and a `ValueChange<Entity>` observer.
 pub fn radio_group() -> impl Bundle {
     (
         RadioGroup,
@@ -148,143 +181,103 @@ pub fn radio_group() -> impl Bundle {
     )
 }
 
-/// Returns a styled radio button bundle with a circle indicator + label.
+#[derive(SceneComponent, Default, Clone, Reflect)]
+#[scene(StyledRadioButtonProps)]
+struct StyledRadioButton;
+
+struct StyledRadioButtonProps {
+    label: String,
+    text_color: Color,
+    window: Entity,
+}
+
+impl Default for StyledRadioButtonProps {
+    fn default() -> Self {
+        Self {
+            label: String::new(),
+            text_color: Color::default(),
+            window: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+/// Returns a styled radio-button scene.
 ///
-/// **Does not include `Checked`**. The caller must conditionally insert it:
-/// ```ignore
-/// let mut cmd = parent.spawn(radio_button("label", true, window));
-/// if checked { cmd.insert(Checked); }
-/// ```
-///
-/// Must be spawned as a child of a `RadioGroup`.
-pub fn radio_button(label: &str, mark_visible: bool, window: Entity) -> impl Bundle + use<> {
-    let mark_visibility = if mark_visible {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
-    (
-        RadioButton,
-        AutoDirectionalNavigation::default(),
-        TabIndex(0),
-        Outline::new(
-            Val::Px(theme::sizes::FOCUS_RING_WIDTH),
-            Val::Px(theme::sizes::FOCUS_RING_OFFSET),
-            Color::NONE,
-        ),
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        },
-        children![
-            // Outer circle
-            (
-                Node {
-                    width: theme::scaled(theme::sizes::RADIO_SIZE),
-                    height: theme::scaled(theme::sizes::RADIO_SIZE),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: px(2.0).all(),
-                    border_radius: BorderRadius::all(theme::scaled(theme::sizes::RADIO_SIZE / 2.0)),
-                    ..default()
-                },
-                BackgroundColor(theme::colors::CARD_BG),
-                BorderColor::all(theme::colors::INPUT_BORDER),
-                // Inner dot
-                children![(
-                    Node {
-                        width: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
-                        height: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
-                        border_radius: BorderRadius::all(theme::scaled(
-                            theme::sizes::RADIO_MARK_SIZE / 2.0
-                        )),
-                        ..default()
-                    },
-                    BackgroundColor(theme::colors::PRIMARY),
-                    mark_visibility,
-                    RadioMark,
-                )],
-            ),
-            // Label
-            (
-                Text::new(label),
-                theme::typography::text(theme::fonts::BODY, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ),
-        ],
+/// The caller adds `Checked` when selected and attaches its radio-group marker.
+pub fn radio_button_scene(label: &str, window: Entity) -> impl Scene {
+    styled_radio_button_scene(label.to_owned(), theme::colors::TEXT_DARK, window)
+}
+
+/// Returns a muted radio-button scene for unavailable options.
+pub fn radio_button_muted_scene(label: &str, suffix: &str, window: Entity) -> impl Scene {
+    styled_radio_button_scene(
+        format!("{label} {suffix}"),
+        theme::colors::TEXT_MUTED,
+        window,
     )
 }
 
-/// Returns a styled radio button bundle with muted styling (for unavailable options).
-///
-/// **Does not include `Checked`**. The caller must conditionally insert it.
-///
-/// Must be spawned as a child of a `RadioGroup`.
-pub fn radio_button_muted(
-    label: &str,
-    suffix: &str,
-    mark_visible: bool,
-    window: Entity,
-) -> impl Bundle + use<> {
-    let label_text = format!("{label} {suffix}");
-    let mark_visibility = if mark_visible {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
-    (
-        RadioButton,
-        AutoDirectionalNavigation::default(),
-        TabIndex(0),
-        Outline::new(
-            Val::Px(theme::sizes::FOCUS_RING_WIDTH),
-            Val::Px(theme::sizes::FOCUS_RING_OFFSET),
-            Color::NONE,
-        ),
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        },
-        children![
-            // Outer circle
-            (
-                Node {
-                    width: theme::scaled(theme::sizes::RADIO_SIZE),
-                    height: theme::scaled(theme::sizes::RADIO_SIZE),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: px(2.0).all(),
-                    border_radius: BorderRadius::all(theme::scaled(theme::sizes::RADIO_SIZE / 2.0)),
-                    ..default()
-                },
-                BackgroundColor(theme::colors::CARD_BG),
-                BorderColor::all(theme::colors::INPUT_BORDER),
-                children![(
+fn styled_radio_button_scene(label: String, text_color: Color, window: Entity) -> impl Scene {
+    bsn! {
+        @StyledRadioButton {
+            @label: {label},
+            @text_color: {text_color},
+            @window: {window},
+        }
+    }
+}
+
+impl StyledRadioButton {
+    fn scene(props: StyledRadioButtonProps) -> impl Scene {
+        bsn! {
+            RadioButton
+            AutoDirectionalNavigation::default()
+            TabIndex(0)
+            Outline::new(
+                Val::Px(theme::sizes::FOCUS_RING_WIDTH),
+                Val::Px(theme::sizes::FOCUS_RING_OFFSET),
+                Color::NONE,
+            )
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: theme::scaled(theme::spacing::SMALL),
+            }
+            Children [
+                (
                     Node {
-                        width: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
-                        height: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
+                        width: theme::scaled(theme::sizes::RADIO_SIZE),
+                        height: theme::scaled(theme::sizes::RADIO_SIZE),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: {px(2.0).all()},
                         border_radius: BorderRadius::all(theme::scaled(
-                            theme::sizes::RADIO_MARK_SIZE / 2.0
+                            theme::sizes::RADIO_SIZE / 2.0
                         )),
-                        ..default()
-                    },
-                    BackgroundColor(theme::colors::PRIMARY),
-                    mark_visibility,
-                    RadioMark,
-                )],
-            ),
-            // Muted label
-            (
-                Text::new(label_text),
-                theme::typography::text(theme::fonts::BODY, window),
-                TextColor(theme::colors::TEXT_MUTED),
-            ),
-        ],
-    )
+                    }
+                    BackgroundColor(theme::colors::CARD_BG)
+                    BorderColor::all(theme::colors::INPUT_BORDER)
+                    Children [(
+                        Node {
+                            width: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
+                            height: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
+                            border_radius: BorderRadius::all(theme::scaled(
+                                theme::sizes::RADIO_MARK_SIZE / 2.0
+                            )),
+                        }
+                        BackgroundColor(theme::colors::PRIMARY)
+                        Visibility::Hidden
+                        RadioMark
+                    )]
+                ),
+                (
+                    Text({props.label})
+                    theme::typography::text_scene(theme::fonts::BODY, props.window)
+                    TextColor({props.text_color})
+                ),
+            ]
+        }
+    }
 }
 
 /// Returns a stacked fraction layout (numerator / bar / denominator).

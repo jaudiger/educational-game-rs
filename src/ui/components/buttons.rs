@@ -5,7 +5,6 @@ use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 
 use crate::ui::animation::AnimatedButton;
 use crate::ui::theme;
-use crate::ui::theme::DesignFontSize;
 
 /// Returns the common button components shared by all interactive buttons.
 ///
@@ -99,13 +98,7 @@ impl ActionButton {
             }
             Children [(
                 Text({props.label})
-                TextFont {
-                    font_size: FontSize::Px(theme::fonts::BUTTON_SMALL),
-                }
-                DesignFontSize {
-                    size: theme::fonts::BUTTON_SMALL,
-                    window: {props.window},
-                }
+                theme::typography::text_scene(theme::fonts::BUTTON_SMALL, props.window)
                 TextColor({props.text_color})
                 TextLayout::justify(Justify::Center)
             )]

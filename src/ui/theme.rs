@@ -43,18 +43,31 @@ impl Default for DesignFontSize {
 /// leaving room for richer Bevy text components without changing every caller.
 pub mod typography {
     use bevy::prelude::*;
+    use bevy::scene::{Scene, bsn};
 
     use super::DesignFontSize;
 
     /// Returns the current game typography bundle for a target window.
     ///
-    /// The returned bundle deliberately keeps the font unspecified so the
-    /// theme observer supplies the branded game font.
+    /// This keeps the font unspecified so the theme observer supplies the branded game font.
     pub fn text(size: f32, window: Entity) -> impl Bundle + use<> {
         (
             TextFont::from_font_size(FontSize::Px(size)),
             DesignFontSize { size, window },
         )
+    }
+
+    /// Returns the current game typography scene for a target window.
+    pub fn text_scene(size: f32, window: Entity) -> impl Scene {
+        bsn! {
+            TextFont {
+                font_size: FontSize::Px(size),
+            }
+            DesignFontSize {
+                size: {size},
+                window: {window},
+            }
+        }
     }
 }
 

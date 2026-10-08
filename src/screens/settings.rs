@@ -12,7 +12,8 @@ use crate::data::progress::{ExplorationTheme, GameMode, Language};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
 use crate::ui::components::{
-    checkbox, radio_button, radio_button_muted, radio_group, screen_root, slider, standard_button,
+    checkbox_scene, radio_button_muted_scene, radio_button_scene, radio_group, screen_root,
+    slider_scene, standard_button,
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -155,21 +156,19 @@ fn mode_section(current_mode: GameMode, i18n: &I18n, window: Entity) -> impl Bun
                 radio_group(),
                 observe(handle_mode_radio_change),
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-                    let mut cmd = parent.spawn((
-                        radio_button(&individual_label, individual_checked, window),
-                        ModeRadio(GameMode::Individual),
-                    ));
+                    let mut cmd = parent.spawn_empty();
+                    cmd.insert(ModeRadio(GameMode::Individual));
                     if individual_checked {
                         cmd.insert(Checked);
                     }
+                    let _ = cmd.apply_scene(radio_button_scene(&individual_label, window));
 
-                    let mut cmd = parent.spawn((
-                        radio_button(&class_label, class_checked, window),
-                        ModeRadio(GameMode::Group),
-                    ));
+                    let mut cmd = parent.spawn_empty();
+                    cmd.insert(ModeRadio(GameMode::Group));
                     if class_checked {
                         cmd.insert(Checked);
                     }
+                    let _ = cmd.apply_scene(radio_button_scene(&class_label, window));
                 })),
             ),
         ],
@@ -228,21 +227,19 @@ fn language_section(
                 radio_group(),
                 observe(handle_language_radio_change),
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-                    let mut cmd = parent.spawn((
-                        radio_button(&french_label, french_checked, window),
-                        LanguageRadio(Language::French),
-                    ));
+                    let mut cmd = parent.spawn_empty();
+                    cmd.insert(LanguageRadio(Language::French));
                     if french_checked {
                         cmd.insert(Checked);
                     }
+                    let _ = cmd.apply_scene(radio_button_scene(&french_label, window));
 
-                    let mut cmd = parent.spawn((
-                        radio_button(&english_label, english_checked, window),
-                        LanguageRadio(Language::English),
-                    ));
+                    let mut cmd = parent.spawn_empty();
+                    cmd.insert(LanguageRadio(Language::English));
                     if english_checked {
                         cmd.insert(Checked);
                     }
+                    let _ = cmd.apply_scene(radio_button_scene(&english_label, window));
                 })),
             ),
         ],
@@ -326,29 +323,34 @@ fn exploration_theme_section(
                 radio_group(),
                 observe(handle_theme_radio_change),
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-                    let mut cmd = parent.spawn((
-                        radio_button(&sky_label, sky_checked, window),
-                        ExplorationThemeRadio(ExplorationTheme::Sky),
-                    ));
+                    let mut cmd = parent.spawn_empty();
+                    cmd.insert(ExplorationThemeRadio(ExplorationTheme::Sky));
                     if sky_checked {
                         cmd.insert(Checked);
                     }
+                    let _ = cmd.apply_scene(radio_button_scene(&sky_label, window));
 
-                    let mut cmd = parent.spawn((
-                        radio_button_muted(&ocean_label, &coming_soon, ocean_checked, window),
-                        ExplorationThemeRadio(ExplorationTheme::Ocean),
-                    ));
+                    let mut cmd = parent.spawn_empty();
+                    cmd.insert(ExplorationThemeRadio(ExplorationTheme::Ocean));
                     if ocean_checked {
                         cmd.insert(Checked);
                     }
-
-                    let mut cmd = parent.spawn((
-                        radio_button_muted(&space_label, &coming_soon, space_checked, window),
-                        ExplorationThemeRadio(ExplorationTheme::Space),
+                    let _ = cmd.apply_scene(radio_button_muted_scene(
+                        &ocean_label,
+                        &coming_soon,
+                        window,
                     ));
+
+                    let mut cmd = parent.spawn_empty();
+                    cmd.insert(ExplorationThemeRadio(ExplorationTheme::Space));
                     if space_checked {
                         cmd.insert(Checked);
                     }
+                    let _ = cmd.apply_scene(radio_button_muted_scene(
+                        &space_label,
+                        &coming_soon,
+                        window,
+                    ));
                 })),
             ),
         ],
@@ -418,8 +420,8 @@ fn bool_setting_section(
                 TextColor(theme::colors::TEXT_DARK),
             ));
 
-            let mut cmd = parent.spawn((
-                checkbox(&checkbox_label, enabled, window),
+            let mut cmd = parent.spawn_empty();
+            cmd.insert((
                 field,
                 observe(checkbox_self_update),
                 observe(handle_bool_setting_change),
@@ -427,6 +429,7 @@ fn bool_setting_section(
             if enabled {
                 cmd.insert(Checked);
             }
+            let _ = cmd.apply_scene(checkbox_scene(&checkbox_label, window));
         })),
     )
 }
@@ -470,26 +473,29 @@ fn volume_section(
             column_gap: theme::scaled(theme::spacing::MEDIUM),
             ..default()
         },
-        children![
-            (
+        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+            parent.spawn((
                 Text::new(label),
                 theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
-            ),
-            (
-                slider(0.0, 1.0, volume, 0.05),
+            ));
+
+            let mut slider = parent.spawn_empty();
+            slider.insert((
                 channel,
                 observe(slider_self_update),
                 observe(handle_volume_slider_change),
                 observe(persist_volume_on_pointer_release),
-            ),
-            (
+            ));
+            let _ = slider.apply_scene(slider_scene(0.0, 1.0, volume, 0.05));
+
+            parent.spawn((
                 Text::new(format!("{percent} %")),
                 theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
                 channel,
-            ),
-        ],
+            ));
+        })),
     )
 }
 

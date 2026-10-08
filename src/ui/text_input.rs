@@ -25,6 +25,12 @@ impl TextInputState {
             max_length,
         }
     }
+
+    fn push_character(&mut self, character: char) {
+        if !character.is_control() && self.text.chars().count() < self.max_length {
+            self.text.push(character);
+        }
+    }
 }
 
 /// Marker for the `Text` child entity that displays the input content
@@ -84,10 +90,8 @@ fn handle_text_input_keyboard(
                     border.set_all(theme::colors::INPUT_BORDER);
                 }
                 Key::Character(c) => {
-                    for ch in c.chars() {
-                        if !ch.is_control() && state.text.len() < state.max_length {
-                            state.text.push(ch);
-                        }
+                    for character in c.chars() {
+                        state.push_character(character);
                     }
                 }
                 _ => {}

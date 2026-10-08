@@ -12,11 +12,11 @@ use bevy::prelude::*;
 use super::theme;
 
 /// Marks the inner check mark of a styled checkbox.
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Clone, Default)]
 pub struct CheckboxMark;
 
 /// Marks the inner dot of a styled radio button.
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Clone, Default)]
 pub struct RadioMark;
 
 /// Default [`TooltipLifetime`]: 2-second auto-dismiss timer.
