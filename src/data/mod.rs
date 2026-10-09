@@ -1,6 +1,7 @@
 pub mod content;
 pub mod progress;
 pub mod save;
+pub mod save_write;
 pub mod system_params;
 
 pub use content::{
@@ -14,4 +15,5 @@ pub use save::{
     ActiveStudent, ClassSave, ClassStudent, IndividualSave, LessonProgress, LessonSessionConfig,
     PlayerSession, SaveData, get_current_progress,
 };
+pub use save_write::{SaveWriteAction, SaveWriteStatus, update_save_data};
 pub use system_params::{PersistenceMut, PlayerContext};

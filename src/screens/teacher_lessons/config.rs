@@ -382,11 +382,10 @@ pub(super) fn build_draft_questions(
             let count = existing_config
                 .and_then(|c| c.counts.get(i).copied())
                 .unwrap_or(1);
+            let default_show_visual = q.effective_show_visual(None).unwrap_or(false);
+            let configured_visual = existing_config.and_then(|c| c.show_visuals.get(i).copied());
+            let show_visual = q.effective_show_visual(configured_visual).unwrap_or(false);
             let has_visual = q.has_optional_visual();
-            let default_show_visual = q.default_show_visual();
-            let show_visual = existing_config
-                .and_then(|c| c.show_visuals.get(i).copied())
-                .unwrap_or(default_show_visual);
             TeacherQuestionDraft {
                 index: i,
                 question_type: q.question_type(),

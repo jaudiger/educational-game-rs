@@ -22,6 +22,7 @@ pub enum TranslationKey {
     Play,
     Quit,
     Settings,
+    SaveWriteFailed,
 
     // Fraction Comparison
     CharacterAte(String, u32, u32),
@@ -167,6 +168,7 @@ impl TranslationKey {
                 Play                      => ("Jouer",                                     "Play"),
                 Quit                      => ("Quitter",                                   "Quit"),
                 Settings                  => ("Param\u{00e8}tres",                         "Settings"),
+                SaveWriteFailed            => ("\u{00c9}chec de sauvegarde. Les changements peuvent \u{00ea}tre perdus \u{00e0} la fermeture.", "Save failed. Changes may be lost when the app closes."),
                 // Fraction Comparison
                 EqualAmount               => ("Pareil",                                    "Equal"),
                 // Fraction Identification

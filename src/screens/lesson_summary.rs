@@ -4,11 +4,12 @@ use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
-    GameMode, GameSettings, LessonProgress, LessonSession, PlayerSession, SaveData, SelectedLesson,
+    GameMode, GameSettings, LessonProgress, LessonSession, PlayerSession, SaveData,
+    SaveWriteAction, SaveWriteStatus, SelectedLesson, update_save_data,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
-use crate::ui::components::{screen_root, standard_button};
+use crate::ui::components::{save_write_failure_notice, screen_root, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -30,11 +31,13 @@ fn save_lesson_progress(
     player_session: Option<Res<PlayerSession>>,
     settings: Res<Persistent<GameSettings>>,
     mut save_data: ResMut<Persistent<SaveData>>,
+    mut write_status: ResMut<SaveWriteStatus>,
 ) {
     // Class mode: scores are already recorded per-answer during LessonPlay.
     if settings.mode == GameMode::Group {
         return;
     }
+    write_status.clear();
 
     // Guard: need lesson ID and active slot
     let Some(ref selected) = selected_lesson else {
@@ -58,15 +61,18 @@ fn save_lesson_progress(
     let lesson_id = lesson_id.clone();
     let slot_index = slot.slot_index;
 
-    save_data
-        .update(|data| {
+    update_save_data(
+        &mut save_data,
+        &mut write_status,
+        SaveWriteAction::IndividualLessonProgress,
+        |data| {
             // Individual mode: replace the existing entry (last score policy).
             if let Some(ref mut save) = data.individual_slots[slot_index] {
                 save.progress
                     .insert(lesson_id.clone(), new_progress.clone());
             }
-        })
-        .expect("failed to save lesson progress");
+        },
+    );
 }
 
 fn setup_lesson_summary(
@@ -74,6 +80,7 @@ fn setup_lesson_summary(
     session: Res<LessonSession>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
+    write_status: Res<SaveWriteStatus>,
 ) {
     let window = *primary_window;
     let correct = session.correct_count;
@@ -88,17 +95,24 @@ fn setup_lesson_summary(
         TranslationKey::SummaryEncouragement
     };
 
-    commands.spawn((
-        screen_root(),
-        DespawnOnExit(AppState::LessonSummary),
-        children![
-            summary_title(&i18n, window),
-            summary_score(&i18n, correct, total, window),
-            summary_percentage(&i18n, percentage, window),
-            summary_message(&i18n, &message_key, window),
-            return_button(&i18n, window),
-        ],
-    ));
+    let show_save_failure = write_status.failed(SaveWriteAction::ClassAnswer)
+        || write_status.failed(SaveWriteAction::IndividualLessonProgress);
+
+    commands
+        .spawn((screen_root(), DespawnOnExit(AppState::LessonSummary)))
+        .with_children(|parent| {
+            parent.spawn(summary_title(&i18n, window));
+            parent.spawn(summary_score(&i18n, correct, total, window));
+            parent.spawn(summary_percentage(&i18n, percentage, window));
+            parent.spawn(summary_message(&i18n, &message_key, window));
+            if show_save_failure {
+                parent.spawn(save_write_failure_notice(
+                    i18n.t(&TranslationKey::SaveWriteFailed).into_owned(),
+                    window,
+                ));
+            }
+            parent.spawn(return_button(&i18n, window));
+        });
 }
 
 fn summary_title(i18n: &I18n, window: Entity) -> impl Bundle + use<> {

@@ -10,10 +10,8 @@ use crate::i18n::{Language, TranslationKey};
 /// Maximum number of times a single question can appear in a teacher-configured session.
 pub const MAX_QUESTION_REPETITIONS: usize = 5;
 
-/// A text string available in both French and English.
-/// Used for pedagogical content (prompts, explanations) that cannot be
-/// represented by a static `TranslationKey` because templates generate
-/// dynamic text at runtime.
+/// A plain text string available in both French and English.
+/// Used for prompts and as localized prose within structured explanations.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct LocalizedText {
     pub fr: Cow<'static, str>,
@@ -35,6 +33,159 @@ impl LocalizedText {
             Language::French => &self.fr,
             Language::English => &self.en,
         }
+    }
+}
+
+/// Semantic color used by values embedded in localized explanations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub enum ExplanationColorRole {
+    Default,
+    Primary,
+    Secondary,
+    Success,
+    PlaceValue { highlighted_zeros: usize },
+}
+
+/// A named value inserted at an authored explanation placeholder.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct ExplanationPlaceholder {
+    pub name: Cow<'static, str>,
+    pub value: ExplanationValue,
+}
+
+impl ExplanationPlaceholder {
+    pub fn new(name: impl Into<Cow<'static, str>>, value: ExplanationValue) -> Self {
+        Self {
+            name: name.into(),
+            value,
+        }
+    }
+}
+
+/// Content bound to a named explanation placeholder.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub enum ExplanationValue {
+    Text(LocalizedText),
+    Number {
+        value: u32,
+        role: ExplanationColorRole,
+    },
+    Fraction {
+        numerator: u32,
+        denominator: u32,
+        numerator_role: ExplanationColorRole,
+        denominator_role: ExplanationColorRole,
+    },
+}
+
+/// Localized explanation prose with explicit named semantic values.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct LocalizedExplanation {
+    pub text: LocalizedText,
+    pub placeholders: Vec<ExplanationPlaceholder>,
+}
+
+impl LocalizedExplanation {
+    pub const fn new(text: LocalizedText, placeholders: Vec<ExplanationPlaceholder>) -> Self {
+        Self { text, placeholders }
+    }
+
+    pub const fn plain(text: LocalizedText) -> Self {
+        Self::new(text, Vec::new())
+    }
+
+    pub fn validation_issues(&self) -> Vec<String> {
+        let mut issues = Vec::new();
+        let mut binding_names = Vec::new();
+        for placeholder in &self.placeholders {
+            let name = placeholder.name.as_ref();
+            if !is_valid_placeholder_name(name) {
+                issues.push(format!("Invalid explanation binding name: {name}"));
+            }
+            if binding_names.contains(&name) {
+                issues.push(format!("Duplicate explanation binding name: {name}"));
+            } else {
+                binding_names.push(name);
+            }
+        }
+
+        for (language, text) in [("French", &self.text.fr), ("English", &self.text.en)] {
+            for (name, issue) in scan_placeholder_names(text) {
+                if let Some(issue) = issue {
+                    issues.push(format!("{language} explanation {issue}"));
+                    continue;
+                }
+                let binding_count = self
+                    .placeholders
+                    .iter()
+                    .filter(|placeholder| placeholder.name == name)
+                    .count();
+                if binding_count == 0 {
+                    issues.push(format!(
+                        "{language} explanation has unknown placeholder: {name}"
+                    ));
+                } else if binding_count > 1 {
+                    issues.push(format!(
+                        "{language} explanation has ambiguous placeholder: {name}"
+                    ));
+                }
+            }
+        }
+        issues
+    }
+}
+
+fn is_valid_placeholder_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    bytes
+        .next()
+        .is_some_and(|first| first.is_ascii_alphabetic() || first == b'_')
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+}
+
+fn scan_placeholder_names(text: &str) -> Vec<(String, Option<String>)> {
+    let mut found = Vec::new();
+    let bytes = text.as_bytes();
+    let mut position = 0;
+    while position < bytes.len() {
+        match bytes[position] {
+            b'{' => {
+                let Some(offset) = bytes[position + 1..].iter().position(|byte| *byte == b'}')
+                else {
+                    found.push((
+                        String::new(),
+                        Some("has an unclosed placeholder".to_owned()),
+                    ));
+                    break;
+                };
+                let end = position + 1 + offset;
+                let name = &text[position + 1..end];
+                if is_valid_placeholder_name(name) {
+                    found.push((name.to_owned(), None));
+                } else {
+                    found.push((
+                        String::new(),
+                        Some("has a malformed placeholder".to_owned()),
+                    ));
+                }
+                position = end + 1;
+            }
+            b'}' => {
+                found.push((
+                    String::new(),
+                    Some("has an unmatched closing brace".to_owned()),
+                ));
+                position += 1;
+            }
+            _ => position += 1,
+        }
+    }
+    found
+}
+
+impl From<LocalizedText> for LocalizedExplanation {
+    fn from(text: LocalizedText) -> Self {
+        Self::plain(text)
     }
 }
 
@@ -214,6 +365,14 @@ impl QuestionDefinition {
         }
     }
 
+    /// Returns the effective visibility for an optional visual.
+    pub fn effective_show_visual(&self, configured: Option<bool>) -> Option<bool> {
+        if !self.has_optional_visual() {
+            return None;
+        }
+        Some(configured.unwrap_or_else(|| self.default_show_visual()))
+    }
+
     /// Returns the default visibility for the optional visual (when the
     /// teacher hasn't explicitly toggled it).
     pub const fn default_show_visual(&self) -> bool {
@@ -238,16 +397,36 @@ impl QuestionDefinition {
     }
 
     /// Returns a `u64` hash that uniquely identifies a resolved question's
-    /// parameters. Used by session building to avoid duplicate questions.
-    /// Returns `None` for unresolved templates.
+    /// semantic content. Used by session building to avoid duplicate questions.
+    /// Returns `None` for unresolved templates or malformed multiple-choice definitions.
     pub fn fingerprint(&self) -> Option<u64> {
         let mut hasher = DefaultHasher::new();
+        self.question_type().hash(&mut hasher);
         match self {
-            Self::Mcq(d) => d.hash(&mut hasher),
-            Self::FractionVisualization(d) => d.hash(&mut hasher),
-            Self::FractionComparison(d) => d.hash(&mut hasher),
-            Self::FractionIdentification(d) => d.hash(&mut hasher),
-            Self::NumericInput(d) => d.hash(&mut hasher),
+            Self::Mcq(d) => {
+                d.prompt.hash(&mut hasher);
+                d.choices.get(d.correct_index)?.hash(&mut hasher);
+            }
+            Self::FractionVisualization(d) => {
+                d.prompt.hash(&mut hasher);
+                d.numerator.hash(&mut hasher);
+                d.denominator.hash(&mut hasher);
+            }
+            Self::FractionComparison(d) => {
+                d.prompt.hash(&mut hasher);
+                d.fraction_a.hash(&mut hasher);
+                d.fraction_b.hash(&mut hasher);
+                d.answer.hash(&mut hasher);
+            }
+            Self::FractionIdentification(d) => {
+                d.numerator.hash(&mut hasher);
+                d.denominator.hash(&mut hasher);
+                d.choices.get(d.correct_index)?.hash(&mut hasher);
+            }
+            Self::NumericInput(d) => {
+                d.prompt.hash(&mut hasher);
+                d.correct_answer.hash(&mut hasher);
+            }
             // Templates are not resolved yet, so no fingerprint.
             _ => return None,
         }
@@ -323,7 +502,7 @@ pub struct McqDefinition {
     pub prompt: LocalizedText,
     pub choices: Vec<String>,
     pub correct_index: usize,
-    pub explanation: LocalizedText,
+    pub explanation: LocalizedExplanation,
     /// Optional visual to display alongside the explanation in feedback.
     pub explanation_visual: Option<ExplanationVisual>,
     /// Optional visual displayed alongside the prompt during the question.
@@ -336,7 +515,7 @@ pub struct FractionVisualizationDefinition {
     pub prompt: LocalizedText,
     pub numerator: u32,
     pub denominator: u32,
-    pub explanation: LocalizedText,
+    pub explanation: LocalizedExplanation,
 }
 
 /// A resolved fraction comparison question pairing two characters.
@@ -349,7 +528,7 @@ pub struct FractionComparisonDefinition {
     pub fraction_b: (u32, u32),
     pub answer: ComparisonAnswer,
     pub difficulty: ComparisonDifficulty,
-    pub explanation: LocalizedText,
+    pub explanation: LocalizedExplanation,
     pub explanation_visual: Option<ExplanationVisual>,
 }
 
@@ -394,7 +573,7 @@ const fn difficulty_label(difficulty: Difficulty, language: Language) -> &'stati
 pub struct NumericInputDefinition {
     pub prompt: LocalizedText,
     pub correct_answer: u32,
-    pub explanation: LocalizedText,
+    pub explanation: LocalizedExplanation,
     pub explanation_visual: Option<ExplanationVisual>,
     /// Optional visual displayed alongside the prompt during the question.
     pub question_visual: Option<QuestionVisual>,
@@ -407,7 +586,7 @@ pub struct FractionIdentificationDefinition {
     pub denominator: u32,
     pub choices: Vec<String>,
     pub correct_index: usize,
-    pub explanation: LocalizedText,
+    pub explanation: LocalizedExplanation,
     pub explanation_visual: Option<ExplanationVisual>,
 }
 

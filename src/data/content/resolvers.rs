@@ -6,11 +6,11 @@ use rand::{Rng, RngExt};
 
 use super::types::{
     ComparisonAnswer, ComparisonDifficulty, ComparisonSide, ComparisonSideWithConversion,
-    ExplanationVisual, FractionComparisonDefinition, FractionComparisonTemplate,
-    FractionIdentificationDefinition, FractionIdentificationTemplate,
-    FractionVisualizationDefinition, FractionVisualizationTemplate, LocalizedText, McqDefinition,
-    McqResolver, McqTemplate, NumericInputDefinition, NumericInputTemplate, ParameterRange,
-    QuestionVisual,
+    ExplanationColorRole, ExplanationPlaceholder, ExplanationValue, ExplanationVisual,
+    FractionComparisonDefinition, FractionComparisonTemplate, FractionIdentificationDefinition,
+    FractionIdentificationTemplate, FractionVisualizationDefinition, FractionVisualizationTemplate,
+    LocalizedExplanation, LocalizedText, McqDefinition, McqResolver, McqTemplate,
+    NumericInputDefinition, NumericInputTemplate, ParameterRange, QuestionVisual,
 };
 
 /// Shuffle `correct` together with `distractors` and return the shuffled list
@@ -85,15 +85,24 @@ impl McqTemplate {
         let distractors: Vec<String> = seen.into_iter().map(|v| v.to_string()).collect();
         let (choices, correct_index) = shuffle_choices(result.to_string(), distractors, rng);
 
-        let explanation = LocalizedText::new(
-            substitute_template(
-                &self.explanation_template.fr,
-                &[("a", &a), ("b", &b), ("result", &result)],
-            ),
-            substitute_template(
-                &self.explanation_template.en,
-                &[("a", &a), ("b", &b), ("result", &result)],
-            ),
+        let explanation = LocalizedExplanation::new(
+            self.explanation_template.clone(),
+            vec![
+                number_placeholder("a", a.unsigned_abs(), ExplanationColorRole::Primary),
+                number_placeholder("b", b.unsigned_abs(), ExplanationColorRole::Secondary),
+                number_placeholder(
+                    "result",
+                    result.unsigned_abs(),
+                    ExplanationColorRole::Success,
+                ),
+                fraction_placeholder(
+                    "fraction",
+                    a.unsigned_abs(),
+                    b.unsigned_abs(),
+                    ExplanationColorRole::Primary,
+                    ExplanationColorRole::Secondary,
+                ),
+            ],
         );
 
         McqDefinition {
@@ -143,28 +152,35 @@ impl McqTemplate {
 
         let (choices, correct_index) = generate_fraction_addition_choices(a, b, c, sum, rng);
 
-        let result = format!("{sum}/{b}");
-        let explanation = LocalizedText::new(
-            substitute_template(
-                &self.explanation_template.fr,
-                &[
-                    ("a", &a),
-                    ("b", &b),
-                    ("c", &c),
-                    ("sum", &sum),
-                    ("result", &result),
-                ],
-            ),
-            substitute_template(
-                &self.explanation_template.en,
-                &[
-                    ("a", &a),
-                    ("b", &b),
-                    ("c", &c),
-                    ("sum", &sum),
-                    ("result", &result),
-                ],
-            ),
+        let explanation = LocalizedExplanation::new(
+            self.explanation_template.clone(),
+            vec![
+                number_placeholder("a", a.unsigned_abs(), ExplanationColorRole::Primary),
+                number_placeholder("b", b.unsigned_abs(), ExplanationColorRole::Default),
+                number_placeholder("c", c.unsigned_abs(), ExplanationColorRole::Secondary),
+                number_placeholder("sum", sum.unsigned_abs(), ExplanationColorRole::Success),
+                fraction_placeholder(
+                    "fraction_a",
+                    a.unsigned_abs(),
+                    b.unsigned_abs(),
+                    ExplanationColorRole::Primary,
+                    ExplanationColorRole::Default,
+                ),
+                fraction_placeholder(
+                    "fraction_c",
+                    c.unsigned_abs(),
+                    b.unsigned_abs(),
+                    ExplanationColorRole::Secondary,
+                    ExplanationColorRole::Default,
+                ),
+                fraction_placeholder(
+                    "result",
+                    sum.unsigned_abs(),
+                    b.unsigned_abs(),
+                    ExplanationColorRole::Success,
+                    ExplanationColorRole::Default,
+                ),
+            ],
         );
 
         McqDefinition {
@@ -226,17 +242,21 @@ impl McqTemplate {
         }
         distractors.truncate(3);
 
-        let (choices, correct_index) = shuffle_choices(correct.clone(), distractors, rng);
+        let (choices, correct_index) = shuffle_choices(correct, distractors, rng);
 
-        let explanation = LocalizedText::new(
-            substitute_template(
-                &self.explanation_template.fr,
-                &[("name", &name_fr), ("fraction", &correct), ("d", &d)],
-            ),
-            substitute_template(
-                &self.explanation_template.en,
-                &[("name", &name_en), ("fraction", &correct), ("d", &d)],
-            ),
+        let explanation = LocalizedExplanation::new(
+            self.explanation_template.clone(),
+            vec![
+                text_placeholder("name", name_fr.to_owned(), name_en.to_owned()),
+                number_placeholder("d", d.unsigned_abs(), ExplanationColorRole::Default),
+                fraction_placeholder(
+                    "fraction",
+                    1,
+                    d.unsigned_abs(),
+                    ExplanationColorRole::Primary,
+                    ExplanationColorRole::Secondary,
+                ),
+            ],
         );
 
         McqDefinition {
@@ -274,15 +294,32 @@ impl McqTemplate {
         #[allow(clippy::cast_sign_loss)]
         let (choices, correct_index) = generate_multiplication_distractors(a as u32, b as u32, rng);
 
-        let explanation = LocalizedText::new(
-            substitute_template(
-                &self.explanation_template.fr,
-                &[("a", &a), ("b", &b), ("result", &result)],
-            ),
-            substitute_template(
-                &self.explanation_template.en,
-                &[("a", &a), ("b", &b), ("result", &result)],
-            ),
+        let place_value = matches!(self.resolver, McqResolver::MultiplyByPowerOf10);
+        let highlighted_zeros = decimal_trailing_zeros(b.unsigned_abs());
+        let place_value_role = ExplanationColorRole::PlaceValue { highlighted_zeros };
+        let explanation = LocalizedExplanation::new(
+            self.explanation_template.clone(),
+            vec![
+                number_placeholder("a", a.unsigned_abs(), ExplanationColorRole::Default),
+                number_placeholder(
+                    "b",
+                    b.unsigned_abs(),
+                    if place_value {
+                        place_value_role
+                    } else {
+                        ExplanationColorRole::Default
+                    },
+                ),
+                number_placeholder(
+                    "result",
+                    result.unsigned_abs(),
+                    if place_value {
+                        place_value_role
+                    } else {
+                        ExplanationColorRole::Default
+                    },
+                ),
+            ],
         );
 
         #[allow(clippy::cast_sign_loss)]
@@ -357,15 +394,19 @@ impl FractionVisualizationTemplate {
             ),
         );
 
-        let explanation = LocalizedText::new(
-            substitute_template(
-                &self.explanation_template.fr,
-                &[("n", &numerator), ("d", &denominator)],
-            ),
-            substitute_template(
-                &self.explanation_template.en,
-                &[("n", &numerator), ("d", &denominator)],
-            ),
+        let explanation = LocalizedExplanation::new(
+            self.explanation_template.clone(),
+            vec![
+                number_placeholder("d", denominator, ExplanationColorRole::Secondary),
+                number_placeholder("n", numerator, ExplanationColorRole::Primary),
+                fraction_placeholder(
+                    "fraction",
+                    numerator,
+                    denominator,
+                    ExplanationColorRole::Primary,
+                    ExplanationColorRole::Secondary,
+                ),
+            ],
         );
 
         FractionVisualizationDefinition {
@@ -453,24 +494,15 @@ impl FractionComparisonTemplate {
             ComparisonAnswer::B
         };
 
-        let substitute_explanation = |template: &str| {
-            substitute_template(
-                template,
-                &[
-                    ("na", &fraction_a.0),
-                    ("da", &fraction_a.1),
-                    ("nb", &fraction_b.0),
-                    ("db", &fraction_b.1),
-                    ("char_a", &self.character_a),
-                    ("char_b", &self.character_b),
-                ],
-            )
-        };
-
-        let explanation = LocalizedText::new(
-            substitute_explanation(&self.explanation_template.fr),
-            substitute_explanation(&self.explanation_template.en),
+        let explanation_placeholders = comparison_explanation_placeholders(
+            self.difficulty,
+            fraction_a,
+            fraction_b,
+            &self.character_a,
+            &self.character_b,
         );
+        let explanation =
+            LocalizedExplanation::new(self.explanation_template.clone(), explanation_placeholders);
 
         let explanation_visual = Some(self.build_visual(fraction_a, fraction_b));
 
@@ -520,6 +552,42 @@ impl FractionComparisonTemplate {
     }
 }
 
+fn comparison_explanation_placeholders(
+    difficulty: ComparisonDifficulty,
+    fraction_a: (u32, u32),
+    fraction_b: (u32, u32),
+    character_a: &str,
+    character_b: &str,
+) -> Vec<ExplanationPlaceholder> {
+    let right_numerator_role = if matches!(difficulty, ComparisonDifficulty::SameNumerator) {
+        ExplanationColorRole::Primary
+    } else {
+        ExplanationColorRole::Secondary
+    };
+    vec![
+        number_placeholder("na", fraction_a.0, ExplanationColorRole::Primary),
+        number_placeholder("da", fraction_a.1, ExplanationColorRole::Default),
+        number_placeholder("nb", fraction_b.0, right_numerator_role),
+        number_placeholder("db", fraction_b.1, ExplanationColorRole::Default),
+        fraction_placeholder(
+            "fraction_a",
+            fraction_a.0,
+            fraction_a.1,
+            ExplanationColorRole::Primary,
+            ExplanationColorRole::Default,
+        ),
+        fraction_placeholder(
+            "fraction_b",
+            fraction_b.0,
+            fraction_b.1,
+            right_numerator_role,
+            ExplanationColorRole::Default,
+        ),
+        text_placeholder("char_a", character_a.to_owned(), character_a.to_owned()),
+        text_placeholder("char_b", character_b.to_owned(), character_b.to_owned()),
+    ]
+}
+
 impl FractionIdentificationTemplate {
     /// Pick a random fraction from the configured ranges and build the
     /// identification MCQ with distractors.
@@ -551,15 +619,31 @@ impl NumericInputTemplate {
             substitute_template(&self.prompt_template.fr, &[("a", &a), ("b", &b)]),
             substitute_template(&self.prompt_template.en, &[("a", &a), ("b", &b)]),
         );
-        let explanation = LocalizedText::new(
-            substitute_template(
-                &self.explanation_template.fr,
-                &[("a", &a), ("b", &b), ("result", &correct_answer)],
-            ),
-            substitute_template(
-                &self.explanation_template.en,
-                &[("a", &a), ("b", &b), ("result", &correct_answer)],
-            ),
+        let highlighted_zeros = decimal_trailing_zeros(b);
+        let place_value_role = ExplanationColorRole::PlaceValue { highlighted_zeros };
+        let explanation = LocalizedExplanation::new(
+            self.explanation_template.clone(),
+            vec![
+                number_placeholder("a", a, ExplanationColorRole::Default),
+                number_placeholder(
+                    "b",
+                    b,
+                    if self.place_value_explanation {
+                        place_value_role
+                    } else {
+                        ExplanationColorRole::Default
+                    },
+                ),
+                number_placeholder(
+                    "result",
+                    correct_answer,
+                    if self.place_value_explanation {
+                        place_value_role
+                    } else {
+                        ExplanationColorRole::Default
+                    },
+                ),
+            ],
         );
 
         let question_visual = if self.with_grid {
@@ -661,6 +745,7 @@ fn generate_multiplication_distractors(a: u32, b: u32, rng: &mut impl Rng) -> (V
 
 /// Build a `FractionIdentificationDefinition` with plausible distractors
 /// derived from the given numerator/denominator.
+#[allow(clippy::literal_string_with_formatting_args)]
 fn generate_fraction_identification(
     numerator: u32,
     denominator: u32,
@@ -697,19 +782,63 @@ fn generate_fraction_identification(
         denominator,
         choices,
         correct_index,
-        explanation: LocalizedText::new(
-            format!(
-                "Il y a {denominator} parts et {numerator} sont coloriées : c'est {numerator}/{denominator}."
+        explanation: LocalizedExplanation::new(
+            LocalizedText::new(
+                "Il y a {denominator} parts et {numerator} sont coloriées : c'est {fraction}.",
+                "There are {denominator} parts and {numerator} are colored: that's {fraction}.",
             ),
-            format!(
-                "There are {denominator} parts and {numerator} are colored: that's {numerator}/{denominator}."
-            ),
+            vec![
+                number_placeholder("denominator", denominator, ExplanationColorRole::Secondary),
+                number_placeholder("numerator", numerator, ExplanationColorRole::Primary),
+                fraction_placeholder(
+                    "fraction",
+                    numerator,
+                    denominator,
+                    ExplanationColorRole::Primary,
+                    ExplanationColorRole::Secondary,
+                ),
+            ],
         ),
         explanation_visual: Some(ExplanationVisual::FractionBar {
             numerator,
             denominator,
         }),
     }
+}
+
+fn decimal_trailing_zeros(value: u32) -> usize {
+    let digits = value.to_string();
+    digits.len() - digits.trim_end_matches('0').len()
+}
+
+fn number_placeholder(
+    name: &'static str,
+    value: u32,
+    role: ExplanationColorRole,
+) -> ExplanationPlaceholder {
+    ExplanationPlaceholder::new(name, ExplanationValue::Number { value, role })
+}
+
+fn fraction_placeholder(
+    name: &'static str,
+    numerator: u32,
+    denominator: u32,
+    numerator_role: ExplanationColorRole,
+    denominator_role: ExplanationColorRole,
+) -> ExplanationPlaceholder {
+    ExplanationPlaceholder::new(
+        name,
+        ExplanationValue::Fraction {
+            numerator,
+            denominator,
+            numerator_role,
+            denominator_role,
+        },
+    )
+}
+
+fn text_placeholder(name: &'static str, fr: String, en: String) -> ExplanationPlaceholder {
+    ExplanationPlaceholder::new(name, ExplanationValue::Text(LocalizedText::new(fr, en)))
 }
 
 /// Substitute `{name}` placeholders with their matching parameter value in a

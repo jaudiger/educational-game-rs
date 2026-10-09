@@ -7,6 +7,7 @@ use bevy_persistent::prelude::Persistent;
 use crate::data::content::QuestionType;
 use crate::data::{
     ContentLibrary, GameMode, Language, LessonProgress, PlayerContext, PlayerSession, SaveData,
+    SaveWriteAction, SaveWriteStatus, update_save_data,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::teacher::{
@@ -16,8 +17,8 @@ use crate::plugins::teacher::{
 use crate::screens::teacher_shared::question_type_label;
 use crate::states::{AppState, cleanup_root};
 use crate::ui::components::{
-    ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button, spawn_confirmation_modal,
-    standard_button,
+    ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button,
+    save_write_failure_notice, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::theme;
 
@@ -82,11 +83,15 @@ fn rebuild_stats_ui(
     ts: TeacherScreenParam<'_, '_>,
     content: Res<ContentLibrary>,
     existing_root: Query<Entity, With<TeacherStatsRoot>>,
+    mut write_status: ResMut<SaveWriteStatus>,
 ) {
     let Ok(state) = ts.teacher.state.single() else {
         return;
     };
-    if !state.is_changed() && !ts.ctx.save_data.is_changed() {
+    if state.is_changed() {
+        write_status.clear();
+    }
+    if !state.is_changed() && !ts.ctx.save_data.is_changed() && !write_status.is_changed() {
         return;
     }
 
@@ -140,6 +145,9 @@ fn rebuild_stats_ui(
             has_any_progress,
             stats_data,
             global_total,
+            save_failure_notice: write_status
+                .failed(SaveWriteAction::TeacherStatsReset)
+                .then(|| ts.i18n.t(&TranslationKey::SaveWriteFailed).into_owned()),
         },
     );
 }
@@ -151,6 +159,7 @@ struct StatsViewData {
     has_any_progress: bool,
     stats_data: Vec<ThemeStatsData>,
     global_total: GlobalTotal,
+    save_failure_notice: Option<String>,
 }
 
 fn spawn_stats_root(
@@ -177,6 +186,9 @@ fn spawn_stats_root(
             parent.spawn(tab);
 
             spawn_stats_title_row(parent, &data.title_text, window);
+            if let Some(notice) = &data.save_failure_notice {
+                parent.spawn(save_write_failure_notice(notice.clone(), window));
+            }
 
             parent.spawn((
                 Node {
@@ -658,6 +670,7 @@ fn handle_confirm_reset(
     target_query: Query<&StatsResetRequest>,
     session: Option<Res<PlayerSession>>,
     mut save_data: ResMut<Persistent<SaveData>>,
+    mut write_status: ResMut<SaveWriteStatus>,
 ) {
     if event.action != ConfirmationDialogAction::Confirm {
         return;
@@ -671,31 +684,36 @@ fn handle_confirm_reset(
     let slot_index = session.slot_index;
     let target = request.target.clone();
 
-    let _ = save_data.update(|data| {
-        let Some(class_save) = data.class_slots[slot_index].as_mut() else {
-            return;
-        };
-        let Some(student) = class_save.students.get_mut(student_index) else {
-            return;
-        };
-        match target {
-            StatsResetTarget::All => {
-                student.progress.clear();
-            }
-            StatsResetTarget::Lesson(ref lid) => {
-                student.progress.remove(lid);
-            }
-            StatsResetTarget::Type(ref lid, qt) => {
-                if let Some(lp) = student.progress.get_mut(lid) {
-                    lp.type_scores.remove(&qt);
-                    // If no types left, remove the lesson entry entirely
-                    if lp.type_scores.is_empty() {
-                        student.progress.remove(lid);
+    update_save_data(
+        &mut save_data,
+        &mut write_status,
+        SaveWriteAction::TeacherStatsReset,
+        |data| {
+            let Some(class_save) = data.class_slots[slot_index].as_mut() else {
+                return;
+            };
+            let Some(student) = class_save.students.get_mut(student_index) else {
+                return;
+            };
+            match target {
+                StatsResetTarget::All => {
+                    student.progress.clear();
+                }
+                StatsResetTarget::Lesson(ref lid) => {
+                    student.progress.remove(lid);
+                }
+                StatsResetTarget::Type(ref lid, qt) => {
+                    if let Some(lp) = student.progress.get_mut(lid) {
+                        lp.type_scores.remove(&qt);
+                        // If no types left, remove the lesson entry entirely
+                        if lp.type_scores.is_empty() {
+                            student.progress.remove(lid);
+                        }
                     }
                 }
             }
-        }
-    });
+        },
+    );
 }
 
 fn handle_return_to_list(

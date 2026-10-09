@@ -7,7 +7,8 @@ use rand::seq::SliceRandom;
 use crate::data::content::QuestionDefinition;
 use crate::data::{
     ActiveStudent, ActiveTheme, AnswerResult, ContentLibrary, LessonSession, LessonSessionConfig,
-    PlayerSession, ResolvedQuestion, SaveData, SelectedLesson,
+    PlayerSession, ResolvedQuestion, SaveData, SaveWriteAction, SaveWriteStatus, SelectedLesson,
+    update_save_data,
 };
 
 /// Maximum re-roll attempts when deduplicating resolved template questions.
@@ -39,12 +40,10 @@ pub(super) fn build_session(
         let mut seen = HashSet::new();
         for (i, question) in lesson.questions.iter().enumerate() {
             let count = config.counts.get(i).copied().unwrap_or(1);
-            let hide = question.has_optional_visual()
-                && !config
-                    .show_visuals
-                    .get(i)
-                    .copied()
-                    .unwrap_or_else(|| question.default_show_visual());
+            let configured_visual = config.show_visuals.get(i).copied();
+            let hide = question
+                .effective_show_visual(configured_visual)
+                .is_some_and(|show| !show);
             for _ in 0..count {
                 pool.push((resolve_unique(question, &mut rng, &mut seen), hide));
             }
@@ -52,12 +51,15 @@ pub(super) fn build_session(
         pool.shuffle(&mut rng);
         pool
     } else {
-        // No config: default behavior (all questions once, visuals shown)
+        // No config: default behavior (all questions once).
         let mut seen = HashSet::new();
         let mut pool: Vec<(QuestionDefinition, bool)> = lesson
             .questions
             .iter()
-            .map(|q| (resolve_unique(q, &mut rng, &mut seen), false))
+            .map(|q| {
+                let hide = q.effective_show_visual(None).is_some_and(|show| !show);
+                (resolve_unique(q, &mut rng, &mut seen), hide)
+            })
             .collect();
         pool.shuffle(&mut rng);
         pool
@@ -161,7 +163,9 @@ pub(super) fn record_class_answer(
     player_session: Option<&PlayerSession>,
     selected_lesson: Option<&SelectedLesson>,
     save_data: &mut Persistent<SaveData>,
+    write_status: &mut SaveWriteStatus,
 ) {
+    write_status.clear();
     let Some(student) = active_student else {
         return;
     };
@@ -184,18 +188,23 @@ pub(super) fn record_class_answer(
     let slot_index = player_session.slot_index;
     let student_index = student.0;
 
-    let _ = save_data.update(|data| {
-        let Some(class_save) = data.class_slots[slot_index].as_mut() else {
-            return;
-        };
-        let Some(student_data) = class_save.students.get_mut(student_index) else {
-            return;
-        };
-        let lesson_progress = student_data.progress.entry(lesson_id.clone()).or_default();
-        let type_score = lesson_progress.type_scores.entry(qt).or_default();
-        type_score.total += 1;
-        if is_correct {
-            type_score.correct += 1;
-        }
-    });
+    update_save_data(
+        save_data,
+        write_status,
+        SaveWriteAction::ClassAnswer,
+        |data| {
+            let Some(class_save) = data.class_slots[slot_index].as_mut() else {
+                return;
+            };
+            let Some(student_data) = class_save.students.get_mut(student_index) else {
+                return;
+            };
+            let lesson_progress = student_data.progress.entry(lesson_id.clone()).or_default();
+            let type_score = lesson_progress.type_scores.entry(qt).or_default();
+            type_score.total += 1;
+            if is_correct {
+                type_score.correct += 1;
+            }
+        },
+    );
 }

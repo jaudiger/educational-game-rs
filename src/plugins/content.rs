@@ -139,8 +139,8 @@ fn build_mcq_questions() -> Vec<QuestionDefinition> {
             ],
             resolver: McqResolver::FractionAddition,
             explanation_template: LocalizedText::new(
-                "Les deux fractions ont le même dénominateur ({b}), on additionne les numérateurs : {a} + {c} = {sum}. Donc {a}/{b} + {c}/{b} = {result}.",
-                "Both fractions have the same denominator ({b}), so we add the numerators: {a} + {c} = {sum}. So {a}/{b} + {c}/{b} = {result}.",
+                "Les deux fractions ont le même dénominateur ({b}), on additionne les numérateurs : {a} + {c} = {sum}. Donc {fraction_a} + {fraction_c} = {result}.",
+                "Both fractions have the same denominator ({b}), so we add the numerators: {a} + {c} = {sum}. So {fraction_a} + {fraction_c} = {result}.",
             ),
             teacher_label: None,
             with_grid: false,
@@ -162,8 +162,8 @@ fn build_mcq_questions() -> Vec<QuestionDefinition> {
             ],
             resolver: McqResolver::FractionValue,
             explanation_template: LocalizedText::new(
-                "Si on partage {a} parts en groupes de {b}, on obtient {result} groupes. Donc {a}/{b} = {result}.",
-                "If we share {a} parts into groups of {b}, we get {result} groups. So {a}/{b} = {result}.",
+                "Si on partage {a} parts en groupes de {b}, on obtient {result} groupes. Donc {fraction} = {result}.",
+                "If we share {a} parts into groups of {b}, we get {result} groups. So {fraction} = {result}.",
             ),
             teacher_label: None,
             with_grid: false,
@@ -182,8 +182,8 @@ fn build_visual_fraction_questions() -> Vec<QuestionDefinition> {
             numerator_range: vec![1, 2, 3, 4, 5, 6, 7],
             denominator_range: vec![3, 4, 5, 6, 8, 10, 12],
             explanation_template: LocalizedText::new(
-                "Il y a {d} parts au total et {n} sont coloriées : c'est la fraction {n}/{d}.",
-                "There are {d} parts in total and {n} are colored: that's the fraction {n}/{d}.",
+                "Il y a {d} parts au total et {n} sont coloriées : c'est la fraction {fraction}.",
+                "There are {d} parts in total and {n} are colored: that's the fraction {fraction}.",
             ),
         }),
         // ----- FractionComparison template (same denominator) -----
@@ -221,8 +221,8 @@ fn build_visual_fraction_questions() -> Vec<QuestionDefinition> {
             denominator_range: vec![3, 4, 6, 8, 12],
             numerator_range: vec![1, 2, 3, 4, 5, 6, 7],
             explanation_template: LocalizedText::new(
-                "Pour comparer {na}/{da} et {nb}/{db} il faut couper les gâteaux en parts de la même taille.",
-                "To compare {na}/{da} and {nb}/{db} we need to cut the pies into same-sized slices.",
+                "Pour comparer {fraction_a} et {fraction_b} il faut couper les gâteaux en parts de la même taille.",
+                "To compare {fraction_a} and {fraction_b} we need to cut the pies into same-sized slices.",
             ),
         }),
     ]

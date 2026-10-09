@@ -124,11 +124,8 @@ fn lesson_has_custom_config(
         .is_some_and(|config| {
             let count_changed = config.counts.iter().any(|&c| c != 1);
             let visual_changed = lesson.questions.iter().enumerate().any(|(i, q)| {
-                q.has_optional_visual()
-                    && config
-                        .show_visuals
-                        .get(i)
-                        .is_some_and(|&v| v != q.default_show_visual())
+                q.effective_show_visual(config.show_visuals.get(i).copied())
+                    != q.effective_show_visual(None)
             });
             count_changed || visual_changed
         })

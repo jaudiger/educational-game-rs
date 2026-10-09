@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_persistent::prelude::*;
 
-use crate::data::{GameSettings, SaveData};
+use crate::data::{GameSettings, SaveData, SaveWriteStatus};
 use crate::i18n::I18n;
 
 /// Initializes persistent storage for save data and game settings.
@@ -19,6 +19,7 @@ impl Plugin for PersistencePlugin {
             .build()
             .expect("failed to initialize save data");
         app.insert_resource(save_data);
+        app.init_resource::<SaveWriteStatus>();
 
         let settings = Persistent::<GameSettings>::builder()
             .name("game settings")

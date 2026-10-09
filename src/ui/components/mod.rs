@@ -120,3 +120,12 @@ pub fn operator_visual_group<B: Bundle>(
         ],
     )
 }
+
+/// Returns the inline notice shown when a save write fails.
+pub fn save_write_failure_notice(text: String, window: Entity) -> impl Bundle + use<> {
+    (
+        Text::new(text),
+        theme::typography::text(theme::fonts::SMALL, window),
+        TextColor(theme::colors::ERROR),
+    )
+}

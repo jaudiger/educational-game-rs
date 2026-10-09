@@ -2,53 +2,36 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_persistent::prelude::Persistent;
 
-use crate::data::content::{ComparisonDifficulty, QuestionDefinition};
+use crate::data::content::{LocalizedExplanation, QuestionDefinition};
 use crate::data::{
-    AnswerResult, ExplanationVisual, GameSettings, Language, LastAnswer, LessonSession,
-    QuestionContainer,
+    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, QuestionContainer,
+    SaveWriteAction, SaveWriteStatus,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
 use crate::ui::animation::AnimateScale;
-use crate::ui::components::standard_button;
+use crate::ui::components::{save_write_failure_notice, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
 use super::FeedbackRoot;
 use super::visuals::spawn_explanation_visual;
 
-use self::comparison_mult_den::ComparisonMultDenRenderer;
-use self::comparison_same_den::ComparisonSameDenRenderer;
-use self::comparison_same_num::ComparisonSameNumRenderer;
-use self::fraction_addition::FractionAdditionRenderer;
-use self::fraction_identification::FractionIdentificationRenderer;
-use self::fraction_value::FractionValueRenderer;
-use self::fraction_visualization::FractionVisualizationRenderer;
-use self::place_value::PlaceValueRenderer;
-use self::renderer::{ExplanationRenderer, PlainRenderer};
+use self::renderer::{ComparisonMath, spawn_comparison_math, spawn_explanation_text};
 
-mod comparison_mult_den;
-mod comparison_same_den;
-mod comparison_same_num;
-mod fraction_addition;
-mod fraction_identification;
-mod fraction_value;
-mod fraction_visualization;
-mod place_value;
 mod renderer;
 
-/// A resolved feedback explanation: a text renderer plus an optional visual.
-/// `Hidden` is returned when the setting is off or the question has neither
-/// text nor visual to show.
 enum FeedbackExplanation {
     Hidden,
     Visible {
-        renderer: Box<dyn ExplanationRenderer>,
+        text: LocalizedExplanation,
+        comparison: Option<ComparisonMath>,
         visual: Option<ExplanationVisual>,
     },
 }
 
 /// Spawns feedback UI after `record_answer` has updated the session and save data.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn setup_feedback_ui(
     mut commands: Commands,
     container: Single<Entity, With<QuestionContainer>>,
@@ -57,104 +40,54 @@ pub(super) fn setup_feedback_ui(
     settings: Res<Persistent<GameSettings>>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
+    write_status: Res<SaveWriteStatus>,
 ) {
     let window = *primary_window;
     let is_correct = matches!(**last_answer, AnswerResult::Correct);
     let is_last = session.current_index + 1 >= session.questions.len();
+    let save_failed = write_status.failed(SaveWriteAction::ClassAnswer);
     let explanation = session.current().map_or(FeedbackExplanation::Hidden, |q| {
-        build_feedback_explanation(settings.show_explanations, &q.definition, i18n.language)
+        build_feedback_explanation(settings.show_explanations, &q.definition)
     });
 
     commands.entity(*container).with_children(|parent| {
-        spawn_feedback_content(parent, &i18n, is_correct, is_last, &explanation, window);
+        spawn_feedback_content(
+            parent,
+            &i18n,
+            is_correct,
+            is_last,
+            save_failed,
+            &explanation,
+            window,
+        );
     });
 }
 
-/// Picks the right renderer for the question and pairs it with the optional
-/// decorative visual pulled from the definition.
 fn build_feedback_explanation(
     show_explanation: bool,
     definition: &QuestionDefinition,
-    language: Language,
 ) -> FeedbackExplanation {
+    let text = localized_explanation(definition);
+    for issue in text.validation_issues() {
+        bevy::log::warn!("Invalid localized explanation: {issue}");
+    }
     if !show_explanation {
         return FeedbackExplanation::Hidden;
     }
     FeedbackExplanation::Visible {
-        renderer: build_renderer(definition, language),
+        text,
+        comparison: comparison_math(definition),
         visual: explanation_visual(definition),
     }
 }
 
-/// Selects the colour-coded renderer when the question type supports one,
-/// falling back to a plain-text renderer otherwise. This is the single
-/// dispatch point: adding a new renderer means adding one arm here.
-fn build_renderer(
-    definition: &QuestionDefinition,
-    language: Language,
-) -> Box<dyn ExplanationRenderer> {
-    if let Some(renderer) = build_colored_renderer(definition) {
-        return renderer;
-    }
-    Box::new(PlainRenderer::new(plain_explanation(definition, language)))
-}
-
-fn build_colored_renderer(definition: &QuestionDefinition) -> Option<Box<dyn ExplanationRenderer>> {
+fn localized_explanation(definition: &QuestionDefinition) -> LocalizedExplanation {
     match definition {
-        QuestionDefinition::FractionIdentification(d) => Some(Box::new(
-            FractionIdentificationRenderer::new(d.numerator, d.denominator),
-        )),
-        QuestionDefinition::FractionVisualization(d) => Some(Box::new(
-            FractionVisualizationRenderer::new(d.numerator, d.denominator),
-        )),
-        QuestionDefinition::FractionComparison(d) => Some(match d.difficulty {
-            ComparisonDifficulty::SameDenominator => Box::new(ComparisonSameDenRenderer::new(
-                d.fraction_a.0,
-                d.fraction_b.0,
-                d.fraction_a.1,
-            )) as Box<dyn ExplanationRenderer>,
-            ComparisonDifficulty::MultipleDenominator => Box::new(ComparisonMultDenRenderer::new(
-                d.fraction_a.0,
-                d.fraction_a.1,
-                d.fraction_b.0,
-                d.fraction_b.1,
-            )),
-            ComparisonDifficulty::SameNumerator => {
-                Box::new(ComparisonSameNumRenderer::new(d.fraction_a.0))
-            }
-        }),
-        QuestionDefinition::Mcq(d) => match d.explanation_visual.as_ref()? {
-            ExplanationVisual::FractionAddition { a, b, c } => {
-                Some(Box::new(FractionAdditionRenderer::new(*a, *b, *c)))
-            }
-            ExplanationVisual::WholeFractions { count, denominator } => Some(Box::new(
-                FractionValueRenderer::new(count * denominator, *denominator, *count),
-            )),
-            ExplanationVisual::PlaceValueTable { number, multiplier } => {
-                Some(Box::new(PlaceValueRenderer::new(*number, *multiplier)))
-            }
-            _ => None,
-        },
-        QuestionDefinition::NumericInput(d) => match d.explanation_visual.as_ref()? {
-            ExplanationVisual::PlaceValueTable { number, multiplier } => {
-                Some(Box::new(PlaceValueRenderer::new(*number, *multiplier)))
-            }
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-/// Plain-text fallback pulled from the question's localized explanation
-/// string. Templates are resolved before the session is built, so reaching
-/// a template here is a bug.
-fn plain_explanation(definition: &QuestionDefinition, language: Language) -> String {
-    match definition {
-        QuestionDefinition::Mcq(d) => d.explanation.get(language).to_owned(),
-        QuestionDefinition::FractionVisualization(d) => d.explanation.get(language).to_owned(),
-        QuestionDefinition::FractionComparison(d) => d.explanation.get(language).to_owned(),
-        QuestionDefinition::FractionIdentification(d) => d.explanation.get(language).to_owned(),
-        QuestionDefinition::NumericInput(d) => d.explanation.get(language).to_owned(),
+        QuestionDefinition::Mcq(d) => d.explanation.clone(),
+        QuestionDefinition::FractionVisualization(d) => d.explanation.clone(),
+        QuestionDefinition::FractionComparison(d) => d.explanation.clone(),
+        QuestionDefinition::FractionIdentification(d) => d.explanation.clone(),
+        QuestionDefinition::NumericInput(d) => d.explanation.clone(),
         QuestionDefinition::McqTemplate(_)
         | QuestionDefinition::FractionVisualizationTemplate(_)
         | QuestionDefinition::FractionComparisonTemplate(_)
@@ -162,6 +95,13 @@ fn plain_explanation(definition: &QuestionDefinition, language: Language) -> Str
         | QuestionDefinition::NumericInputTemplate(_) => {
             unreachable!("templates must be resolved before building the session")
         }
+    }
+}
+
+const fn comparison_math(definition: &QuestionDefinition) -> Option<ComparisonMath> {
+    match definition {
+        QuestionDefinition::FractionComparison(question) => Some(ComparisonMath::new(question)),
+        _ => None,
     }
 }
 
@@ -180,6 +120,7 @@ fn spawn_feedback_content(
     i18n: &I18n,
     is_correct: bool,
     is_last: bool,
+    save_failed: bool,
     explanation: &FeedbackExplanation,
     window: Entity,
 ) {
@@ -197,6 +138,12 @@ fn spawn_feedback_content(
         ))
         .with_children(|feedback| {
             spawn_result_text(feedback, i18n, is_correct, window);
+            if save_failed {
+                feedback.spawn(save_write_failure_notice(
+                    i18n.t(&TranslationKey::SaveWriteFailed).into_owned(),
+                    window,
+                ));
+            }
             spawn_explanation_section(feedback, i18n, explanation, window);
             spawn_next_button(feedback, i18n, is_last, window);
         });
@@ -208,7 +155,12 @@ fn spawn_explanation_section(
     explanation: &FeedbackExplanation,
     window: Entity,
 ) {
-    let FeedbackExplanation::Visible { renderer, visual } = explanation else {
+    let FeedbackExplanation::Visible {
+        text,
+        comparison,
+        visual,
+    } = explanation
+    else {
         return;
     };
 
@@ -222,7 +174,10 @@ fn spawn_explanation_section(
             ..default()
         })
         .with_children(|section| {
-            renderer.spawn(section, i18n, window);
+            spawn_explanation_text(section, text, i18n.language, theme::fonts::HEADING, window);
+            if let Some(comparison) = comparison {
+                spawn_comparison_math(section, comparison, theme::fonts::HEADING, window);
+            }
             if let Some(visual) = visual {
                 spawn_explanation_visual(section, visual, window, i18n.language);
             }
