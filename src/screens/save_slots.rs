@@ -4,17 +4,17 @@ use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextCursorStyle};
 use bevy::window::PrimaryWindow;
-use bevy_persistent::prelude::*;
 
 use crate::data::{
-    ClassSave, GameMode, GameSettings, IndividualSave, PersistenceMut, PlayerContext,
-    PlayerSession, SaveData,
+    ClassSave, GameMode, GameSettings, IndividualSave, PersistenceAction, PersistenceMut,
+    PersistenceStatus, PlayerContext, PlayerSession, SaveData,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, InLessonFlow, StateScopedResourceExt};
 use crate::ui::components::{
     ConfirmationDialogAction, ConfirmationDialogActionEvent, action_button_scene, button_base,
-    card_node, icon_button, screen_root, spawn_confirmation_modal, standard_button,
+    card_node, icon_button, persistence_notice, screen_root, spawn_confirmation_modal,
+    standard_button,
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -79,23 +79,33 @@ struct SaveSlotsRoot;
 
 fn setup_save_slots(
     mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
-    save_data: Res<Persistent<SaveData>>,
+    settings: Res<GameSettings>,
+    save_data: Res<SaveData>,
+    status: Res<PersistenceStatus>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
     let window = *primary_window;
     commands.insert_resource(SaveSlotsState::default());
-    spawn_save_slots_ui(&mut commands, settings.mode, &save_data, &i18n, window);
+    spawn_save_slots_ui(
+        &mut commands,
+        settings.mode,
+        &save_data,
+        *status,
+        &i18n,
+        window,
+    );
 }
 
 fn spawn_save_slots_ui(
     commands: &mut Commands,
     mode: GameMode,
     save_data: &SaveData,
+    status: PersistenceStatus,
     i18n: &I18n,
     window: Entity,
 ) {
+    let notice = persistence_notice(PersistenceAction::SaveSlot, status, i18n, window);
     let title = match mode {
         GameMode::Individual => i18n.t(&TranslationKey::SelectSave),
         GameMode::Group => i18n.t(&TranslationKey::SelectClass),
@@ -154,6 +164,8 @@ fn spawn_save_slots_ui(
                         );
                     }
                 });
+
+            parent.spawn(notice);
 
             // Back button
             parent.spawn((
@@ -514,13 +526,10 @@ fn handle_confirm_delete(
     let index = target.0;
     let mode = persistence.settings.mode;
 
-    persistence
-        .save_data
-        .update(|data| match mode {
-            GameMode::Individual => data.individual_slots[index] = None,
-            GameMode::Group => data.class_slots[index] = None,
-        })
-        .expect("failed to update save data");
+    persistence.update_save_data(PersistenceAction::SaveSlot, |data| match mode {
+        GameMode::Individual => data.individual_slots[index] = None,
+        GameMode::Group => data.class_slots[index] = None,
+    });
 
     for entity in &root_query {
         commands.entity(entity).despawn();
@@ -529,6 +538,7 @@ fn handle_confirm_delete(
         &mut commands,
         mode,
         &persistence.save_data,
+        *persistence.status,
         &i18n,
         *primary_window,
     );
@@ -573,24 +583,21 @@ fn handle_create_confirm(
     }
 
     let mode = persistence.settings.mode;
-    persistence
-        .save_data
-        .update(|data| match mode {
-            GameMode::Individual => {
-                data.individual_slots[slot_index] = Some(IndividualSave {
-                    name: name.clone(),
-                    progress: HashMap::new(),
-                });
-            }
-            GameMode::Group => {
-                data.class_slots[slot_index] = Some(ClassSave {
-                    name: name.clone(),
-                    students: Vec::new(),
-                    lesson_configs: HashMap::new(),
-                });
-            }
-        })
-        .expect("failed to update save data");
+    persistence.update_save_data(PersistenceAction::SaveSlot, |data| match mode {
+        GameMode::Individual => {
+            data.individual_slots[slot_index] = Some(IndividualSave {
+                name: name.clone(),
+                progress: HashMap::new(),
+            });
+        }
+        GameMode::Group => {
+            data.class_slots[slot_index] = Some(ClassSave {
+                name: name.clone(),
+                students: Vec::new(),
+                lesson_configs: HashMap::new(),
+            });
+        }
+    });
 
     commands.insert_resource(PlayerSession { slot_index });
 

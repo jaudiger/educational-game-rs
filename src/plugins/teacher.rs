@@ -5,7 +5,6 @@ use bevy::window::{
     EnabledButtons, Monitor, PrimaryMonitor, PrimaryWindow, WindowPosition, WindowRef,
     WindowResolution,
 };
-use bevy_persistent::prelude::*;
 
 use crate::data::content::QuestionType;
 use crate::data::{GameMode, GameSettings, PlayerContext};
@@ -170,7 +169,7 @@ pub fn teacher_stats_view_active(query: Query<&TeacherWindowState, With<TeacherW
 
 fn spawn_teacher_window_if_class_mode(
     mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     i18n: Res<I18n>,
     existing: Query<(), With<TeacherWindow>>,
     primary_window: Query<&Window, With<PrimaryWindow>>,

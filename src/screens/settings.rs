@@ -5,15 +5,14 @@ use bevy::ui_widgets::{
     SliderValue, ValueChange, checkbox_self_update, observe, slider_self_update,
 };
 use bevy::window::PrimaryWindow;
-use bevy_persistent::prelude::*;
 
-use crate::data::GameSettings;
 use crate::data::progress::{ExplorationTheme, GameMode, Language};
+use crate::data::{GameSettings, GameSettingsMut, PersistenceAction, PersistenceStatus};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
 use crate::ui::components::{
-    checkbox_scene, radio_button_muted_scene, radio_button_scene, radio_group, screen_root,
-    slider_scene, standard_button,
+    checkbox_scene, persistence_notice, radio_button_muted_scene, radio_button_scene, radio_group,
+    screen_root, slider_scene, standard_button,
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -63,19 +62,22 @@ struct ExplorationThemeRadio(ExplorationTheme);
 
 fn setup_settings(
     mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
+    status: Res<PersistenceStatus>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
-    spawn_settings_ui(&mut commands, &settings, &i18n, *primary_window);
+    spawn_settings_ui(&mut commands, &settings, *status, &i18n, *primary_window);
 }
 
 fn spawn_settings_ui(
     commands: &mut Commands,
     settings: &GameSettings,
+    status: PersistenceStatus,
     i18n: &I18n,
     window: Entity,
 ) {
+    let notice = persistence_notice(PersistenceAction::GameSettings, status, i18n, window);
     let title = i18n.t(&TranslationKey::Settings);
     let back = i18n.t(&TranslationKey::Back);
 
@@ -118,6 +120,7 @@ fn spawn_settings_ui(
                     volume_section(VolumeChannel::Sfx, settings.sfx_volume, i18n, window),
                 ],
             ),
+            notice,
             // Back button
             (
                 standard_button(
@@ -178,16 +181,14 @@ fn mode_section(current_mode: GameMode, i18n: &I18n, window: Entity) -> impl Bun
 fn handle_mode_radio_change(
     event: On<ValueChange<Entity>>,
     radio_query: Query<(Entity, &ModeRadio)>,
-    mut settings: ResMut<Persistent<GameSettings>>,
+    mut settings: GameSettingsMut<'_>,
     mut commands: Commands,
 ) {
     let Ok((_, mode_radio)) = radio_query.get(event.value) else {
         return;
     };
     let mode = mode_radio.0;
-    settings
-        .update(|s| s.mode = mode)
-        .expect("failed to update game settings");
+    settings.update(|s| s.mode = mode);
 
     // Update Checked states on all radio buttons
     for (entity, radio) in radio_query.iter().collect::<Vec<_>>() {
@@ -249,7 +250,7 @@ fn language_section(
 fn handle_language_radio_change(
     event: On<ValueChange<Entity>>,
     radio_query: Query<(Entity, &LanguageRadio)>,
-    mut settings: ResMut<Persistent<GameSettings>>,
+    mut settings: GameSettingsMut<'_>,
     mut commands: Commands,
 ) {
     let Ok((_, lang_radio)) = radio_query.get(event.value) else {
@@ -257,14 +258,12 @@ fn handle_language_radio_change(
     };
     let language = lang_radio.0;
 
-    if language == settings.language {
+    if language == settings.settings.language {
         return;
     }
 
     let lang = language;
-    settings
-        .update(|s| s.language = lang)
-        .expect("failed to update game settings");
+    settings.update(|s| s.language = lang);
 
     for (entity, radio) in radio_query.iter().collect::<Vec<_>>() {
         if radio.0 == language {
@@ -281,7 +280,8 @@ fn handle_language_radio_change(
 /// `sync_i18n` (in [`SettingsPlugin`]) propagates the language change.
 fn rebuild_settings_on_language_change(
     mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
+    status: Res<PersistenceStatus>,
     i18n: Res<I18n>,
     root_query: Query<Entity, With<SettingsRoot>>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
@@ -289,7 +289,7 @@ fn rebuild_settings_on_language_change(
     for entity in &root_query {
         commands.entity(entity).despawn();
     }
-    spawn_settings_ui(&mut commands, &settings, &i18n, *primary_window);
+    spawn_settings_ui(&mut commands, &settings, *status, &i18n, *primary_window);
 }
 
 fn exploration_theme_section(
@@ -360,7 +360,7 @@ fn exploration_theme_section(
 fn handle_theme_radio_change(
     event: On<ValueChange<Entity>>,
     radio_query: Query<(Entity, &ExplorationThemeRadio)>,
-    mut settings: ResMut<Persistent<GameSettings>>,
+    mut settings: GameSettingsMut<'_>,
     mut commands: Commands,
 ) {
     let Ok((_, theme_radio)) = radio_query.get(event.value) else {
@@ -373,9 +373,7 @@ fn handle_theme_radio_change(
         return;
     }
 
-    settings
-        .update(|s| s.exploration_theme = exploration_theme)
-        .expect("failed to update game settings");
+    settings.update(|s| s.exploration_theme = exploration_theme);
 
     // Update Checked states on all radio buttons
     for (entity, radio) in radio_query.iter().collect::<Vec<_>>() {
@@ -437,19 +435,17 @@ fn bool_setting_section(
 fn handle_bool_setting_change(
     event: On<ValueChange<bool>>,
     field_query: Query<&BoolSettingField>,
-    mut settings: ResMut<Persistent<GameSettings>>,
+    mut settings: GameSettingsMut<'_>,
 ) {
     let val = event.value;
     let Ok(field) = field_query.get(event.event_target()) else {
         return;
     };
     let f = *field;
-    settings
-        .update(|s| match f {
-            BoolSettingField::ShowExplanations => s.show_explanations = val,
-            BoolSettingField::GamepadNavigation => s.gamepad_navigation = val,
-        })
-        .expect("failed to update game settings");
+    settings.update(|s| match f {
+        BoolSettingField::ShowExplanations => s.show_explanations = val,
+        BoolSettingField::GamepadNavigation => s.gamepad_navigation = val,
+    });
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -503,7 +499,7 @@ fn handle_volume_slider_change(
     event: On<ValueChange<f32>>,
     channel_query: Query<&VolumeChannel>,
     pressed_query: Query<(), With<Pressed>>,
-    mut settings: ResMut<Persistent<GameSettings>>,
+    mut settings: GameSettingsMut<'_>,
 ) {
     let volume = event.value;
     let Ok(channel) = channel_query.get(event.event_target()) else {
@@ -511,22 +507,21 @@ fn handle_volume_slider_change(
     };
     let ch = *channel;
     {
-        let settings = settings.get_mut();
         match ch {
-            VolumeChannel::Music => settings.music_volume = volume,
-            VolumeChannel::Sfx => settings.sfx_volume = volume,
+            VolumeChannel::Music => settings.settings.music_volume = volume,
+            VolumeChannel::Sfx => settings.settings.sfx_volume = volume,
         }
     }
     if event.is_final && !pressed_query.contains(event.event_target()) {
-        settings.persist().expect("failed to update game settings");
+        settings.persist();
     }
 }
 
 fn persist_volume_on_pointer_release(
     _event: On<Pointer<Release>>,
-    settings: ResMut<Persistent<GameSettings>>,
+    mut settings: GameSettingsMut<'_>,
 ) {
-    settings.persist().expect("failed to update game settings");
+    settings.persist();
 }
 
 /// Updates the volume percentage label to match the current slider value.

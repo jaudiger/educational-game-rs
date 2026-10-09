@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use bevy::audio::{PlaybackMode, Volume};
 use bevy::prelude::*;
-use bevy_persistent::prelude::*;
 
 use crate::data::{AnswerResult, GameSettings};
 use crate::questions::AnswerSubmitted;
@@ -129,7 +128,7 @@ impl Plugin for GameAudioPlugin {
         // Sync music volume when settings change.
         app.add_systems(
             Update,
-            sync_music_volume.run_if(resource_changed::<Persistent<GameSettings>>),
+            sync_music_volume.run_if(resource_changed::<GameSettings>),
         );
 
         // Button click detection.
@@ -165,7 +164,7 @@ fn preload_audio_assets(mut commands: Commands, asset_server: Res<AssetServer>) 
 fn on_state_enter_music(
     mut commands: Commands,
     state: Res<State<AppState>>,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     audio_assets: Option<Res<AudioAssets>>,
     current_music: Option<Res<CurrentMusic>>,
     music_query: Query<Entity, With<BackgroundMusic>>,
@@ -269,7 +268,7 @@ fn detect_button_clicks(
 fn on_answer_submitted(
     event: On<AnswerSubmitted>,
     mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     audio_assets: Res<AudioAssets>,
 ) {
     let kind = match event.result {
@@ -296,7 +295,7 @@ fn on_answer_submitted(
 fn on_play_click_sound(
     _event: On<PlayClickSound>,
     mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     audio_assets: Res<AudioAssets>,
 ) {
     let Some(handle) = audio_assets.sfx.get(&SfxKind::Click) else {
@@ -317,7 +316,7 @@ fn on_play_click_sound(
 /// Keeps the volume of currently playing background music in sync with
 /// `GameSettings::music_volume`, including tracks that are still fading in.
 fn sync_music_volume(
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     current_music: Option<Res<CurrentMusic>>,
     mut query: Query<(&mut AudioSink, Option<&mut FadeIn>), With<BackgroundMusic>>,
 ) {

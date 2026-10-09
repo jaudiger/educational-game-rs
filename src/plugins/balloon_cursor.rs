@@ -3,7 +3,6 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 use bevy::window::{CursorOptions, PrimaryWindow};
-use bevy_persistent::prelude::Persistent;
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
@@ -141,7 +140,7 @@ fn setup_balloon_cursor(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     mut cursor_opts: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     // Only activate for the Sky theme; other themes will have their own plugin.

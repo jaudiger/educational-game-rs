@@ -9,7 +9,6 @@ use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
-use bevy_persistent::prelude::Persistent;
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
@@ -284,7 +283,7 @@ fn cloud_definitions() -> Vec<CloudShape> {
 fn setup_sky_background(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     window: Single<&Window, With<PrimaryWindow>>,
 ) {
     if settings.exploration_theme != ExplorationTheme::Sky {

@@ -2,12 +2,11 @@ use std::collections::HashMap;
 
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
-use bevy_persistent::prelude::Persistent;
 
 use crate::data::content::QuestionType;
 use crate::data::{
-    ContentLibrary, GameMode, Language, LessonProgress, PlayerContext, PlayerSession, SaveData,
-    SaveWriteAction, SaveWriteStatus, update_save_data,
+    ContentLibrary, GameMode, Language, LessonProgress, PersistenceAction, PersistenceStatus,
+    PlayerContext, PlayerSession, SaveDataMut,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::teacher::{
@@ -83,13 +82,13 @@ fn rebuild_stats_ui(
     ts: TeacherScreenParam<'_, '_>,
     content: Res<ContentLibrary>,
     existing_root: Query<Entity, With<TeacherStatsRoot>>,
-    mut write_status: ResMut<SaveWriteStatus>,
+    mut write_status: ResMut<PersistenceStatus>,
 ) {
     let Ok(state) = ts.teacher.state.single() else {
         return;
     };
     if state.is_changed() {
-        write_status.clear();
+        write_status.clear_save_data();
     }
     if !state.is_changed() && !ts.ctx.save_data.is_changed() && !write_status.is_changed() {
         return;
@@ -146,7 +145,7 @@ fn rebuild_stats_ui(
             stats_data,
             global_total,
             save_failure_notice: write_status
-                .failed(SaveWriteAction::TeacherStatsReset)
+                .failed(PersistenceAction::TeacherStatsReset)
                 .then(|| ts.i18n.t(&TranslationKey::SaveWriteFailed).into_owned()),
         },
     );
@@ -669,8 +668,7 @@ fn handle_confirm_reset(
     event: On<ConfirmationDialogActionEvent>,
     target_query: Query<&StatsResetRequest>,
     session: Option<Res<PlayerSession>>,
-    mut save_data: ResMut<Persistent<SaveData>>,
-    mut write_status: ResMut<SaveWriteStatus>,
+    mut persistence: SaveDataMut<'_>,
 ) {
     if event.action != ConfirmationDialogAction::Confirm {
         return;
@@ -684,36 +682,31 @@ fn handle_confirm_reset(
     let slot_index = session.slot_index;
     let target = request.target.clone();
 
-    update_save_data(
-        &mut save_data,
-        &mut write_status,
-        SaveWriteAction::TeacherStatsReset,
-        |data| {
-            let Some(class_save) = data.class_slots[slot_index].as_mut() else {
-                return;
-            };
-            let Some(student) = class_save.students.get_mut(student_index) else {
-                return;
-            };
-            match target {
-                StatsResetTarget::All => {
-                    student.progress.clear();
-                }
-                StatsResetTarget::Lesson(ref lid) => {
-                    student.progress.remove(lid);
-                }
-                StatsResetTarget::Type(ref lid, qt) => {
-                    if let Some(lp) = student.progress.get_mut(lid) {
-                        lp.type_scores.remove(&qt);
-                        // If no types left, remove the lesson entry entirely
-                        if lp.type_scores.is_empty() {
-                            student.progress.remove(lid);
-                        }
+    persistence.update(PersistenceAction::TeacherStatsReset, |data| {
+        let Some(class_save) = data.class_slots[slot_index].as_mut() else {
+            return;
+        };
+        let Some(student) = class_save.students.get_mut(student_index) else {
+            return;
+        };
+        match target {
+            StatsResetTarget::All => {
+                student.progress.clear();
+            }
+            StatsResetTarget::Lesson(ref lid) => {
+                student.progress.remove(lid);
+            }
+            StatsResetTarget::Type(ref lid, qt) => {
+                if let Some(lp) = student.progress.get_mut(lid) {
+                    lp.type_scores.remove(&qt);
+                    // If no types left, remove the lesson entry entirely
+                    if lp.type_scores.is_empty() {
+                        student.progress.remove(lid);
                     }
                 }
             }
-        },
-    );
+        }
+    });
 }
 
 fn handle_return_to_list(

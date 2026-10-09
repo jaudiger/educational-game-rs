@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
-use bevy_persistent::prelude::*;
 
 use crate::data::content::{ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, QuestionType};
-use crate::data::{Language, LessonSessionConfig, PlayerContext, PlayerSession, SaveData};
+use crate::data::{
+    Language, LessonSessionConfig, PersistenceAction, PlayerContext, PlayerSession, SaveDataMut,
+};
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::teacher::{
     TeacherQuestionDraft, TeacherTab, TeacherView, TeacherWindow, TeacherWindowState, tab_header,
@@ -695,7 +696,7 @@ fn update_save_button_state(
 pub(super) fn handle_save_config(
     query: Query<&Interaction, (Changed<Interaction>, With<SaveConfigButton>)>,
     mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
-    mut save_data: ResMut<Persistent<SaveData>>,
+    mut persistence: SaveDataMut<'_>,
     session: Option<Res<PlayerSession>>,
 ) {
     for interaction in &query {
@@ -732,15 +733,13 @@ pub(super) fn handle_save_config(
             )
         };
 
-        save_data
-            .update(|data| {
-                if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
-                    class_save
-                        .lesson_configs
-                        .insert(lesson_id.clone(), config.clone());
-                }
-            })
-            .expect("failed to update save data");
+        persistence.update(PersistenceAction::TeacherLessonConfig, |data| {
+            if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
+                class_save
+                    .lesson_configs
+                    .insert(lesson_id.clone(), config.clone());
+            }
+        });
 
         state.view = TeacherView::Lessons;
     }

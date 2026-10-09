@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use crate::data::{
-    ActiveTheme, ContentLibrary, GameMode, PlayerContext, QuestionContainer, SaveWriteStatus,
+    ActiveTheme, ContentLibrary, GameMode, PersistenceStatus, PlayerContext, QuestionContainer,
     SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
@@ -25,10 +25,10 @@ pub(super) fn setup_lesson_play(
     i18n: Res<I18n>,
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
-    mut write_status: ResMut<SaveWriteStatus>,
+    mut write_status: ResMut<PersistenceStatus>,
 ) {
     let window = *primary_window;
-    write_status.clear();
+    write_status.clear_save_data();
     // Look up teacher config for class mode
     let lesson_config = if ctx.settings.mode == GameMode::Group {
         ctx.session.as_ref().and_then(|slot| {

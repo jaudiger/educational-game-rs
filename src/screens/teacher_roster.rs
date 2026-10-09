@@ -1,8 +1,10 @@
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
-use bevy_persistent::prelude::*;
 
-use crate::data::{ActiveStudent, ClassStudent, GameMode, PlayerSession, SaveData};
+use crate::data::{
+    ActiveStudent, ClassStudent, GameMode, PersistenceAction, PersistenceStatus, PlayerSession,
+    SaveData, SaveDataMut,
+};
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::teacher::{
     TeacherScreenParam, TeacherView, TeacherViewOverlay, TeacherWindow, TeacherWindowParam,
@@ -11,7 +13,7 @@ use crate::plugins::teacher::{
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES, LessonPhase, cleanup_root};
 use crate::ui::components::{
     ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base, icon_button,
-    spawn_confirmation_modal,
+    persistence_notice, spawn_confirmation_modal,
 };
 use crate::ui::text_input::{TextInputState, text_input};
 use crate::ui::theme;
@@ -72,6 +74,7 @@ struct AddStudentButton;
 fn rebuild_roster_ui(
     mut commands: Commands,
     ts: TeacherScreenParam<'_, '_>,
+    status: Res<PersistenceStatus>,
     app_state: Res<State<AppState>>,
     existing_root: Query<Entity, With<TeacherRosterRoot>>,
 ) {
@@ -120,6 +123,8 @@ fn rebuild_roster_ui(
     let no_students_text = ts.i18n.t(&TranslationKey::NoStudentsYet).into_owned();
     let name_label = ts.i18n.t(&TranslationKey::NameLabel).into_owned();
     let add_label = ts.i18n.t(&TranslationKey::Add).into_owned();
+    let write_notice =
+        persistence_notice(PersistenceAction::TeacherRoster, *status, &ts.i18n, window);
 
     commands.spawn((
         Node {
@@ -136,6 +141,7 @@ fn rebuild_roster_ui(
         TeacherRosterRoot,
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn(tab_header_bundle);
+            parent.spawn(write_notice);
 
             parent.spawn((
                 Text::new(title_text),
@@ -288,7 +294,7 @@ fn handle_add_student(
     query: Query<&Interaction, (Changed<Interaction>, With<AddStudentButton>)>,
     keyboard: Res<ButtonInput<KeyCode>>,
     session: Option<Res<PlayerSession>>,
-    mut save_data: ResMut<Persistent<SaveData>>,
+    mut persistence: SaveDataMut<'_>,
     input: Query<&TextInputState>,
 ) {
     let Some(ref session) = session else { return };
@@ -310,22 +316,20 @@ fn handle_add_student(
         return;
     }
 
-    save_data
-        .update(|data| {
-            if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
-                class_save.students.push(ClassStudent {
-                    name: name.clone(),
-                    ..Default::default()
-                });
-            }
-        })
-        .expect("failed to update save data");
+    persistence.update(PersistenceAction::TeacherRoster, |data| {
+        if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
+            class_save.students.push(ClassStudent {
+                name: name.clone(),
+                ..Default::default()
+            });
+        }
+    });
 }
 
 fn handle_remove_student_click(
     query: Query<(&Interaction, &RemoveStudentButton), Changed<Interaction>>,
     session: Option<Res<PlayerSession>>,
-    save_data: Res<Persistent<SaveData>>,
+    save_data: Res<SaveData>,
     mut commands: Commands,
     existing_popover: Query<Entity, With<StudentRemovePopover>>,
     i18n: Res<I18n>,
@@ -379,7 +383,7 @@ fn handle_confirm_remove_student(
     target_query: Query<&RemoveStudentTarget>,
     session: Option<Res<PlayerSession>>,
     active_student: Option<Res<ActiveStudent>>,
-    mut save_data: ResMut<Persistent<SaveData>>,
+    mut persistence: SaveDataMut<'_>,
     mut commands: Commands,
 ) {
     if event.action != ConfirmationDialogAction::Confirm {
@@ -391,7 +395,7 @@ fn handle_confirm_remove_student(
     };
     let student_index = target.0;
     let student_name = target.1.clone();
-    let Some(class_save) = save_data.class_slots[session.slot_index].as_ref() else {
+    let Some(class_save) = persistence.save_data.class_slots[session.slot_index].as_ref() else {
         return;
     };
     if class_save
@@ -402,13 +406,11 @@ fn handle_confirm_remove_student(
         return;
     }
 
-    save_data
-        .update(|data| {
-            if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
-                class_save.students.remove(student_index);
-            }
-        })
-        .expect("failed to update save data");
+    persistence.update(PersistenceAction::TeacherRoster, |data| {
+        if let Some(ref mut class_save) = data.class_slots[session.slot_index] {
+            class_save.students.remove(student_index);
+        }
+    });
 
     match active_student.as_deref().map(|student| student.0) {
         Some(index) if index == student_index => commands.remove_resource::<ActiveStudent>(),

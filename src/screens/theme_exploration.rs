@@ -2,16 +2,18 @@ use bevy::color::Luminance;
 use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
     ActiveStudent, ActiveTheme, ContentLibrary, ExplorationTheme, GameSettings, LessonProgress,
-    PlayerContext, PlayerSession, SaveData, SelectedLesson, get_current_progress,
+    PersistenceAction, PersistenceStatus, PlayerContext, PlayerSession, SaveData, SelectedLesson,
+    get_current_progress,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, ExplorationView, InLessonFlow, StateScopedResourceExt};
 use crate::ui::animation::{AnimatedButton, FloatingCard};
-use crate::ui::components::{HoverTooltip, button_base, screen_root, standard_button};
+use crate::ui::components::{
+    HoverTooltip, button_base, persistence_notice, screen_root, standard_button,
+};
 use crate::ui::theme;
 
 /// Theme exploration screen showing available themes and lessons.
@@ -32,7 +34,7 @@ impl Plugin for ThemeExplorationScreenPlugin {
                 update_exploration_progress.run_if(
                     in_state(AppState::ThemeExploration).and_then(
                         resource_changed_or_removed::<ActiveStudent>
-                            .or_else(resource_changed::<Persistent<SaveData>>),
+                            .or_else(resource_changed::<SaveData>),
                     ),
                 ),
             )
@@ -171,6 +173,7 @@ fn setup_themes(
     mut commands: Commands,
     content: Res<ContentLibrary>,
     i18n: Res<I18n>,
+    status: Res<PersistenceStatus>,
     active_theme: Option<Res<ActiveTheme>>,
     mut next_exploration_view: ResMut<NextState<ExplorationView>>,
     ctx: PlayerContext<'_>,
@@ -189,6 +192,7 @@ fn setup_themes(
     }
 
     let window = *primary_window;
+    let write_notice = persistence_notice(PersistenceAction::SaveSlot, *status, &i18n, window);
 
     // Pre-compute all strings before the SpawnWith closure.
     let title = i18n.t(&TranslationKey::Themes).into_owned();
@@ -239,6 +243,8 @@ fn setup_themes(
                     offset: Vec2::new(0.0, 2.0),
                 });
             }
+
+            parent.spawn(write_notice);
 
             // Theme buttons grid
             parent
@@ -555,11 +561,13 @@ struct LessonButtonData {
     best_percent_text: Option<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn setup_theme_lessons(
     mut commands: Commands,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
     i18n: Res<I18n>,
+    status: Res<PersistenceStatus>,
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
     existing_roots: Query<Entity, With<ExplorationScreenRoot>>,
@@ -573,6 +581,7 @@ fn setup_theme_lessons(
     }
 
     let window = *primary_window;
+    let write_notice = persistence_notice(PersistenceAction::SaveSlot, *status, &i18n, window);
 
     // Pre-compute all strings before the SpawnWith closure.
     let theme_title = i18n.t(&theme_data.title_key).into_owned();
@@ -626,6 +635,8 @@ fn setup_theme_lessons(
                     offset: Vec2::new(0.0, 2.0),
                 });
             }
+
+            parent.spawn(write_notice);
 
             // Lesson buttons
             parent

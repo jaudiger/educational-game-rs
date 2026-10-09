@@ -8,7 +8,6 @@ use bevy::input_focus::{InputFocus, InputFocusVisible};
 use bevy::math::{CompassOctant, Dir2};
 use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigator;
-use bevy_persistent::prelude::*;
 
 use crate::data::GameSettings;
 
@@ -42,7 +41,7 @@ impl Plugin for FocusNavigationPlugin {
     }
 }
 
-fn gamepad_navigation_enabled(settings: Res<Persistent<GameSettings>>) -> bool {
+fn gamepad_navigation_enabled(settings: Res<GameSettings>) -> bool {
     settings.gamepad_navigation
 }
 
@@ -163,7 +162,7 @@ fn hide_focus_on_mouse_click(
 fn update_focus_ring(
     focus: Res<InputFocus>,
     focus_visible: Res<InputFocusVisible>,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     mut outlines: Query<(Entity, &mut Outline)>,
 ) {
     let show_for = if settings.gamepad_navigation && focus_visible.0 {

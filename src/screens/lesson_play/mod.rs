@@ -1,9 +1,8 @@
 use bevy::prelude::*;
-use bevy_persistent::prelude::Persistent;
 
 use crate::data::{
     ActiveStudent, GameMode, GameSettings, LastAnswer, LessonSession, PersistenceMut,
-    PlayerSession, SaveWriteStatus, SelectedLesson,
+    PlayerSession, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
@@ -86,7 +85,6 @@ fn record_answer(
     active_student: Option<Res<ActiveStudent>>,
     player_session: Option<Res<PlayerSession>>,
     selected_lesson: Option<Res<SelectedLesson>>,
-    mut write_status: ResMut<SaveWriteStatus>,
 ) {
     session::update_session_score(&mut session, &last_answer);
 
@@ -97,18 +95,14 @@ fn record_answer(
             active_student.as_deref(),
             player_session.as_deref(),
             selected_lesson.as_deref(),
-            &mut persistence.save_data,
-            &mut write_status,
+            &mut persistence,
         );
     }
 }
 
 /// Clear `ActiveStudent` at the start of each question in class mode,
 /// so the teacher must re-select a student before the next answer.
-fn clear_active_student_for_question(
-    mut commands: Commands,
-    settings: Res<Persistent<GameSettings>>,
-) {
+fn clear_active_student_for_question(mut commands: Commands, settings: Res<GameSettings>) {
     if settings.mode == GameMode::Group {
         commands.remove_resource::<ActiveStudent>();
     }

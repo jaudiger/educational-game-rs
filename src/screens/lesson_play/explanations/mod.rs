@@ -1,11 +1,10 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use bevy_persistent::prelude::Persistent;
 
 use crate::data::content::{LocalizedExplanation, QuestionDefinition};
 use crate::data::{
-    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, QuestionContainer,
-    SaveWriteAction, SaveWriteStatus,
+    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, PersistenceAction,
+    PersistenceStatus, QuestionContainer,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
@@ -37,15 +36,15 @@ pub(super) fn setup_feedback_ui(
     container: Single<Entity, With<QuestionContainer>>,
     last_answer: Res<LastAnswer>,
     session: Res<LessonSession>,
-    settings: Res<Persistent<GameSettings>>,
+    settings: Res<GameSettings>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
-    write_status: Res<SaveWriteStatus>,
+    write_status: Res<PersistenceStatus>,
 ) {
     let window = *primary_window;
     let is_correct = matches!(**last_answer, AnswerResult::Correct);
     let is_last = session.current_index + 1 >= session.questions.len();
-    let save_failed = write_status.failed(SaveWriteAction::ClassAnswer);
+    let save_failed = write_status.failed(PersistenceAction::ClassAnswer);
     let explanation = session.current().map_or(FeedbackExplanation::Hidden, |q| {
         build_feedback_explanation(settings.show_explanations, &q.definition)
     });

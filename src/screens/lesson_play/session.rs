@@ -1,14 +1,12 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
-use bevy_persistent::prelude::Persistent;
 use rand::seq::SliceRandom;
 
 use crate::data::content::QuestionDefinition;
 use crate::data::{
     ActiveStudent, ActiveTheme, AnswerResult, ContentLibrary, LessonSession, LessonSessionConfig,
-    PlayerSession, ResolvedQuestion, SaveData, SaveWriteAction, SaveWriteStatus, SelectedLesson,
-    update_save_data,
+    PersistenceAction, PersistenceMut, PlayerSession, ResolvedQuestion, SelectedLesson,
 };
 
 /// Maximum re-roll attempts when deduplicating resolved template questions.
@@ -162,10 +160,9 @@ pub(super) fn record_class_answer(
     active_student: Option<&ActiveStudent>,
     player_session: Option<&PlayerSession>,
     selected_lesson: Option<&SelectedLesson>,
-    save_data: &mut Persistent<SaveData>,
-    write_status: &mut SaveWriteStatus,
+    persistence: &mut PersistenceMut<'_>,
 ) {
-    write_status.clear();
+    persistence.status.clear_save_data();
     let Some(student) = active_student else {
         return;
     };
@@ -188,23 +185,18 @@ pub(super) fn record_class_answer(
     let slot_index = player_session.slot_index;
     let student_index = student.0;
 
-    update_save_data(
-        save_data,
-        write_status,
-        SaveWriteAction::ClassAnswer,
-        |data| {
-            let Some(class_save) = data.class_slots[slot_index].as_mut() else {
-                return;
-            };
-            let Some(student_data) = class_save.students.get_mut(student_index) else {
-                return;
-            };
-            let lesson_progress = student_data.progress.entry(lesson_id.clone()).or_default();
-            let type_score = lesson_progress.type_scores.entry(qt).or_default();
-            type_score.total += 1;
-            if is_correct {
-                type_score.correct += 1;
-            }
-        },
-    );
+    persistence.update_save_data(PersistenceAction::ClassAnswer, |data| {
+        let Some(class_save) = data.class_slots[slot_index].as_mut() else {
+            return;
+        };
+        let Some(student_data) = class_save.students.get_mut(student_index) else {
+            return;
+        };
+        let lesson_progress = student_data.progress.entry(lesson_id.clone()).or_default();
+        let type_score = lesson_progress.type_scores.entry(qt).or_default();
+        type_score.total += 1;
+        if is_correct {
+            type_score.correct += 1;
+        }
+    });
 }

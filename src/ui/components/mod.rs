@@ -9,6 +9,9 @@ pub use overlays::*;
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 
+use crate::data::{PersistenceAction, PersistenceStatus};
+use crate::i18n::{I18n, TranslationKey};
+
 use super::theme;
 
 /// Marks the inner check mark of a styled checkbox.
@@ -119,6 +122,46 @@ pub fn operator_visual_group<B: Bundle>(
             visual,
         ],
     )
+}
+
+#[derive(Component, Reflect)]
+pub struct PersistenceNotice(PersistenceAction);
+
+pub fn persistence_notice(
+    action: PersistenceAction,
+    status: PersistenceStatus,
+    i18n: &I18n,
+    window: Entity,
+) -> impl Bundle + use<> {
+    let message = if status.failed(action) {
+        i18n.t(&TranslationKey::SaveWriteFailed).into_owned()
+    } else {
+        String::new()
+    };
+
+    (
+        Text::new(message),
+        PersistenceNotice(action),
+        theme::typography::text(theme::fonts::SMALL, window),
+        TextColor(theme::colors::ERROR),
+    )
+}
+
+pub fn sync_persistence_notices(
+    status: Res<PersistenceStatus>,
+    i18n: Res<I18n>,
+    mut notice_query: Query<(&PersistenceNotice, &mut Text)>,
+) {
+    for (notice, mut text) in &mut notice_query {
+        let message = if status.failed(notice.0) {
+            i18n.t(&TranslationKey::SaveWriteFailed).into_owned()
+        } else {
+            String::new()
+        };
+        if **text != message {
+            message.clone_into(&mut **text);
+        }
+    }
 }
 
 /// Returns the inline notice shown when a save write fails.

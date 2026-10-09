@@ -4,13 +4,14 @@ mod tree;
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 
-use crate::data::{ContentLibrary, GameMode};
+use crate::data::{ContentLibrary, GameMode, PersistenceAction, PersistenceStatus};
 use crate::i18n::I18n;
 use crate::plugins::teacher::{
     TeacherQuestionDraft, TeacherScreenParam, TeacherView, tab_header,
     teacher_lesson_config_view_active, teacher_lessons_tree_view_active, teacher_window_exists,
 };
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES, cleanup_root};
+use crate::ui::components::persistence_notice;
 use crate::ui::theme;
 
 /// Teacher lessons tab for configuring per-lesson question selection.
@@ -105,6 +106,7 @@ fn rebuild_lessons_ui(
     mut commands: Commands,
     ts: TeacherScreenParam<'_, '_>,
     existing_root: Query<Entity, With<TeacherLessonsRoot>>,
+    status: Res<PersistenceStatus>,
     content: Res<ContentLibrary>,
     app_state: Res<State<AppState>>,
 ) {
@@ -138,6 +140,7 @@ fn rebuild_lessons_ui(
             let questions = questions.clone();
             let title = lesson_title.clone();
             let i18n_owned = I18n::new(ts.i18n.language);
+            let write_notice = lesson_config_notice(*status, &ts.i18n, window);
             commands.spawn((
                 Node {
                     width: percent(100.0),
@@ -151,6 +154,7 @@ fn rebuild_lessons_ui(
                 UiTargetCamera(camera_entity),
                 TeacherLessonsRoot,
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+                    parent.spawn(write_notice);
                     config::spawn_config_view(
                         parent,
                         &i18n_owned,
@@ -166,6 +170,7 @@ fn rebuild_lessons_ui(
             let is_theme_exploration = *app_state.get() == AppState::ThemeExploration;
             let header = tab_header(&ts.i18n, active_tab, window);
             let i18n_owned = I18n::new(ts.i18n.language);
+            let write_notice = lesson_config_notice(*status, &ts.i18n, window);
             let tree_specs = tree::build_tree_specs(
                 &content.themes,
                 &ts.ctx.save_data,
@@ -186,6 +191,7 @@ fn rebuild_lessons_ui(
                 TeacherLessonsRoot,
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
                     parent.spawn(header);
+                    parent.spawn(write_notice);
                     tree::spawn_tree_view(
                         parent,
                         &tree_specs,
@@ -198,6 +204,14 @@ fn rebuild_lessons_ui(
         }
         TeacherView::Students | TeacherView::StudentStats { .. } => {}
     }
+}
+
+fn lesson_config_notice(
+    status: PersistenceStatus,
+    i18n: &I18n,
+    window: Entity,
+) -> impl Bundle + use<> {
+    persistence_notice(PersistenceAction::TeacherLessonConfig, status, i18n, window)
 }
 
 pub(super) fn has_any_selected(questions: &[TeacherQuestionDraft]) -> bool {

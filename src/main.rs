@@ -55,7 +55,7 @@ fn main() {
             GameAudioPlugin,
             LessonMascotPlugin,
             NavigationPlugin,
-            PersistencePlugin,
+            PersistencePlugin::default(),
             ScrollPlugin,
             SettingsPlugin,
             SkyBackgroundPlugin,

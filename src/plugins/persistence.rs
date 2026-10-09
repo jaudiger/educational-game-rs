@@ -1,37 +1,48 @@
+use std::path::PathBuf;
+
 use bevy::prelude::*;
-use bevy_persistent::prelude::*;
 
-use crate::data::{GameSettings, SaveData, SaveWriteStatus};
+use crate::data::{GameSettings, PersistencePaths, PersistenceStatus, SaveData, load_or_default};
 use crate::i18n::I18n;
+use crate::ui::components::sync_persistence_notices;
 
-/// Initializes persistent storage for save data and game settings.
-pub struct PersistencePlugin;
+/// Loads and synchronously persists local save data and game settings.
+pub struct PersistencePlugin {
+    paths: PersistencePaths,
+}
+
+impl Default for PersistencePlugin {
+    fn default() -> Self {
+        Self::new("local")
+    }
+}
+
+impl PersistencePlugin {
+    pub fn new(directory: impl Into<PathBuf>) -> Self {
+        Self {
+            paths: PersistencePaths::in_directory(directory),
+        }
+    }
+}
 
 impl Plugin for PersistencePlugin {
     fn build(&self, app: &mut App) {
-        let save_data = Persistent::<SaveData>::builder()
-            .name("save data")
-            .format(StorageFormat::Json)
-            .path("local/save_data.json")
-            .default(SaveData::default())
-            .revertible(true)
-            .revert_to_default_on_deserialization_errors(true)
-            .build()
+        let save_data = load_or_default(self.paths.save_data_file(), SaveData::default())
             .expect("failed to initialize save data");
-        app.insert_resource(save_data);
-        app.init_resource::<SaveWriteStatus>();
-
-        let settings = Persistent::<GameSettings>::builder()
-            .name("game settings")
-            .format(StorageFormat::Json)
-            .path("local/settings.json")
-            .default(GameSettings::default())
-            .revertible(true)
-            .revert_to_default_on_deserialization_errors(true)
-            .build()
+        let settings = load_or_default(self.paths.settings_file(), GameSettings::default())
             .expect("failed to initialize game settings");
         let language = settings.language;
-        app.insert_resource(settings);
-        app.insert_resource(I18n::new(language));
+
+        app.insert_resource(self.paths.clone())
+            .insert_resource(save_data)
+            .insert_resource(settings)
+            .init_resource::<PersistenceStatus>()
+            .insert_resource(I18n::new(language))
+            .add_systems(
+                Update,
+                sync_persistence_notices.run_if(
+                    resource_changed::<PersistenceStatus>.or_else(resource_changed::<I18n>),
+                ),
+            );
     }
 }

@@ -7,9 +7,10 @@ rust-version = "1.99"
 
 [dependencies]
 bevy = { version = "0.19.0", features = ["debug", "bevy_ui_widgets"] }
-bevy-persistent = { version = "0.11.0", features = ["json"] }
 rand = "0.10"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }
