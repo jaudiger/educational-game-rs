@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui_widgets::ScrollArea;
 
 use crate::data::content::{Lesson, Theme};
 use crate::data::{PlayerSession, SaveData};
@@ -68,13 +69,16 @@ pub(super) fn spawn_tree_view(
     window: Entity,
 ) {
     parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            flex_grow: 1.0,
-            overflow: Overflow::scroll_y(),
-            ..default()
-        })
+        .spawn((
+            ScrollArea,
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: theme::scaled(theme::spacing::SMALL),
+                flex_grow: 1.0,
+                overflow: Overflow::scroll_y(),
+                ..default()
+            },
+        ))
         .with_children(|list| {
             for theme_data in themes {
                 let theme_color = if theme_data.available {

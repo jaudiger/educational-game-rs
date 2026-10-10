@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
+use bevy::ui_widgets::ScrollArea;
 
 use crate::data::content::{ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, QuestionType};
 use crate::data::{
@@ -116,6 +117,7 @@ fn spawn_question_counter_section(
     let questions = draft.to_vec();
 
     parent.spawn((
+        ScrollArea,
         Node {
             flex_grow: 1.0,
             min_height: px(0.0),

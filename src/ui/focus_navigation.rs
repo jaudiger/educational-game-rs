@@ -8,7 +8,7 @@ use bevy::input_focus::{InputFocus, InputFocusVisible};
 use bevy::math::{CompassOctant, Dir2};
 use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigator;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::{Activate, Button, Tab, TabList, ValueChange};
 
 use crate::data::GameSettings;
 
@@ -50,6 +50,7 @@ fn gamepad_navigation_enabled(settings: Res<GameSettings>) -> bool {
 #[derive(Resource, Default)]
 struct DirectionalInput {
     direction: Option<CompassOctant>,
+    gamepad_direction: Option<CompassOctant>,
     activate: bool,
 }
 
@@ -112,8 +113,12 @@ fn process_directional_input(
     let direction = Dir2::from_xy(f32::from(east_west), f32::from(north_south))
         .ok()
         .map(CompassOctant::from);
+    let gamepad_direction = Dir2::from_xy(f32::from(gew), f32::from(gns))
+        .ok()
+        .map(CompassOctant::from);
 
     input.direction = direction;
+    input.gamepad_direction = gamepad_direction;
     input.activate = activate;
 
     if direction.is_some() || activate {
@@ -123,18 +128,29 @@ fn process_directional_input(
 
 fn handle_directional_navigation(
     input: Res<DirectionalInput>,
+    tabs: Query<(), With<Tab>>,
     mut navigator: AutoDirectionalNavigator,
 ) {
-    if let Some(direction) = input.direction {
+    let direction = if navigator
+        .input_focus()
+        .is_some_and(|entity| tabs.contains(entity))
+    {
+        input.gamepad_direction
+    } else {
+        input.direction
+    };
+    if let Some(direction) = direction {
         let _ = navigator.navigate(direction);
     }
 }
 
-/// Triggers the focused button for gamepad activation.
+/// Routes gamepad activation to a focused button or tab.
 fn gamepad_activate_focused(
     input: Res<DirectionalInput>,
     focus: Res<InputFocus>,
     buttons: Query<(), With<Button>>,
+    tabs: Query<&ChildOf, With<Tab>>,
+    tab_lists: Query<(), With<TabList>>,
     mut commands: Commands,
 ) {
     if !input.activate {
@@ -143,6 +159,14 @@ fn gamepad_activate_focused(
     let Some(entity) = focus.get() else { return };
     if buttons.contains(entity) {
         commands.trigger(Activate { entity });
+    } else if let Ok(parent) = tabs.get(entity)
+        && tab_lists.contains(parent.parent())
+    {
+        commands.trigger(ValueChange::<Option<Entity>> {
+            source: parent.parent(),
+            value: Some(entity),
+            is_final: true,
+        });
     }
 }
 

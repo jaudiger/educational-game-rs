@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
+use bevy::ui_widgets::ScrollArea;
 
 use crate::data::content::QuestionType;
 use crate::data::{
@@ -393,6 +394,7 @@ fn reset_icon_button(window: Entity) -> impl Bundle {
 fn spawn_stats_frame(parent: &mut ChildSpawner, data: Vec<ThemeStatsData>, window: Entity) {
     // Scrollable rounded frame (same style as lesson config view)
     parent.spawn((
+        ScrollArea,
         Node {
             flex_direction: FlexDirection::Column,
             row_gap: theme::scaled(theme::spacing::MEDIUM),

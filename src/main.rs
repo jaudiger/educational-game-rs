@@ -24,8 +24,8 @@ use screens::{
 };
 use states::{ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase};
 use ui::{
-    ButtonActivationPlugin, FocusNavigationPlugin, NavigationPlugin, ScrollPlugin, TextInputPlugin,
-    ThemePlugin, UiAnimationPlugin,
+    ButtonActivationPlugin, FocusNavigationPlugin, NavigationPlugin, TextInputPlugin, ThemePlugin,
+    UiAnimationPlugin,
 };
 
 fn main() {
@@ -57,7 +57,6 @@ fn main() {
             LessonMascotPlugin,
             NavigationPlugin,
             PersistencePlugin::default(),
-            ScrollPlugin,
             SettingsPlugin,
             SkyBackgroundPlugin,
             TeacherPlugin,

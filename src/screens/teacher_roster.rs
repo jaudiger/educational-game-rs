@@ -1,5 +1,6 @@
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
+use bevy::ui_widgets::ScrollArea;
 
 use crate::data::{
     ActiveStudent, ClassStudent, GameMode, PersistenceAction, PersistenceStatus, PlayerSession,
@@ -173,13 +174,16 @@ fn spawn_student_list(
     window: Entity,
 ) {
     parent
-        .spawn((Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            flex_grow: 1.0,
-            overflow: Overflow::scroll_y(),
-            ..default()
-        },))
+        .spawn((
+            ScrollArea,
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: theme::scaled(theme::spacing::SMALL),
+                flex_grow: 1.0,
+                overflow: Overflow::scroll_y(),
+                ..default()
+            },
+        ))
         .with_children(|list| {
             for (i, name) in names.iter().enumerate() {
                 let is_selected = selected_index == Some(i);
