@@ -1,8 +1,10 @@
 use super::theme;
 use crate::states::AppState;
-use bevy::math::Curve;
-use bevy::math::curve::easing::{EaseFunction, EasingCurve};
+use bevy::curve::Curve;
+use bevy::curve::easing::{EaseFunction, EasingCurve};
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
+use bevy::ui::Pressed;
 
 pub struct UiAnimationPlugin;
 
@@ -31,14 +33,16 @@ pub struct AnimateScale {
     curve: EasingCurve<f32>,
     duration: f32,
     elapsed: f32,
+    target: f32,
 }
 
 impl AnimateScale {
-    pub fn new(start: f32, end: f32, ease_fn: EaseFunction, duration: f32) -> Self {
+    pub const fn new(start: f32, end: f32, ease_fn: EaseFunction, duration: f32) -> Self {
         Self {
             curve: EasingCurve::new(start, end, ease_fn),
             duration,
             elapsed: 0.0,
+            target: end,
         }
     }
 }
@@ -113,39 +117,54 @@ fn tick_floating_cards(time: Res<Time>, mut query: Query<(&FloatingCard, &mut Ui
 type AnimatedButtonQuery<'w, 's> = Query<
     'w,
     's,
-    (Entity, &'static Interaction, &'static UiTransform),
-    (Changed<Interaction>, With<AnimatedButton>),
+    (
+        Entity,
+        &'static Hovered,
+        Has<Pressed>,
+        &'static UiTransform,
+        Option<&'static AnimateScale>,
+    ),
+    With<AnimatedButton>,
 >;
 
 fn animate_button_hover(mut commands: Commands, query: AnimatedButtonQuery<'_, '_>) {
-    for (entity, interaction, transform) in &query {
-        let current = transform.scale.x;
-        let (target, ease_fn, duration) = match interaction {
-            Interaction::Hovered => (
-                theme::animation::BUTTON_HOVER_SCALE,
-                EaseFunction::CubicOut,
-                theme::animation::BUTTON_HOVER_DURATION,
-            ),
-            Interaction::Pressed => (
+    for (entity, hovered, pressed, transform, animation) in &query {
+        let (target, ease_fn, duration) = if pressed {
+            (
                 theme::animation::BUTTON_PRESS_SCALE,
                 EaseFunction::CubicIn,
                 theme::animation::BUTTON_PRESS_DURATION,
-            ),
-            Interaction::None => (
+            )
+        } else if hovered.get() {
+            (
+                theme::animation::BUTTON_HOVER_SCALE,
+                EaseFunction::CubicOut,
+                theme::animation::BUTTON_HOVER_DURATION,
+            )
+        } else {
+            (
                 1.0,
                 EaseFunction::CubicOut,
                 theme::animation::BUTTON_HOVER_DURATION,
-            ),
+            )
         };
-        commands
-            .entity(entity)
-            .try_insert(AnimateScale::new(current, target, ease_fn, duration));
+        if animation.is_some_and(|animation| (animation.target - target).abs() <= f32::EPSILON)
+            || (animation.is_none() && (transform.scale.x - target).abs() <= f32::EPSILON)
+        {
+            continue;
+        }
+        commands.entity(entity).try_insert(AnimateScale::new(
+            transform.scale.x,
+            target,
+            ease_fn,
+            duration,
+        ));
     }
 }
 
 /// Observer that auto-inserts a `ScreenEntryAnimation` on every entity that
 /// gets a `DespawnOnExit<AppState>` component added (i.e. screen roots).
-fn auto_screen_entry_animation(trigger: On<Add, DespawnOnExit<AppState>>, mut commands: Commands) {
+fn auto_screen_entry_animation(trigger: On<Add<DespawnOnExit<AppState>>>, mut commands: Commands) {
     let entity = trigger.event_target();
 
     commands.entity(entity).insert((

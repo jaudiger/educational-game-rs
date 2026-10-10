@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextCursorStyle};
+use bevy::ui_widgets::TextInput;
 use bevy::window::PrimaryWindow;
 
 use crate::data::{
@@ -12,8 +13,8 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, InLessonFlow, StateScopedResourceExt};
 use crate::ui::components::{
-    ConfirmationDialogAction, ConfirmationDialogActionEvent, action_button_scene, button_base,
-    card_node, icon_button, persistence_notice, screen_root, spawn_confirmation_modal,
+    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, action_button_scene,
+    button_base, card_node, icon_button, persistence_notice, screen_root, spawn_confirmation_modal,
     standard_button,
 };
 use crate::ui::navigation::NavigateTo;
@@ -292,7 +293,8 @@ fn start_slot_creation(
 
 #[allow(clippy::too_many_arguments)]
 fn handle_slot_click(
-    query: Query<(&Interaction, &SlotCard), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&SlotCard>,
     mut commands: Commands,
     mut state: ResMut<SaveSlotsState>,
     ctx: PlayerContext<'_>,
@@ -302,15 +304,15 @@ fn handle_slot_click(
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     if !popover_query.is_empty() {
         return;
     }
 
-    for (interaction, slot) in &query {
-        if *interaction != Interaction::Pressed {
+    for entity in activated_entities {
+        let Ok(slot) = query.get(entity) else {
             continue;
-        }
-
+        };
         let index = slot.0;
         let is_filled = match ctx.settings.mode {
             GameMode::Individual => ctx.save_data.individual_slots[index].is_some(),
@@ -404,6 +406,7 @@ fn creation_name_input(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
                     max_characters: Some(MAX_NAME_LENGTH),
                     ..default()
                 },
+                TextInput,
                 TextCursorStyle {
                     color: theme::colors::TEXT_DARK,
                     ..default()
@@ -467,43 +470,46 @@ fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
 }
 
 fn handle_delete_click(
-    query: Query<(&Interaction, Entity, &DeleteSlotButton), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&DeleteSlotButton>,
     state: Res<SaveSlotsState>,
     mut commands: Commands,
     existing_popover: Query<Entity, With<DeletePopover>>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     if state.creating_slot.is_some() {
         return;
     }
 
-    for (interaction, _button_entity, delete_btn) in &query {
-        if *interaction == Interaction::Pressed {
-            // Despawn any existing delete popover first
-            for entity in &existing_popover {
-                commands.entity(entity).try_despawn();
-            }
-
-            let slot_index = delete_btn.0;
-            let modal_entity = spawn_confirmation_modal(
-                &mut commands,
-                &i18n.t(&TranslationKey::DeleteSlotN(slot_index + 1)),
-                &i18n.t(&TranslationKey::Delete),
-                &i18n.t(&TranslationKey::Cancel),
-                theme::colors::ERROR,
-                *primary_window,
-                None,
-            );
-            commands
-                .entity(modal_entity)
-                .insert((
-                    DeletePopover,
-                    ConfirmDeleteTarget(slot_index),
-                    DespawnOnExit(AppState::SaveSlots),
-                ))
-                .observe(handle_confirm_delete);
+    for entity in activated_entities {
+        let Ok(delete_btn) = query.get(entity) else {
+            continue;
+        };
+        // Despawn any existing delete popover first
+        for entity in &existing_popover {
+            commands.entity(entity).try_despawn();
         }
+
+        let slot_index = delete_btn.0;
+        let modal_entity = spawn_confirmation_modal(
+            &mut commands,
+            &i18n.t(&TranslationKey::DeleteSlotN(slot_index + 1)),
+            &i18n.t(&TranslationKey::Delete),
+            &i18n.t(&TranslationKey::Cancel),
+            theme::colors::ERROR,
+            *primary_window,
+            None,
+        );
+        commands
+            .entity(modal_entity)
+            .insert((
+                DeletePopover,
+                ConfirmDeleteTarget(slot_index),
+                DespawnOnExit(AppState::SaveSlots),
+            ))
+            .observe(handle_confirm_delete);
     }
 }
 
@@ -546,7 +552,8 @@ fn handle_confirm_delete(
 
 #[allow(clippy::too_many_arguments)]
 fn handle_create_confirm(
-    query: Query<&Interaction, (Changed<Interaction>, With<ConfirmCreateButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<ConfirmCreateButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut input_focus: ResMut<InputFocus>,
     mut state: ResMut<SaveSlotsState>,
@@ -555,6 +562,10 @@ fn handle_create_confirm(
     mut next_state: ResMut<NextState<AppState>>,
     input: Option<Single<(Entity, &EditableText), With<SaveSlotNameInput>>>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    let pressed_button = activated_entities
+        .iter()
+        .any(|entity| query.contains(*entity));
     let Some(slot_index) = state.creating_slot else {
         return;
     };
@@ -570,7 +581,6 @@ fn handle_create_confirm(
     let (input_entity, input) = *input;
     let focused = input_focus.get() == Some(input_entity);
 
-    let pressed_button = query.iter().any(|i| *i == Interaction::Pressed);
     let pressed_enter = focused && keyboard.just_pressed(KeyCode::Enter);
 
     if !pressed_button && !pressed_enter {
@@ -607,20 +617,24 @@ fn handle_create_confirm(
 }
 
 fn handle_cancel_create(
-    query: Query<&Interaction, (Changed<Interaction>, With<CancelCreateButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<CancelCreateButton>>,
     mut input_focus: ResMut<InputFocus>,
     mut state: ResMut<SaveSlotsState>,
     mut commands: Commands,
     form_query: Query<Entity, With<CreationForm>>,
 ) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            input_focus.clear();
-            state.creating_slot = None;
-            for entity in &form_query {
-                commands.entity(entity).despawn();
-            }
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        if !query.contains(entity) {
+            continue;
         }
+        input_focus.clear();
+        state.creating_slot = None;
+        for entity in &form_query {
+            commands.entity(entity).despawn();
+        }
+        break;
     }
 }
 

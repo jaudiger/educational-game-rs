@@ -37,10 +37,9 @@ pub struct TooltipPopover;
 pub struct TooltipLifetime(pub Timer);
 
 /// Attach to any UI node to show a tooltip on hover.
-/// The entity must have `Interaction` (automatic for `Button`,
-/// add `Interaction::None` manually for plain nodes).
+/// The entity must track pointer hover, which is added automatically.
 #[derive(Component, Reflect)]
-#[require(Interaction)]
+#[require(bevy::picking::hover::Hovered)]
 pub struct HoverTooltip {
     pub message: String,
     pub window: Entity,

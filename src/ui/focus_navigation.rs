@@ -8,6 +8,7 @@ use bevy::input_focus::{InputFocus, InputFocusVisible};
 use bevy::math::{CompassOctant, Dir2};
 use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigator;
+use bevy::ui_widgets::{Activate, Button};
 
 use crate::data::GameSettings;
 
@@ -33,7 +34,7 @@ impl Plugin for FocusNavigationPlugin {
         .add_systems(
             Update,
             (
-                keyboard_activate_focused.run_if(gamepad_navigation_enabled),
+                gamepad_activate_focused.run_if(gamepad_navigation_enabled),
                 hide_focus_on_mouse_click.run_if(gamepad_navigation_enabled),
                 update_focus_ring,
             ),
@@ -52,8 +53,8 @@ struct DirectionalInput {
     activate: bool,
 }
 
-/// Reads arrow keys and Enter/Space, returning the axis deltas and activate flag.
-fn keyboard_nav_delta(keyboard: &ButtonInput<KeyCode>) -> (i8, i8, bool) {
+/// Reads arrow keys and returns directional axis deltas.
+fn keyboard_nav_delta(keyboard: &ButtonInput<KeyCode>) -> (i8, i8) {
     let mut east_west: i8 = 0;
     let mut north_south: i8 = 0;
     if keyboard.just_pressed(KeyCode::ArrowRight) {
@@ -68,8 +69,7 @@ fn keyboard_nav_delta(keyboard: &ButtonInput<KeyCode>) -> (i8, i8, bool) {
     if keyboard.just_pressed(KeyCode::ArrowDown) {
         north_south -= 1;
     }
-    let activate = keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::Space);
-    (east_west, north_south, activate)
+    (east_west, north_south)
 }
 
 /// Reads D-pad and South button across all connected gamepads, returning accumulated axis deltas and activate flag.
@@ -103,11 +103,11 @@ fn process_directional_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     gamepads: Query<&Gamepad>,
 ) {
-    let (kew, kns, ka) = keyboard_nav_delta(&keyboard);
+    let (kew, kns) = keyboard_nav_delta(&keyboard);
     let (gew, gns, ga) = gamepad_nav_delta(&gamepads);
     let east_west = kew + gew;
     let north_south = kns + gns;
-    let activate = ka || ga;
+    let activate = ga;
 
     let direction = Dir2::from_xy(f32::from(east_west), f32::from(north_south))
         .ok()
@@ -130,20 +130,19 @@ fn handle_directional_navigation(
     }
 }
 
-/// When Enter/Space/Gamepad-South is pressed and an entity has focus,
-/// set `Interaction::Pressed` on the focused `Button` so existing
-/// `Changed<Interaction>` handlers fire.
-fn keyboard_activate_focused(
+/// Triggers the focused button for gamepad activation.
+fn gamepad_activate_focused(
     input: Res<DirectionalInput>,
     focus: Res<InputFocus>,
-    mut buttons: Query<&mut Interaction, With<Button>>,
+    buttons: Query<(), With<Button>>,
+    mut commands: Commands,
 ) {
     if !input.activate {
         return;
     }
     let Some(entity) = focus.get() else { return };
-    if let Ok(mut interaction) = buttons.get_mut(entity) {
-        *interaction = Interaction::Pressed;
+    if buttons.contains(entity) {
+        commands.trigger(Activate { entity });
     }
 }
 

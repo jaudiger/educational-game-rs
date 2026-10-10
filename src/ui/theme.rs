@@ -116,7 +116,7 @@ impl Plugin for ThemePlugin {
 }
 
 fn override_default_font(
-    on: On<Add, TextFont>,
+    on: On<Add<TextFont>>,
     mut query: Query<&mut TextFont>,
     fonts: Res<GameFonts>,
 ) {
@@ -130,7 +130,7 @@ fn override_default_font(
 /// Immediately scales a [`TextFont`] when a [`DesignFontSize`] is added,
 /// preventing a one-frame flash at the unscaled size.
 fn scale_font_on_add(
-    trigger: On<Add, DesignFontSize>,
+    trigger: On<Add<DesignFontSize>>,
     mut query: Query<(&DesignFontSize, &mut TextFont)>,
     windows: Query<&Window>,
 ) {

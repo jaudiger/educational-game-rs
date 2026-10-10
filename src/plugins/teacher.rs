@@ -10,7 +10,7 @@ use crate::data::content::QuestionType;
 use crate::data::{GameMode, GameSettings, PlayerContext};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES};
-use crate::ui::components::toggle_button;
+use crate::ui::components::{ButtonActivated, toggle_button};
 use crate::ui::theme;
 
 /// Spawns and manages the secondary teacher window in class mode.
@@ -305,17 +305,19 @@ fn cleanup_teacher_view_overlays(
 }
 
 fn handle_tab_click(
-    query: Query<(&Interaction, &TeacherTabButton), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&TeacherTabButton>,
     mut states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Ok(mut state) = states.single_mut() else {
         return;
     };
 
-    for (interaction, tab_btn) in &query {
-        if *interaction != Interaction::Pressed {
+    for entity in activated_entities {
+        let Ok(tab_btn) = query.get(entity) else {
             continue;
-        }
+        };
         if tab_btn.0 == state.view.tab() && !state.view.is_detail() {
             continue;
         }

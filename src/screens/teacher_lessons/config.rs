@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 
 use crate::data::content::{ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, QuestionType};
@@ -11,6 +12,7 @@ use crate::plugins::teacher::{
     TeacherQuestionDraft, TeacherTab, TeacherView, TeacherWindow, TeacherWindowState, tab_header,
 };
 use crate::screens::teacher_shared::question_type_label;
+use crate::ui::components::ButtonActivated;
 use crate::ui::components::{button_base, icon_button, standard_button};
 use crate::ui::theme;
 
@@ -207,7 +209,7 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &TeacherQuestionDraf
                 min_height: theme::scaled(36.0),
                 ..default()
             },
-            Interaction::None,
+            Hovered::default(),
             QuestionRow(full_prompt.clone()),
         ))
         .with_children(|row| {
@@ -402,16 +404,18 @@ pub(super) fn build_draft_questions(
 
 /// Opens the config view for a lesson when the gear button is clicked.
 pub(super) fn handle_config_button_click(
-    query: Query<(&Interaction, &ConfigLessonButton), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&ConfigLessonButton>,
     content: Res<ContentLibrary>,
     ctx: PlayerContext<'_>,
     i18n: Res<I18n>,
     mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
-    for (interaction, config_btn) in &query {
-        if *interaction != Interaction::Pressed {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        let Ok(config_btn) = query.get(entity) else {
             continue;
-        }
+        };
 
         let Some(theme_data) = content.theme(&config_btn.theme_id) else {
             continue;
@@ -447,11 +451,13 @@ pub(super) fn handle_config_button_click(
 /// Increments or decrements the repetition count for a specific question.
 /// The direction and magnitude come from the `delta` field on the button component.
 pub(super) fn handle_count_change(
-    query: Query<(&Interaction, &CountButton), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&CountButton>,
     mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Ok(mut state) = teacher_states.single_mut() else {
         return;
     };
@@ -459,10 +465,10 @@ pub(super) fn handle_count_change(
     let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
         return;
     };
-    for (interaction, btn) in &query {
-        if *interaction != Interaction::Pressed {
+    for entity in activated_entities {
+        let Ok(btn) = query.get(entity) else {
             continue;
-        }
+        };
         let idx = btn.index;
         let Some(q) = questions.iter_mut().find(|q| q.index == idx) else {
             continue;
@@ -482,10 +488,12 @@ pub(super) fn handle_count_change(
 
 /// Toggles the optional visual for a specific question on/off.
 pub(super) fn handle_visual_toggle(
-    query: Query<(&Interaction, &VisualToggleButton), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&VisualToggleButton>,
     mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut bg_query: Query<(&mut BackgroundColor, &VisualToggleButton)>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Ok(mut state) = teacher_states.single_mut() else {
         return;
     };
@@ -493,10 +501,10 @@ pub(super) fn handle_visual_toggle(
     let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
         return;
     };
-    for (interaction, btn) in &query {
-        if *interaction != Interaction::Pressed {
+    for entity in activated_entities {
+        let Ok(btn) = query.get(entity) else {
             continue;
-        }
+        };
         let idx = btn.0;
         let Some(q) = questions.iter_mut().find(|q| q.index == idx) else {
             continue;
@@ -546,7 +554,8 @@ fn reset_visual_toggles(
 
 /// Resets all question counts to the default value (1) and visual toggles to their defaults.
 pub(super) fn handle_reset_config(
-    query: Query<&Interaction, (Changed<Interaction>, With<ResetConfigButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<ResetConfigButton>>,
     mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut text_query: Query<&mut Text, With<CountText>>,
     mut save_btn_query: Query<&mut BackgroundColor, With<SaveConfigButton>>,
@@ -555,6 +564,7 @@ pub(super) fn handle_reset_config(
         Without<SaveConfigButton>,
     >,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Ok(mut state) = teacher_states.single_mut() else {
         return;
     };
@@ -562,8 +572,8 @@ pub(super) fn handle_reset_config(
     let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
         return;
     };
-    for interaction in &query {
-        if *interaction != Interaction::Pressed {
+    for entity in activated_entities {
+        if !query.contains(entity) {
             continue;
         }
         for q in questions.iter_mut() {
@@ -651,15 +661,14 @@ pub(super) fn update_question_labels(mut query: Query<(&mut Text, &ComputedNode,
 }
 
 /// Updates the hover detail text when a question row is hovered.
-/// Checks every frame (not `Changed<Interaction>`) because child buttons
-/// inside the row steal the hover, making the row's `Interaction` flicker.
+/// Checks every frame because child buttons are part of the row hover state.
 pub(super) fn update_config_hover_text(
-    rows: Query<(&Interaction, &QuestionRow)>,
+    rows: Query<(&Hovered, &QuestionRow)>,
     mut hover_text: Query<&mut Text, With<ConfigHoverText>>,
 ) {
-    let hovered_prompt = rows.iter().find_map(|(interaction, row)| {
-        (*interaction == Interaction::Hovered).then_some(row.0.as_str())
-    });
+    let hovered_prompt = rows
+        .iter()
+        .find_map(|(hovered, row)| hovered.get().then_some(row.0.as_str()));
 
     for mut text in &mut hover_text {
         match hovered_prompt {
@@ -694,13 +703,15 @@ fn update_save_button_state(
 
 /// Saves the current config draft to persistence and returns to tree view.
 pub(super) fn handle_save_config(
-    query: Query<&Interaction, (Changed<Interaction>, With<SaveConfigButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<SaveConfigButton>>,
     mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
     mut persistence: SaveDataMut<'_>,
     session: Option<Res<PlayerSession>>,
 ) {
-    for interaction in &query {
-        if *interaction != Interaction::Pressed {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        if !query.contains(entity) {
             continue;
         }
         let Some(ref session) = session else {
@@ -746,12 +757,14 @@ pub(super) fn handle_save_config(
 }
 
 pub(super) fn handle_return_to_tree(
-    query: Query<&Interaction, (Changed<Interaction>, With<ReturnToTreeButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<ReturnToTreeButton>>,
     mut teacher_states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
-    if !query
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    if !activated_entities
         .iter()
-        .any(|interaction| *interaction == Interaction::Pressed)
+        .any(|entity| query.contains(*entity))
     {
         return;
     }

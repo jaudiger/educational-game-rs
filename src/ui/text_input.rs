@@ -1,6 +1,9 @@
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
+use bevy::ui_widgets::Button;
+
+use crate::ui::components::ButtonActivated;
 
 use super::theme;
 
@@ -55,10 +58,13 @@ impl Plugin for TextInputPlugin {
 }
 
 fn handle_text_input_focus(
-    mut query: Query<(&Interaction, &mut TextInputState, &mut BorderColor), Changed<Interaction>>,
+    mut activated: MessageReader<ButtonActivated>,
+    mut query: Query<(&mut TextInputState, &mut BorderColor)>,
 ) {
-    for (interaction, mut state, mut border) in &mut query {
-        if *interaction == Interaction::Pressed && !state.focused {
+    for activation in activated.read() {
+        if let Ok((mut state, mut border)) = query.get_mut(activation.0)
+            && !state.focused
+        {
             state.focused = true;
             border.set_all(theme::colors::PRIMARY);
         }

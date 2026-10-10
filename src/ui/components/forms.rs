@@ -58,29 +58,26 @@ impl StyledSlider {
                 align_items: AlignItems::Center,
             }
             Children [
-                (
-                    Node {
-                        width: percent(100.0),
-                        height: theme::scaled(theme::sizes::SLIDER_TRACK_HEIGHT),
-                        border_radius: BorderRadius::all(theme::scaled(
-                            theme::sizes::SLIDER_TRACK_HEIGHT / 2.0
-                        )),
-                        position_type: PositionType::Absolute,
-                    }
-                    BackgroundColor(theme::colors::TOGGLE_INACTIVE)
-                ),
-                (
-                    SliderThumb
-                    Node {
-                        width: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
-                        height: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
-                        border_radius: BorderRadius::all(theme::scaled(
-                            theme::sizes::SLIDER_THUMB_SIZE / 2.0
-                        )),
-                        position_type: PositionType::Absolute,
-                    }
-                    BackgroundColor(theme::colors::PRIMARY)
-                ),
+                Node {
+                    width: percent(100.0),
+                    height: theme::scaled(theme::sizes::SLIDER_TRACK_HEIGHT),
+                    border_radius: BorderRadius::all(theme::scaled(
+                        theme::sizes::SLIDER_TRACK_HEIGHT / 2.0
+                    )),
+                    position_type: PositionType::Absolute,
+                }
+                BackgroundColor(theme::colors::TOGGLE_INACTIVE)
+                --
+                SliderThumb
+                Node {
+                    width: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
+                    height: theme::scaled(theme::sizes::SLIDER_THUMB_SIZE),
+                    border_radius: BorderRadius::all(theme::scaled(
+                        theme::sizes::SLIDER_THUMB_SIZE / 2.0
+                    )),
+                    position_type: PositionType::Absolute,
+                }
+                BackgroundColor(theme::colors::PRIMARY)
             ]
         }
     }
@@ -134,33 +131,30 @@ impl StyledCheckbox {
                 column_gap: theme::scaled(theme::spacing::SMALL),
             }
             Children [
-                (
+                Node {
+                    width: theme::scaled(theme::sizes::CHECKBOX_SIZE),
+                    height: theme::scaled(theme::sizes::CHECKBOX_SIZE),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: {px(2.0).all()},
+                    border_radius: BorderRadius::all(theme::scaled(6.0)),
+                }
+                BackgroundColor(theme::colors::CARD_BG)
+                BorderColor::all(theme::colors::INPUT_BORDER)
+                Children [
                     Node {
-                        width: theme::scaled(theme::sizes::CHECKBOX_SIZE),
-                        height: theme::scaled(theme::sizes::CHECKBOX_SIZE),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        border: {px(2.0).all()},
-                        border_radius: BorderRadius::all(theme::scaled(6.0)),
+                        width: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
+                        height: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
+                        border_radius: BorderRadius::all(theme::scaled(3.0)),
                     }
-                    BackgroundColor(theme::colors::CARD_BG)
-                    BorderColor::all(theme::colors::INPUT_BORDER)
-                    Children [(
-                        Node {
-                            width: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
-                            height: theme::scaled(theme::sizes::CHECKBOX_MARK_SIZE),
-                            border_radius: BorderRadius::all(theme::scaled(3.0)),
-                        }
-                        BackgroundColor(theme::colors::PRIMARY)
-                        Visibility::Hidden
-                        CheckboxMark
-                    )]
-                ),
-                (
-                    Text({props.label})
-                    theme::typography::text_scene(theme::fonts::BODY, props.window)
-                    TextColor(theme::colors::TEXT_DARK)
-                ),
+                    BackgroundColor(theme::colors::PRIMARY)
+                    Visibility::Hidden
+                    CheckboxMark
+                ]
+                --
+                Text({props.label})
+                @theme::typography::text_scene(theme::fonts::BODY, props.window)
+                TextColor(theme::colors::TEXT_DARK)
             ]
         }
     }
@@ -244,37 +238,34 @@ impl StyledRadioButton {
                 column_gap: theme::scaled(theme::spacing::SMALL),
             }
             Children [
-                (
+                Node {
+                    width: theme::scaled(theme::sizes::RADIO_SIZE),
+                    height: theme::scaled(theme::sizes::RADIO_SIZE),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: {px(2.0).all()},
+                    border_radius: BorderRadius::all(theme::scaled(
+                        theme::sizes::RADIO_SIZE / 2.0
+                    )),
+                }
+                BackgroundColor(theme::colors::CARD_BG)
+                BorderColor::all(theme::colors::INPUT_BORDER)
+                Children [
                     Node {
-                        width: theme::scaled(theme::sizes::RADIO_SIZE),
-                        height: theme::scaled(theme::sizes::RADIO_SIZE),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        border: {px(2.0).all()},
+                        width: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
+                        height: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
                         border_radius: BorderRadius::all(theme::scaled(
-                            theme::sizes::RADIO_SIZE / 2.0
+                            theme::sizes::RADIO_MARK_SIZE / 2.0
                         )),
                     }
-                    BackgroundColor(theme::colors::CARD_BG)
-                    BorderColor::all(theme::colors::INPUT_BORDER)
-                    Children [(
-                        Node {
-                            width: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
-                            height: theme::scaled(theme::sizes::RADIO_MARK_SIZE),
-                            border_radius: BorderRadius::all(theme::scaled(
-                                theme::sizes::RADIO_MARK_SIZE / 2.0
-                            )),
-                        }
-                        BackgroundColor(theme::colors::PRIMARY)
-                        Visibility::Hidden
-                        RadioMark
-                    )]
-                ),
-                (
-                    Text({props.label})
-                    theme::typography::text_scene(theme::fonts::BODY, props.window)
-                    TextColor({props.text_color})
-                ),
+                    BackgroundColor(theme::colors::PRIMARY)
+                    Visibility::Hidden
+                    RadioMark
+                ]
+                --
+                Text({props.label})
+                @theme::typography::text_scene(theme::fonts::BODY, props.window)
+                TextColor({props.text_color})
             ]
         }
     }

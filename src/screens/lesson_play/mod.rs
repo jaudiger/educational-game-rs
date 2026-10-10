@@ -8,6 +8,7 @@ use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
 use crate::states::cleanup_root;
 use crate::states::{ActiveLesson, AppState, LessonPhase, StateScopedResourceExt};
+use crate::ui::components::ButtonActivated;
 
 mod explanations;
 mod layout;
@@ -122,11 +123,12 @@ fn advance_question(
 }
 
 fn handle_quit_lesson(
-    query: Query<&Interaction, (Changed<Interaction>, With<QuitLessonButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<QuitLessonButton>>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
+    for activation in activations.read() {
+        if query.contains(activation.0) {
             next_state.set(AppState::ThemeExploration);
         }
     }

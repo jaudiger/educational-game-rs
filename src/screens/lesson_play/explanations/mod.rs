@@ -189,7 +189,7 @@ fn spawn_result_text(
     is_correct: bool,
     window: Entity,
 ) {
-    use bevy::math::curve::easing::EaseFunction;
+    use bevy::curve::easing::EaseFunction;
 
     let (key, color, ease_fn, duration) = if is_correct {
         (

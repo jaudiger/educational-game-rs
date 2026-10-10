@@ -11,6 +11,7 @@ use super::registry::{QuestionRoot, register_question_systems, submit_answer};
 use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
+use crate::ui::components::ButtonActivated;
 use crate::ui::theme;
 
 /// Handles fraction identification question UI and answer submission.
@@ -81,24 +82,18 @@ fn spawn_identification_ui(
     });
 }
 
-type IdentificationChoiceQuery<'w, 's> = Query<
-    'w,
-    's,
-    (&'static Interaction, &'static IdentificationChoice),
-    (Changed<Interaction>, With<Button>),
->;
-
 fn handle_identification_click(
-    query: IdentificationChoiceQuery<'_, '_>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&IdentificationChoice>,
     session: Res<LessonSession>,
     mut commands: Commands,
     mut next_phase: ResMut<NextState<LessonPhase>>,
 ) {
-    for (interaction, choice) in &query {
-        if *interaction != Interaction::Pressed {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        let Ok(choice) = query.get(entity) else {
             continue;
-        }
-
+        };
         let Some(question) = session.current() else {
             return;
         };

@@ -4,7 +4,6 @@ use super::AppState;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, SubStates)]
 #[source(AppState = AppState::LessonPlay)]
-#[states(scoped_entities)]
 pub enum LessonPhase {
     #[default]
     ShowQuestion,
@@ -15,7 +14,6 @@ pub enum LessonPhase {
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, SubStates)]
 #[source(AppState = AppState::ThemeExploration)]
-#[states(scoped_entities)]
 pub enum ExplorationView {
     #[default]
     Themes,

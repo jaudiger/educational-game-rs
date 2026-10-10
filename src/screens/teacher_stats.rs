@@ -16,7 +16,7 @@ use crate::plugins::teacher::{
 use crate::screens::teacher_shared::question_type_label;
 use crate::states::{AppState, cleanup_root};
 use crate::ui::components::{
-    ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button,
+    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button,
     save_write_failure_notice, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::theme;
@@ -585,8 +585,10 @@ fn spawn_type_row(
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_reset_click(
-    query: Query<(&Interaction, &StatsResetButton), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&StatsResetButton>,
     mut commands: Commands,
     existing_popover: Query<Entity, With<StatsResetPopover>>,
     i18n: Res<I18n>,
@@ -594,6 +596,7 @@ fn handle_reset_click(
     teacher: TeacherWindowParam<'_, '_>,
     teacher_state: Query<&TeacherWindowState, With<TeacherWindow>>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Some(ref session) = ctx.session else {
         return;
     };
@@ -617,10 +620,10 @@ fn handle_reset_click(
         return;
     };
 
-    for (interaction, reset_btn) in &query {
-        if *interaction != Interaction::Pressed {
+    for entity in activated_entities {
+        let Ok(reset_btn) = query.get(entity) else {
             continue;
-        }
+        };
 
         // Despawn any existing popover
         for entity in &existing_popover {
@@ -710,12 +713,14 @@ fn handle_confirm_reset(
 }
 
 fn handle_return_to_list(
-    query: Query<&Interaction, (Changed<Interaction>, With<ReturnToListButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<ReturnToListButton>>,
     mut states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
-    if !query
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    if !activated_entities
         .iter()
-        .any(|interaction| *interaction == Interaction::Pressed)
+        .any(|entity| query.contains(*entity))
     {
         return;
     }

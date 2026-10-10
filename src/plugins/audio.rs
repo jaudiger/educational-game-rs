@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use crate::data::{AnswerResult, GameSettings};
 use crate::questions::AnswerSubmitted;
 use crate::states::AppState;
+use crate::ui::components::ButtonActivated;
 
 /// Duration of music fade transitions in seconds.
 const FADE_DURATION: f32 = 2.0;
@@ -250,17 +251,10 @@ fn fade_out_system(
     }
 }
 
-/// Detects button press interactions and triggers [`PlayClickSound`].
-fn detect_button_clicks(
-    mut commands: Commands,
-    query: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            commands.trigger(PlayClickSound);
-            // Only one click sound per frame is enough.
-            return;
-        }
+/// Triggers a click sound for activated buttons.
+fn detect_button_clicks(mut commands: Commands, mut activations: MessageReader<ButtonActivated>) {
+    if activations.read().count() > 0 {
+        commands.trigger(PlayClickSound);
     }
 }
 

@@ -14,6 +14,7 @@ use crate::data::content::ComparisonAnswer;
 use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
+use crate::ui::components::ButtonActivated;
 use crate::ui::components::standard_button;
 use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
@@ -179,24 +180,18 @@ fn comparison_button(label: &str, answer: ComparisonAnswer, window: Entity) -> i
     )
 }
 
-type ComparisonChoiceQuery<'w, 's> = Query<
-    'w,
-    's,
-    (&'static Interaction, &'static ComparisonChoice),
-    (Changed<Interaction>, With<Button>),
->;
-
 fn handle_comparison_click(
-    query: ComparisonChoiceQuery<'_, '_>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&ComparisonChoice>,
     session: Res<LessonSession>,
     mut commands: Commands,
     mut next_phase: ResMut<NextState<LessonPhase>>,
 ) {
-    for (interaction, choice) in &query {
-        if *interaction != Interaction::Pressed {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        let Ok(choice) = query.get(entity) else {
             continue;
-        }
-
+        };
         let Some(question) = session.current() else {
             return;
         };

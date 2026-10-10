@@ -1,14 +1,32 @@
 use bevy::input_focus::tab_navigation::TabIndex;
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::scene::{Scene, SceneComponent, bsn};
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
+use bevy::ui_widgets::{Activate, Button};
 
 use crate::ui::animation::AnimatedButton;
 use crate::ui::theme;
 
+#[derive(Message, Clone, Copy)]
+pub struct ButtonActivated(pub Entity);
+
+pub struct ButtonActivationPlugin;
+
+impl Plugin for ButtonActivationPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_message::<ButtonActivated>()
+            .add_observer(forward_button_activation);
+    }
+}
+
+fn forward_button_activation(event: On<Activate>, mut messages: MessageWriter<ButtonActivated>) {
+    messages.write(ButtonActivated(event.entity));
+}
+
 /// Returns the common button components shared by all interactive buttons.
 ///
-/// Includes `Button`, `BackgroundColor`, `AnimatedButton`, focus navigation
+/// Includes `Button`, `Hovered`, `BackgroundColor`, `AnimatedButton`, focus navigation
 /// (`AutoDirectionalNavigation`, `TabIndex(0)`), and focus ring `Outline`.
 ///
 /// Does **not** include `Node` (layout) or children (text/icons). The caller
@@ -19,6 +37,7 @@ use crate::ui::theme;
 pub fn button_base(bg_color: Color) -> impl Bundle {
     (
         Button,
+        Hovered::default(),
         BackgroundColor(bg_color),
         AnimatedButton,
         AutoDirectionalNavigation::default(),
@@ -78,6 +97,7 @@ impl ActionButton {
     fn scene(props: ActionButtonProps) -> impl Scene {
         bsn! {
             Button
+            Hovered::default()
             BackgroundColor({props.bg_color})
             AnimatedButton
             AutoDirectionalNavigation::default()
@@ -96,12 +116,12 @@ impl ActionButton {
                 overflow: Overflow::clip(),
                 border_radius: {BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS))},
             }
-            Children [(
+            Children [
                 Text({props.label})
-                theme::typography::text_scene(theme::fonts::BUTTON_SMALL, props.window)
+                @theme::typography::text_scene(theme::fonts::BUTTON_SMALL, props.window)
                 TextColor({props.text_color})
                 TextLayout::justify(Justify::Center)
-            )]
+            ]
         }
     }
 }
@@ -211,4 +231,26 @@ pub fn toggle_button(label: &str, active: bool, window: Entity) -> impl Bundle +
             TextLayout::justify(Justify::Center),
         )],
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forwards_button_activation_to_a_message() {
+        let mut app = App::new();
+        app.add_plugins(ButtonActivationPlugin);
+
+        let entity = app.world_mut().spawn_empty().id();
+        app.world_mut().trigger(Activate { entity });
+
+        let activated_entity = app
+            .world()
+            .resource::<Messages<ButtonActivated>>()
+            .iter_current_update_messages()
+            .next()
+            .map(|activation| activation.0);
+        assert_eq!(activated_entity, Some(entity));
+    }
 }

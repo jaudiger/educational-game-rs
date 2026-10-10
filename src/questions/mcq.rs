@@ -8,6 +8,7 @@ use crate::data::content::QuestionVisual;
 use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
 use crate::i18n::I18n;
 use crate::states::LessonPhase;
+use crate::ui::components::ButtonActivated;
 use crate::ui::components::operator_visual_group;
 use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
@@ -169,32 +170,32 @@ fn spawn_prompt_and_fraction_bars(
         });
 }
 
-type McqChoiceQuery<'w, 's> =
-    Query<'w, 's, (&'static Interaction, &'static McqChoice), (Changed<Interaction>, With<Button>)>;
-
 fn handle_mcq_click(
-    query: McqChoiceQuery<'_, '_>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&McqChoice>,
     session: Res<LessonSession>,
     mut commands: Commands,
     mut next_phase: ResMut<NextState<LessonPhase>>,
 ) {
-    for (interaction, choice) in &query {
-        if *interaction == Interaction::Pressed {
-            let Some(question) = session.current() else {
-                return;
-            };
-            let QuestionDefinition::Mcq(mcq) = &question.definition else {
-                return;
-            };
-
-            let result = if choice.index == mcq.correct_index {
-                AnswerResult::Correct
-            } else {
-                AnswerResult::Incorrect
-            };
-
-            submit_answer(&mut commands, &mut next_phase, result);
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        let Ok(choice) = query.get(entity) else {
+            continue;
+        };
+        let Some(question) = session.current() else {
             return;
-        }
+        };
+        let QuestionDefinition::Mcq(mcq) = &question.definition else {
+            return;
+        };
+
+        let result = if choice.index == mcq.correct_index {
+            AnswerResult::Correct
+        } else {
+            AnswerResult::Incorrect
+        };
+
+        submit_answer(&mut commands, &mut next_phase, result);
+        return;
     }
 }

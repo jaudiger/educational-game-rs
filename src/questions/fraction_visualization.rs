@@ -12,6 +12,7 @@ use super::registry::{QuestionRoot, register_question_systems, submit_answer};
 use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
+use crate::ui::components::ButtonActivated;
 use crate::ui::components::standard_button;
 use crate::ui::theme;
 
@@ -86,40 +87,36 @@ fn spawn_validate_button(parent: &mut ChildSpawnerCommands, i18n: &I18n, window:
         ));
 }
 
-type SliceToggleQuery<'w, 's> = Query<
-    'w,
-    's,
-    (
-        &'static Interaction,
-        &'static mut FractionSlice,
-        &'static mut BackgroundColor,
-    ),
-    (Changed<Interaction>, With<Button>),
->;
-
-fn handle_slice_toggle(mut slice_query: SliceToggleQuery<'_, '_>) {
-    for (interaction, mut slice, mut bg) in &mut slice_query {
-        if *interaction == Interaction::Pressed {
-            slice.colored = !slice.colored;
-            *bg = if slice.colored {
-                BackgroundColor(theme::colors::PRIMARY)
-            } else {
-                BackgroundColor(COLOR_UNCOLORED)
-            };
-        }
+fn handle_slice_toggle(
+    mut activations: MessageReader<ButtonActivated>,
+    mut slice_query: Query<(&mut FractionSlice, &mut BackgroundColor)>,
+) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        let Ok((mut slice, mut bg)) = slice_query.get_mut(entity) else {
+            continue;
+        };
+        slice.colored = !slice.colored;
+        *bg = if slice.colored {
+            BackgroundColor(theme::colors::PRIMARY)
+        } else {
+            BackgroundColor(COLOR_UNCOLORED)
+        };
     }
 }
 
 #[allow(clippy::cast_possible_truncation)]
 fn handle_validate(
-    validate_query: Query<&Interaction, (Changed<Interaction>, With<ValidateButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    validate_query: Query<(), With<ValidateButton>>,
     slices: Query<&FractionSlice>,
     session: Res<LessonSession>,
     mut commands: Commands,
     mut next_phase: ResMut<NextState<LessonPhase>>,
 ) {
-    for interaction in &validate_query {
-        if *interaction != Interaction::Pressed {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    for entity in activated_entities {
+        if !validate_query.contains(entity) {
             continue;
         }
 

@@ -12,8 +12,8 @@ use crate::plugins::teacher::{
 };
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES, LessonPhase, cleanup_root};
 use crate::ui::components::{
-    ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base, icon_button,
-    persistence_notice, spawn_confirmation_modal,
+    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base,
+    icon_button, persistence_notice, spawn_confirmation_modal,
 };
 use crate::ui::text_input::{TextInputState, text_input};
 use crate::ui::theme;
@@ -291,15 +291,18 @@ fn spawn_student_row(
 }
 
 fn handle_add_student(
-    query: Query<&Interaction, (Changed<Interaction>, With<AddStudentButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<AddStudentButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     session: Option<Res<PlayerSession>>,
     mut persistence: SaveDataMut<'_>,
     input: Query<&TextInputState>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
+    let pressed_button = activated_entities
+        .iter()
+        .any(|entity| query.contains(*entity));
     let Some(ref session) = session else { return };
-
-    let pressed_button = query.iter().any(|i| *i == Interaction::Pressed);
     let input = input.single().ok();
     let pressed_enter =
         input.is_some_and(|input| input.focused && keyboard.just_pressed(KeyCode::Enter));
@@ -326,8 +329,10 @@ fn handle_add_student(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_remove_student_click(
-    query: Query<(&Interaction, &RemoveStudentButton), Changed<Interaction>>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<&RemoveStudentButton>,
     session: Option<Res<PlayerSession>>,
     save_data: Res<SaveData>,
     mut commands: Commands,
@@ -335,6 +340,7 @@ fn handle_remove_student_click(
     i18n: Res<I18n>,
     teacher: TeacherWindowParam<'_, '_>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Some(ref session) = session else { return };
     let Ok(window) = teacher.window.single() else {
         return;
@@ -343,38 +349,39 @@ fn handle_remove_student_click(
         return;
     };
 
-    for (interaction, remove_btn) in &query {
-        if *interaction == Interaction::Pressed {
-            // Despawn any existing popover first
-            for entity in &existing_popover {
-                commands.entity(entity).try_despawn();
-            }
-
-            let student_index = remove_btn.0;
-            let student_name = save_data.class_slots[session.slot_index]
-                .as_ref()
-                .and_then(|cs| cs.students.get(student_index))
-                .map_or_else(String::new, |s| s.name.clone());
-
-            let modal_entity = spawn_confirmation_modal(
-                &mut commands,
-                &i18n.t(&TranslationKey::RemoveStudentConfirm(student_name.clone())),
-                &i18n.t(&TranslationKey::Delete),
-                &i18n.t(&TranslationKey::Cancel),
-                theme::colors::ERROR,
-                window,
-                Some(camera),
-            );
-            commands
-                .entity(modal_entity)
-                .insert((
-                    StudentRemovePopover,
-                    TeacherViewOverlay,
-                    RemoveStudentTarget(student_index, student_name),
-                    DespawnOnExit(AppState::ThemeExploration),
-                ))
-                .observe(handle_confirm_remove_student);
+    for entity in activated_entities {
+        let Ok(remove_btn) = query.get(entity) else {
+            continue;
+        };
+        // Despawn any existing popover first
+        for entity in &existing_popover {
+            commands.entity(entity).try_despawn();
         }
+
+        let student_index = remove_btn.0;
+        let student_name = save_data.class_slots[session.slot_index]
+            .as_ref()
+            .and_then(|cs| cs.students.get(student_index))
+            .map_or_else(String::new, |s| s.name.clone());
+
+        let modal_entity = spawn_confirmation_modal(
+            &mut commands,
+            &i18n.t(&TranslationKey::RemoveStudentConfirm(student_name.clone())),
+            &i18n.t(&TranslationKey::Delete),
+            &i18n.t(&TranslationKey::Cancel),
+            theme::colors::ERROR,
+            window,
+            Some(camera),
+        );
+        commands
+            .entity(modal_entity)
+            .insert((
+                StudentRemovePopover,
+                TeacherViewOverlay,
+                RemoveStudentTarget(student_index, student_name),
+                DespawnOnExit(AppState::ThemeExploration),
+            ))
+            .observe(handle_confirm_remove_student);
     }
 }
 
@@ -437,8 +444,9 @@ fn update_roster_selection(
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn handle_student_click(
+    mut activations: MessageReader<ButtonActivated>,
     mut row_queries: ParamSet<(
-        Query<(&Interaction, &mut StudentRow), Changed<Interaction>>,
+        Query<(Entity, &mut StudentRow)>,
         Query<(&StudentRow, &mut BackgroundColor)>,
     )>,
     mut commands: Commands,
@@ -449,6 +457,7 @@ fn handle_student_click(
     lesson_phase: Option<Res<State<LessonPhase>>>,
     mut teacher_state: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
+    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     // Freeze selection during feedback / transition (answer already attributed)
     if let Some(ref phase) = lesson_phase
         && matches!(
@@ -467,24 +476,29 @@ fn handle_student_click(
     };
 
     let mut selected_student = None;
-    for (interaction, mut row) in &mut row_queries.p0() {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
+    for entity in activated_entities {
         let now = time.elapsed_secs_f64();
-        let is_double_click = active_student.as_deref().is_some_and(|student| {
-            student.0 == row.0 && row.1.is_some_and(|last_click| now - last_click < 0.4)
-        });
+        let (student_index, is_double_click) = {
+            let mut rows = row_queries.p0();
+            let Ok((_, mut row)) = rows.get_mut(entity) else {
+                continue;
+            };
+            let is_double_click = active_student.as_deref().is_some_and(|student| {
+                student.0 == row.0 && row.1.is_some_and(|last_click| now - last_click < 0.4)
+            });
+            let student_index = row.0;
+            if !is_double_click {
+                row.1 = Some(now);
+            }
+            (student_index, is_double_click)
+        };
 
         if is_double_click && *app_state.get() == AppState::ThemeExploration {
-            teacher_state.view = TeacherView::StudentStats {
-                student_index: row.0,
-            };
+            teacher_state.view = TeacherView::StudentStats { student_index };
             return;
         }
 
-        row.1 = Some(now);
-        selected_student = Some(row.0);
+        selected_student = Some(student_index);
     }
 
     if let Some(student_index) = selected_student {

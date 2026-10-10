@@ -1,6 +1,8 @@
 use bevy::color::Luminance;
 use bevy::input_focus::AutoFocus;
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
+use bevy::ui::Pressed;
 use bevy::window::PrimaryWindow;
 
 use crate::data::{
@@ -12,7 +14,7 @@ use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, ExplorationView, InLessonFlow, StateScopedResourceExt};
 use crate::ui::animation::{AnimatedButton, FloatingCard};
 use crate::ui::components::{
-    HoverTooltip, button_base, persistence_notice, screen_root, standard_button,
+    ButtonActivated, HoverTooltip, button_base, persistence_notice, screen_root, standard_button,
 };
 use crate::ui::theme;
 
@@ -512,41 +514,43 @@ fn count_completed_for_theme(
 }
 
 fn update_exploration_card_hover(
-    mut query: Query<
-        (&Interaction, &ExplorationCardHover, &mut BackgroundColor),
-        Changed<Interaction>,
-    >,
+    mut query: Query<(
+        &Hovered,
+        Has<Pressed>,
+        &ExplorationCardHover,
+        &mut BackgroundColor,
+    )>,
 ) {
-    for (interaction, hover, mut background) in &mut query {
-        background.0 = match interaction {
-            Interaction::Hovered => hover.hovered,
-            Interaction::Pressed => hover.pressed,
-            Interaction::None => hover.base,
+    for (hovered, pressed, card_hover, mut background) in &mut query {
+        let color = if pressed {
+            card_hover.pressed
+        } else if hovered.get() {
+            card_hover.hovered
+        } else {
+            card_hover.base
         };
+        if background.0 != color {
+            background.0 = color;
+        }
     }
 }
 
 fn handle_themes(
-    theme_query: Query<(&Interaction, &ThemeButton), Changed<Interaction>>,
-    back_query: Query<&Interaction, (Changed<Interaction>, With<BackToSaveSlotsButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    theme_query: Query<&ThemeButton>,
+    back_query: Query<(), With<BackToSaveSlotsButton>>,
     content: Res<ContentLibrary>,
     mut commands: Commands,
     mut next_app_state: ResMut<NextState<AppState>>,
     mut next_exploration_view: ResMut<NextState<ExplorationView>>,
 ) {
-    // Handle theme button clicks
-    for (interaction, theme_btn) in &theme_query {
-        if *interaction == Interaction::Pressed
-            && content.theme(&theme_btn.0).is_some_and(|t| t.available)
-        {
-            commands.insert_resource(ActiveTheme(theme_btn.0.clone()));
-            next_exploration_view.set(ExplorationView::ThemeLessons);
-        }
-    }
-
-    // Handle back button
-    for interaction in &back_query {
-        if *interaction == Interaction::Pressed {
+    for activation in activations.read() {
+        if let Ok(theme_btn) = theme_query.get(activation.0) {
+            if content.theme(&theme_btn.0).is_some_and(|t| t.available) {
+                commands.insert_resource(ActiveTheme(theme_btn.0.clone()));
+                next_exploration_view.set(ExplorationView::ThemeLessons);
+            }
+        } else if back_query.contains(activation.0) {
             next_app_state.set(AppState::SaveSlots);
         }
     }
@@ -821,31 +825,28 @@ fn spawn_lesson_button(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_theme_lessons(
-    lesson_query: Query<(&Interaction, &LessonButton), Changed<Interaction>>,
-    back_query: Query<&Interaction, (Changed<Interaction>, With<BackToThemesButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    lesson_query: Query<&LessonButton>,
+    back_query: Query<(), With<BackToThemesButton>>,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
     mut commands: Commands,
     mut next_app_state: ResMut<NextState<AppState>>,
     mut next_exploration_view: ResMut<NextState<ExplorationView>>,
 ) {
-    // Handle lesson button clicks
-    for (interaction, lesson_btn) in &lesson_query {
-        if *interaction == Interaction::Pressed
-            && let Some(theme_data) = content.theme(&active_theme)
-            && theme_data
-                .lesson(&lesson_btn.0)
-                .is_some_and(|l| l.available)
-        {
-            commands.insert_resource(SelectedLesson(Some(lesson_btn.0.clone())));
-            next_app_state.set(AppState::LessonPlay);
-        }
-    }
-
-    // Handle back button
-    for interaction in &back_query {
-        if *interaction == Interaction::Pressed {
+    for activation in activations.read() {
+        if let Ok(lesson_btn) = lesson_query.get(activation.0) {
+            if let Some(theme_data) = content.theme(&active_theme)
+                && theme_data
+                    .lesson(&lesson_btn.0)
+                    .is_some_and(|lesson| lesson.available)
+            {
+                commands.insert_resource(SelectedLesson(Some(lesson_btn.0.clone())));
+                next_app_state.set(AppState::LessonPlay);
+            }
+        } else if back_query.contains(activation.0) {
             commands.remove_resource::<ActiveTheme>();
             next_exploration_view.set(ExplorationView::Themes);
         }

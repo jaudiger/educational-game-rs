@@ -4,6 +4,7 @@ use bevy::input_focus::AutoFocus;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
+use bevy::ui_widgets::Button;
 
 use crate::ui::theme;
 
@@ -109,18 +110,18 @@ fn slice_border_radius(index: u32, total: u32) -> BorderRadius {
     }
     if index == 0 {
         return BorderRadius {
-            top_left: px(CORNER_RADIUS),
-            bottom_left: px(CORNER_RADIUS),
-            top_right: px(0.0),
-            bottom_right: px(0.0),
+            top_left: px(CORNER_RADIUS).into(),
+            bottom_left: px(CORNER_RADIUS).into(),
+            top_right: px(0.0).into(),
+            bottom_right: px(0.0).into(),
         };
     }
     if index == total - 1 {
         return BorderRadius {
-            top_left: px(0.0),
-            bottom_left: px(0.0),
-            top_right: px(CORNER_RADIUS),
-            bottom_right: px(CORNER_RADIUS),
+            top_left: px(0.0).into(),
+            bottom_left: px(0.0).into(),
+            top_right: px(CORNER_RADIUS).into(),
+            bottom_right: px(CORNER_RADIUS).into(),
         };
     }
     BorderRadius::ZERO

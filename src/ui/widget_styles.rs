@@ -1,3 +1,4 @@
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::Checked;
 use bevy::ui_widgets::{Slider, SliderRange, SliderThumb, SliderValue};
@@ -80,32 +81,28 @@ pub fn dismiss_tooltip_timer(
 /// Spawns/despawns tooltips on hover for entities with `HoverTooltip`.
 pub fn handle_hover_tooltips(
     mut commands: Commands,
-    query: Query<(Entity, &Interaction, &HoverTooltip), Changed<Interaction>>,
+    query: Query<(Entity, &Hovered, &HoverTooltip), Changed<Hovered>>,
     existing: Query<Entity, With<HoverTooltipPopover>>,
 ) {
-    for (entity, interaction, hover_tooltip) in &query {
-        match interaction {
-            Interaction::Hovered => {
-                for e in &existing {
-                    commands.entity(e).try_despawn();
-                }
-                let tooltip = spawn_tooltip_popover(
-                    &mut commands,
-                    entity,
-                    &hover_tooltip.message,
-                    hover_tooltip.window,
-                );
-                commands
-                    .entity(tooltip)
-                    .insert(HoverTooltipPopover)
-                    .remove::<TooltipLifetime>();
+    for (entity, hovered, hover_tooltip) in &query {
+        if hovered.get() {
+            for e in &existing {
+                commands.entity(e).try_despawn();
             }
-            Interaction::None => {
-                for e in &existing {
-                    commands.entity(e).try_despawn();
-                }
+            let tooltip = spawn_tooltip_popover(
+                &mut commands,
+                entity,
+                &hover_tooltip.message,
+                hover_tooltip.window,
+            );
+            commands
+                .entity(tooltip)
+                .insert(HoverTooltipPopover)
+                .remove::<TooltipLifetime>();
+        } else {
+            for e in &existing {
+                commands.entity(e).try_despawn();
             }
-            Interaction::Pressed => {}
         }
     }
 }

@@ -5,7 +5,9 @@ use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, Popover
 use crate::ui::theme;
 
 use super::buttons::action_button_scene;
-use super::{PopoverCancelButton, PopoverConfirmButton, TooltipPopover, card_node};
+use super::{
+    ButtonActivated, PopoverCancelButton, PopoverConfirmButton, TooltipPopover, card_node,
+};
 
 /// Spawns a centered confirmation modal (full-screen overlay + card).
 ///
@@ -45,7 +47,6 @@ pub fn spawn_confirmation_modal(
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)),
         GlobalZIndex(100),
         FocusPolicy::Block,
-        Interaction::None,
         children![(
             card_n,
             card_bg,
@@ -113,36 +114,26 @@ pub struct ConfirmationDialogActionEvent {
     pub action: ConfirmationDialogAction,
 }
 
-#[allow(clippy::type_complexity)]
 pub fn dispatch_confirmation_button_actions(
-    mut commands: Commands,
-    confirm_buttons: Query<
-        (Entity, &Interaction),
-        (Changed<Interaction>, With<PopoverConfirmButton>),
-    >,
-    cancel_buttons: Query<
-        (Entity, &Interaction),
-        (Changed<Interaction>, With<PopoverCancelButton>),
-    >,
+    mut activations: MessageReader<ButtonActivated>,
+    confirm_buttons: Query<(), With<PopoverConfirmButton>>,
+    cancel_buttons: Query<(), With<PopoverCancelButton>>,
     parents: Query<&ChildOf>,
     dialogs: Query<(), With<ConfirmationDialog>>,
+    mut commands: Commands,
 ) {
-    for (button, interaction) in &confirm_buttons {
-        if *interaction == Interaction::Pressed {
+    for activation in activations.read() {
+        if confirm_buttons.contains(activation.0) {
             dispatch_confirmation_action(
-                button,
+                activation.0,
                 ConfirmationDialogAction::Confirm,
                 &mut commands,
                 &parents,
                 &dialogs,
             );
-        }
-    }
-
-    for (button, interaction) in &cancel_buttons {
-        if *interaction == Interaction::Pressed {
+        } else if cancel_buttons.contains(activation.0) {
             dispatch_confirmation_action(
-                button,
+                activation.0,
                 ConfirmationDialogAction::Cancel,
                 &mut commands,
                 &parents,

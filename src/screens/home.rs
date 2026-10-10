@@ -4,7 +4,7 @@ use bevy::window::PrimaryWindow;
 
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
-use crate::ui::components::{screen_root, standard_button};
+use crate::ui::components::{ButtonActivated, screen_root, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -86,11 +86,12 @@ fn setup_home(
 }
 
 fn handle_quit(
-    query: Query<&Interaction, (Changed<Interaction>, With<QuitButton>)>,
+    mut activations: MessageReader<ButtonActivated>,
+    query: Query<(), With<QuitButton>>,
     mut app_exit: MessageWriter<AppExit>,
 ) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
+    for activation in activations.read() {
+        if query.contains(activation.0) {
             app_exit.write(AppExit::Success);
         }
     }

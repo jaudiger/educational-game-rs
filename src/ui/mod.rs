@@ -9,6 +9,7 @@ pub mod theme;
 pub mod widget_styles;
 
 pub use animation::UiAnimationPlugin;
+pub use components::ButtonActivationPlugin;
 pub use focus_navigation::FocusNavigationPlugin;
 pub use navigation::NavigationPlugin;
 pub use scroll::ScrollPlugin;

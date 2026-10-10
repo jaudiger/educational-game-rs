@@ -129,27 +129,24 @@ impl SkyBalloonMascot {
                 align_items: AlignItems::Center,
             }
             Children [
-                (
-                    SwayingEnvelope
-                    Node {
-                        width: theme::scaled(SKY_ENVELOPE_WIDTH),
-                        height: theme::scaled(SKY_ENVELOPE_HEIGHT),
-                    }
-                    ImageNode {
-                        image: {props.envelope_image}
-                    }
-                ),
-                (
-                    PulledBasket
-                    Node {
-                        width: theme::scaled(SKY_BASKET_WIDTH),
-                        height: theme::scaled(SKY_BASKET_HEIGHT),
-                        margin: UiRect::top(theme::scaled(-SKY_BASKET_OVERLAP)),
-                    }
-                    ImageNode {
-                        image: {props.basket_image}
-                    }
-                ),
+                SwayingEnvelope
+                Node {
+                    width: theme::scaled(SKY_ENVELOPE_WIDTH),
+                    height: theme::scaled(SKY_ENVELOPE_HEIGHT),
+                }
+                ImageNode {
+                    image: {props.envelope_image}
+                }
+                --
+                PulledBasket
+                Node {
+                    width: theme::scaled(SKY_BASKET_WIDTH),
+                    height: theme::scaled(SKY_BASKET_HEIGHT),
+                    margin: UiRect::top(theme::scaled(-SKY_BASKET_OVERLAP)),
+                }
+                ImageNode {
+                    image: {props.basket_image}
+                }
             ]
         }
     }

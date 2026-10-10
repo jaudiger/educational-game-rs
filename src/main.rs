@@ -24,8 +24,8 @@ use screens::{
 };
 use states::{ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase};
 use ui::{
-    FocusNavigationPlugin, NavigationPlugin, ScrollPlugin, TextInputPlugin, ThemePlugin,
-    UiAnimationPlugin,
+    ButtonActivationPlugin, FocusNavigationPlugin, NavigationPlugin, ScrollPlugin, TextInputPlugin,
+    ThemePlugin, UiAnimationPlugin,
 };
 
 fn main() {
@@ -50,6 +50,7 @@ fn main() {
         // Plugins
         .add_plugins((
             BalloonCursorPlugin,
+            ButtonActivationPlugin,
             ContentPlugin,
             FocusNavigationPlugin,
             GameAudioPlugin,

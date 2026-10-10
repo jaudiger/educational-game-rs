@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+
+use super::components::ButtonActivated;
 use bevy::state::state::FreelyMutableState;
 
 /// Generic navigation component. Attach to any `Button` entity to make it
@@ -13,11 +15,12 @@ pub struct NavigateTo<S: FreelyMutableState>(pub S);
 /// Bevy system that handles all `NavigateTo<S>` button presses for a given
 /// state type `S`. Register once per state type in `NavigationPlugin`.
 fn handle_navigate_to<S: FreelyMutableState + Clone>(
-    query: Query<(&Interaction, &NavigateTo<S>), Changed<Interaction>>,
+    mut activated: MessageReader<ButtonActivated>,
+    query: Query<&NavigateTo<S>>,
     mut next_state: ResMut<NextState<S>>,
 ) {
-    for (interaction, nav) in &query {
-        if *interaction == Interaction::Pressed {
+    for activation in activated.read() {
+        if let Ok(nav) = query.get(activation.0) {
             next_state.set(nav.0.clone());
         }
     }
