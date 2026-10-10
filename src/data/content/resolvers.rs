@@ -498,11 +498,13 @@ impl FractionComparisonTemplate {
             self.difficulty,
             fraction_a,
             fraction_b,
+            answer,
             &self.character_a,
             &self.character_b,
         );
-        let explanation =
-            LocalizedExplanation::new(self.explanation_template.clone(), explanation_placeholders);
+        let explanation_text =
+            comparison_explanation_text(self.difficulty, answer, &self.explanation_template);
+        let explanation = LocalizedExplanation::new(explanation_text, explanation_placeholders);
 
         let explanation_visual = Some(self.build_visual(fraction_a, fraction_b));
 
@@ -552,10 +554,36 @@ impl FractionComparisonTemplate {
     }
 }
 
+fn comparison_explanation_text(
+    difficulty: ComparisonDifficulty,
+    answer: ComparisonAnswer,
+    template: &LocalizedText,
+) -> LocalizedText {
+    if answer != ComparisonAnswer::Equal {
+        return template.clone();
+    }
+
+    match difficulty {
+        ComparisonDifficulty::SameDenominator => LocalizedText::new(
+            "Les deux fractions ont le même numérateur et le même dénominateur. Elles sont donc égales.",
+            "The two fractions have the same numerator and denominator. They are therefore equal.",
+        ),
+        ComparisonDifficulty::SameNumerator => LocalizedText::new(
+            "Ils mangent le même nombre de parts et les parts ont la même taille. Les fractions sont donc égales.",
+            "They eat the same number of slices, and the slices are the same size. The fractions are therefore equal.",
+        ),
+        ComparisonDifficulty::MultipleDenominator => LocalizedText::new(
+            "Après conversion en parts de même taille, les deux fractions sont égales.",
+            "After converting to slices of the same size, the two fractions are equal.",
+        ),
+    }
+}
+
 fn comparison_explanation_placeholders(
     difficulty: ComparisonDifficulty,
     fraction_a: (u32, u32),
     fraction_b: (u32, u32),
+    answer: ComparisonAnswer,
     character_a: &str,
     character_b: &str,
 ) -> Vec<ExplanationPlaceholder> {
@@ -563,6 +591,10 @@ fn comparison_explanation_placeholders(
         ExplanationColorRole::Primary
     } else {
         ExplanationColorRole::Secondary
+    };
+    let (greater_fraction, lesser_fraction) = match answer {
+        ComparisonAnswer::A | ComparisonAnswer::Equal => (fraction_a, fraction_b),
+        ComparisonAnswer::B => (fraction_b, fraction_a),
     };
     vec![
         number_placeholder("na", fraction_a.0, ExplanationColorRole::Primary),
@@ -581,6 +613,20 @@ fn comparison_explanation_placeholders(
             fraction_b.0,
             fraction_b.1,
             right_numerator_role,
+            ExplanationColorRole::Default,
+        ),
+        fraction_placeholder(
+            "greater_fraction",
+            greater_fraction.0,
+            greater_fraction.1,
+            ExplanationColorRole::Primary,
+            ExplanationColorRole::Default,
+        ),
+        fraction_placeholder(
+            "lesser_fraction",
+            lesser_fraction.0,
+            lesser_fraction.1,
+            ExplanationColorRole::Secondary,
             ExplanationColorRole::Default,
         ),
         text_placeholder("char_a", character_a.to_owned(), character_a.to_owned()),

@@ -1,8 +1,7 @@
 use bevy::prelude::*;
 
 use crate::data::content::{
-    ComparisonAnswer, ComparisonDifficulty, ExplanationColorRole, ExplanationPlaceholder,
-    ExplanationValue, FractionComparisonDefinition, LocalizedExplanation,
+    ExplanationColorRole, ExplanationPlaceholder, ExplanationValue, LocalizedExplanation,
 };
 use crate::i18n::Language;
 use crate::ui::components::stacked_fraction;
@@ -14,87 +13,6 @@ use super::super::visuals::PV_ZERO_COLOR;
 enum Segment<'a> {
     Text(String),
     Value(&'a ExplanationValue),
-}
-
-pub(super) struct ComparisonMath {
-    fraction_a: (u32, u32),
-    fraction_b: (u32, u32),
-    relation: &'static str,
-    same_numerator: bool,
-}
-
-impl ComparisonMath {
-    pub(super) const fn new(definition: &FractionComparisonDefinition) -> Self {
-        let relation = match definition.answer {
-            ComparisonAnswer::A => ">",
-            ComparisonAnswer::B => "<",
-            ComparisonAnswer::Equal => "=",
-        };
-        Self {
-            fraction_a: definition.fraction_a,
-            fraction_b: definition.fraction_b,
-            relation,
-            same_numerator: matches!(definition.difficulty, ComparisonDifficulty::SameNumerator),
-        }
-    }
-}
-
-pub(super) fn spawn_comparison_math(
-    parent: &mut ChildSpawnerCommands,
-    comparison: &ComparisonMath,
-    font_size: f32,
-    window: Entity,
-) {
-    let gap = theme::scaled(font_size * 0.28);
-    parent
-        .spawn(Node {
-            align_self: AlignSelf::Stretch,
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::Center,
-            ..default()
-        })
-        .with_children(|wrapper| {
-            wrapper
-                .spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    flex_wrap: FlexWrap::Wrap,
-                    column_gap: gap,
-                    row_gap: theme::scaled(theme::spacing::SMALL),
-                    ..default()
-                })
-                .with_children(|row| {
-                    let left_role = ExplanationColorRole::Primary;
-                    let right_role = if comparison.same_numerator {
-                        ExplanationColorRole::Primary
-                    } else {
-                        ExplanationColorRole::Secondary
-                    };
-                    row.spawn(stacked_fraction(
-                        comparison.fraction_a.0,
-                        comparison.fraction_a.1,
-                        font_size,
-                        role_color(left_role),
-                        theme::colors::TEXT_DARK,
-                        window,
-                    ));
-                    spawn_text(
-                        row,
-                        comparison.relation,
-                        theme::colors::TEXT_DARK,
-                        font_size,
-                        window,
-                    );
-                    row.spawn(stacked_fraction(
-                        comparison.fraction_b.0,
-                        comparison.fraction_b.1,
-                        font_size,
-                        role_color(right_role),
-                        theme::colors::TEXT_DARK,
-                        window,
-                    ));
-                });
-        });
 }
 
 pub(super) fn spawn_explanation_text(

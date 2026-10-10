@@ -195,8 +195,8 @@ fn build_visual_fraction_questions() -> Vec<QuestionDefinition> {
             denominator_range: vec![4, 5, 6, 8, 10, 12],
             numerator_range: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
             explanation_template: LocalizedText::new(
-                "Les gâteaux ont les mêmes parts ({da}), on compare juste le nombre de parts : {na} et {nb}.",
-                "The pies have the same slices ({da}), so we compare how many slices: {na} and {nb}.",
+                "Les deux gâteaux sont divisés en {da} parts chacun. On compare les numérateurs : {na} et {nb}. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                "Each pie is divided into {da} slices. Compare the numerators, {na} and {nb}. So {greater_fraction} is greater than {lesser_fraction}.",
             ),
         }),
         // ----- FractionComparison template (same numerator) -----
@@ -208,8 +208,8 @@ fn build_visual_fraction_questions() -> Vec<QuestionDefinition> {
             denominator_range: vec![3, 4, 5, 6, 8, 10, 12],
             numerator_range: vec![2, 3, 4, 5],
             explanation_template: LocalizedText::new(
-                "Ils mangent le même nombre de parts ({na}), mais moins le gâteau a de parts, plus elles sont grosses !",
-                "They eat the same number of slices ({na}), but fewer slices in a pie means bigger slices!",
+                "Ils mangent le même nombre de parts ({na}), mais moins il y a de parts dans le gâteau, plus chaque part est grosse. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                "They eat the same number of slices ({na}), but the fewer slices the pie has, the larger each slice is. So {greater_fraction} is greater than {lesser_fraction}.",
             ),
         }),
         // ----- FractionComparison template (multiple denominator) -----
@@ -221,8 +221,8 @@ fn build_visual_fraction_questions() -> Vec<QuestionDefinition> {
             denominator_range: vec![3, 4, 6, 8, 12],
             numerator_range: vec![1, 2, 3, 4, 5, 6, 7],
             explanation_template: LocalizedText::new(
-                "Pour comparer {fraction_a} et {fraction_b} il faut couper les gâteaux en parts de la même taille.",
-                "To compare {fraction_a} and {fraction_b} we need to cut the pies into same-sized slices.",
+                "Pour comparer {fraction_a} et {fraction_b}, on partage les gâteaux en parts de même taille. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                "To compare {fraction_a} and {fraction_b}, divide the pies into slices of the same size. So {greater_fraction} is greater than {lesser_fraction}.",
             ),
         }),
     ]

@@ -16,7 +16,7 @@ use crate::ui::theme;
 use super::FeedbackRoot;
 use super::visuals::spawn_explanation_visual;
 
-use self::renderer::{ComparisonMath, spawn_comparison_math, spawn_explanation_text};
+use self::renderer::spawn_explanation_text;
 
 mod renderer;
 
@@ -24,7 +24,6 @@ enum FeedbackExplanation {
     Hidden,
     Visible {
         text: LocalizedExplanation,
-        comparison: Option<ComparisonMath>,
         visual: Option<ExplanationVisual>,
     },
 }
@@ -75,7 +74,6 @@ fn build_feedback_explanation(
     }
     FeedbackExplanation::Visible {
         text,
-        comparison: comparison_math(definition),
         visual: explanation_visual(definition),
     }
 }
@@ -94,13 +92,6 @@ fn localized_explanation(definition: &QuestionDefinition) -> LocalizedExplanatio
         | QuestionDefinition::NumericInputTemplate(_) => {
             unreachable!("templates must be resolved before building the session")
         }
-    }
-}
-
-const fn comparison_math(definition: &QuestionDefinition) -> Option<ComparisonMath> {
-    match definition {
-        QuestionDefinition::FractionComparison(question) => Some(ComparisonMath::new(question)),
-        _ => None,
     }
 }
 
@@ -154,12 +145,7 @@ fn spawn_explanation_section(
     explanation: &FeedbackExplanation,
     window: Entity,
 ) {
-    let FeedbackExplanation::Visible {
-        text,
-        comparison,
-        visual,
-    } = explanation
-    else {
+    let FeedbackExplanation::Visible { text, visual } = explanation else {
         return;
     };
 
@@ -174,9 +160,6 @@ fn spawn_explanation_section(
         })
         .with_children(|section| {
             spawn_explanation_text(section, text, i18n.language, theme::fonts::HEADING, window);
-            if let Some(comparison) = comparison {
-                spawn_comparison_math(section, comparison, theme::fonts::HEADING, window);
-            }
             if let Some(visual) = visual {
                 spawn_explanation_visual(section, visual, window, i18n.language);
             }
