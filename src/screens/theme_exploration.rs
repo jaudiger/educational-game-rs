@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bevy::color::Luminance;
 use bevy::input_focus::AutoFocus;
 use bevy::picking::hover::Hovered;
@@ -6,7 +8,7 @@ use bevy::ui::Pressed;
 use bevy::window::PrimaryWindow;
 
 use crate::data::{
-    ActiveStudent, ActiveTheme, ContentLibrary, ExplorationTheme, GameSettings,
+    ActiveStudent, ActiveTheme, ContentLibrary, ExplorationTheme, GameMode, GameSettings,
     LessonLaunchSelection, LessonProgress, PersistenceAction, PersistenceStatus, PlayerContext,
     PlayerSession, SaveData, SelectedLesson, get_current_progress,
 };
@@ -231,13 +233,24 @@ fn setup_themes(
         .themes
         .iter()
         .map(|theme_data| {
-            let (completed, total_lessons) = count_completed_for_theme(
-                theme_data,
-                &ctx.save_data,
-                &ctx.settings,
-                ctx.session.as_deref(),
-                ctx.active_student.as_deref(),
-            );
+            let (completed, total_lessons) = if exploration_progress_visible(ctx.settings.mode) {
+                count_completed_for_theme(
+                    theme_data,
+                    &ctx.save_data,
+                    &ctx.settings,
+                    ctx.session.as_deref(),
+                    ctx.active_student.as_deref(),
+                )
+            } else {
+                (
+                    0,
+                    theme_data
+                        .lessons
+                        .iter()
+                        .filter(|lesson| lesson.available)
+                        .count(),
+                )
+            };
             ThemeButtonData {
                 id: theme_data.id.clone(),
                 available: theme_data.available,
@@ -589,6 +602,32 @@ struct LessonButtonData {
     best_percent_text: Option<String>,
 }
 
+fn build_lesson_button_data(
+    theme_data: &crate::data::content::Theme,
+    progress: Option<&HashMap<String, LessonProgress>>,
+    i18n: &I18n,
+) -> Vec<LessonButtonData> {
+    theme_data
+        .lessons
+        .iter()
+        .map(|lesson| {
+            let best_percent = progress
+                .and_then(|progress| progress.get(&lesson.id))
+                .map(LessonProgress::percentage);
+            LessonButtonData {
+                id: lesson.id.clone(),
+                available: lesson.available,
+                title_text: i18n.t(&lesson.title_key).into_owned(),
+                coming_soon_text: i18n.t(&TranslationKey::ComingSoon).into_owned(),
+                best_percent_text: best_percent.map(|percentage| {
+                    i18n.t(&TranslationKey::BestPercent(percentage))
+                        .into_owned()
+                }),
+            }
+        })
+        .collect()
+}
+
 struct LessonActionLabels {
     play_series: String,
     choose_question: String,
@@ -620,14 +659,18 @@ fn setup_theme_lessons(
     let theme_title = i18n.t(&theme_data.title_key).into_owned();
     let back_label = i18n.t(&TranslationKey::BackToThemes).into_owned();
 
-    let progress = ctx.session.as_ref().and_then(|slot| {
-        get_current_progress(
-            &ctx.save_data,
-            ctx.settings.mode,
-            slot.slot_index,
-            ctx.active_student.as_ref().map(|s| s.0),
-        )
-    });
+    let progress = if exploration_progress_visible(ctx.settings.mode) {
+        ctx.session.as_ref().and_then(|slot| {
+            get_current_progress(
+                &ctx.save_data,
+                ctx.settings.mode,
+                slot.slot_index,
+                ctx.active_student.as_ref().map(|student| student.0),
+            )
+        })
+    } else {
+        None
+    };
 
     let card_style = ExplorationCardStyle::for_exploration_theme(ctx.settings.exploration_theme);
     let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
@@ -637,23 +680,7 @@ fn setup_theme_lessons(
         choose_question: i18n.t(&TranslationKey::ChooseQuestion).into_owned(),
     };
 
-    let lesson_buttons: Vec<LessonButtonData> = theme_data
-        .lessons
-        .iter()
-        .map(|lesson| {
-            let best_percent = progress
-                .and_then(|p| p.get(&lesson.id))
-                .map(LessonProgress::percentage);
-            LessonButtonData {
-                id: lesson.id.clone(),
-                available: lesson.available,
-                title_text: i18n.t(&lesson.title_key).into_owned(),
-                coming_soon_text: i18n.t(&TranslationKey::ComingSoon).into_owned(),
-                best_percent_text: best_percent
-                    .map(|pct| i18n.t(&TranslationKey::BestPercent(pct)).into_owned()),
-            }
-        })
-        .collect();
+    let lesson_buttons = build_lesson_button_data(theme_data, progress, &i18n);
 
     let mut root = commands.spawn((
         screen_root(),
@@ -721,6 +748,10 @@ fn setup_theme_lessons(
     }
 }
 
+const fn exploration_progress_visible(mode: GameMode) -> bool {
+    matches!(mode, GameMode::Individual)
+}
+
 fn update_exploration_progress(
     ctx: PlayerContext<'_>,
     content: Res<ContentLibrary>,
@@ -732,43 +763,51 @@ fn update_exploration_progress(
     let theme_data = active_theme
         .as_deref()
         .and_then(|theme| content.theme(&theme.0));
-    let progress = ctx.session.as_deref().and_then(|session| {
-        get_current_progress(
-            &ctx.save_data,
-            ctx.settings.mode,
-            session.slot_index,
-            ctx.active_student.as_deref().map(|student| student.0),
-        )
-    });
+    let progress = if exploration_progress_visible(ctx.settings.mode) {
+        ctx.session.as_deref().and_then(|session| {
+            get_current_progress(
+                &ctx.save_data,
+                ctx.settings.mode,
+                session.slot_index,
+                ctx.active_student.as_deref().map(|student| student.0),
+            )
+        })
+    } else {
+        None
+    };
 
     for (progress_kind, mut text, mut node) in &mut progress_query {
-        let label = match (*exploration_view.get(), progress_kind) {
-            (ExplorationView::Themes, ExplorationProgressText::Theme(theme_id)) => {
-                content.theme(theme_id).and_then(|theme_data| {
-                    let (completed, total) = count_completed_for_theme(
-                        theme_data,
-                        &ctx.save_data,
-                        &ctx.settings,
-                        ctx.session.as_deref(),
-                        ctx.active_student.as_deref(),
-                    );
-                    (completed > 0).then(|| {
-                        i18n.t(&TranslationKey::LessonsCompleted(completed, total))
-                            .into_owned()
+        let label = if exploration_progress_visible(ctx.settings.mode) {
+            match (*exploration_view.get(), progress_kind) {
+                (ExplorationView::Themes, ExplorationProgressText::Theme(theme_id)) => {
+                    content.theme(theme_id).and_then(|theme_data| {
+                        let (completed, total) = count_completed_for_theme(
+                            theme_data,
+                            &ctx.save_data,
+                            &ctx.settings,
+                            ctx.session.as_deref(),
+                            ctx.active_student.as_deref(),
+                        );
+                        (completed > 0).then(|| {
+                            i18n.t(&TranslationKey::LessonsCompleted(completed, total))
+                                .into_owned()
+                        })
                     })
-                })
+                }
+                (ExplorationView::ThemeLessons, ExplorationProgressText::Lesson(lesson_id)) => {
+                    theme_data
+                        .and_then(|theme| theme.lesson(lesson_id))
+                        .filter(|lesson| lesson.available)
+                        .and_then(|lesson| progress.and_then(|progress| progress.get(&lesson.id)))
+                        .map(|progress| {
+                            i18n.t(&TranslationKey::BestPercent(progress.percentage()))
+                                .into_owned()
+                        })
+                }
+                _ => continue,
             }
-            (ExplorationView::ThemeLessons, ExplorationProgressText::Lesson(lesson_id)) => {
-                theme_data
-                    .and_then(|theme| theme.lesson(lesson_id))
-                    .filter(|lesson| lesson.available)
-                    .and_then(|lesson| progress.and_then(|progress| progress.get(&lesson.id)))
-                    .map(|progress| {
-                        i18n.t(&TranslationKey::BestPercent(progress.percentage()))
-                            .into_owned()
-                    })
-            }
-            _ => continue,
+        } else {
+            None
         };
         set_exploration_progress_text(&mut text, &mut node, label);
     }

@@ -1,6 +1,8 @@
 use bevy::input_focus::tab_navigation::TabGroup;
+use bevy::picking::events::PointerClick;
+use bevy::picking::pointer::PointerButton;
 use bevy::prelude::*;
-use bevy::ui_widgets::ScrollArea;
+use bevy::ui_widgets::{ScrollArea, observe};
 
 use crate::data::{
     ActiveStudent, ClassStudent, GameMode, PersistenceAction, PersistenceStatus, PlayerSession,
@@ -140,6 +142,7 @@ fn rebuild_roster_ui(
         UiTargetCamera(camera_entity),
         TabGroup::new(0),
         TeacherRosterRoot,
+        observe(clear_student_selection_outside_student_rows),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn(tab_header_bundle);
             parent.spawn(write_notice);
@@ -510,6 +513,38 @@ fn handle_student_click(
             commands.insert_resource(ActiveStudent(student_index));
         }
         update_roster_selection(&mut row_queries.p1(), student_index);
+    }
+}
+
+fn clear_student_selection_outside_student_rows(
+    click: On<PointerClick>,
+    mut commands: Commands,
+    active_student: Option<Res<ActiveStudent>>,
+    parents: Query<&ChildOf>,
+    student_rows: Query<(), With<StudentRow>>,
+    popover_query: Query<(), With<StudentRemovePopover>>,
+    lesson_phase: Option<Res<State<LessonPhase>>>,
+) {
+    if click.button != PointerButton::Primary || active_student.is_none() {
+        return;
+    }
+    if lesson_phase.as_deref().is_some_and(|phase| {
+        matches!(
+            phase.get(),
+            LessonPhase::ShowFeedback | LessonPhase::Transitioning
+        )
+    }) || !popover_query.is_empty()
+    {
+        return;
+    }
+
+    let target = click.original_event_target();
+    let clicked_on_student = student_rows.contains(target)
+        || parents
+            .iter_ancestors(target)
+            .any(|ancestor| student_rows.contains(ancestor));
+    if !clicked_on_student {
+        commands.remove_resource::<ActiveStudent>();
     }
 }
 
