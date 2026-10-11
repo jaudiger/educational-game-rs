@@ -3,5 +3,6 @@ pub mod resolvers;
 pub mod session;
 pub mod types;
 
-pub use session::build_session;
+#[allow(unused_imports)]
+pub use session::build_session_with_selection;
 pub use types::*;

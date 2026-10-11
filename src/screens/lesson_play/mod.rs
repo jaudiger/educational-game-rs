@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
 use crate::data::{
-    ActiveStudent, GameMode, GameSettings, LastAnswer, LessonSession, PersistenceMut,
-    PlayerSession, SelectedLesson,
+    ActiveStudent, GameMode, GameSettings, LastAnswer, LessonLaunchSelection, LessonSession,
+    PersistenceMut, PlayerSession, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
@@ -10,7 +10,7 @@ use crate::questions::registry::{
     QuestionInteractionSet, QuestionResponseSubmitted, assess_question_responses,
 };
 use crate::states::cleanup_root;
-use crate::states::{ActiveLesson, AppState, LessonPhase, StateScopedResourceExt};
+use crate::states::{ActiveLesson, AppState, InLessonFlow, LessonPhase, StateScopedResourceExt};
 use crate::ui::components::ButtonActivated;
 
 mod explanations;
@@ -25,7 +25,8 @@ impl Plugin for LessonPlayScreenPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<QuestionResponseSubmitted>()
             .register_state_scoped_resource::<ActiveLesson, LessonSession>(ActiveLesson)
-            .register_state_scoped_resource::<ActiveLesson, SelectedLesson>(ActiveLesson)
+            .register_state_scoped_resource::<InLessonFlow, SelectedLesson>(InLessonFlow)
+            .register_state_scoped_resource::<InLessonFlow, LessonLaunchSelection>(InLessonFlow)
             .register_state_scoped_resource::<ActiveLesson, LastAnswer>(ActiveLesson)
             .add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
             .add_systems(
@@ -87,7 +88,7 @@ fn transition_to_waiting(mut next_phase: ResMut<NextState<LessonPhase>>) {
     next_phase.set(LessonPhase::WaitingAnswer);
 }
 
-/// Updates session score and records the answer to the active student in class mode.
+/// Updates the session score and immediately persists the active player answer.
 /// Runs before `setup_feedback_ui` so the UI reads the updated session.
 fn record_answer(
     last_answer: Res<LastAnswer>,
@@ -99,16 +100,15 @@ fn record_answer(
 ) {
     session::update_session_score(&mut session, &last_answer);
 
-    if persistence.settings.mode == GameMode::Group {
-        session::record_class_answer(
-            &session,
-            &last_answer,
-            active_student.as_deref(),
-            player_session.as_deref(),
-            selected_lesson.as_deref(),
-            &mut persistence,
-        );
-    }
+    session::record_answer(
+        &session,
+        &last_answer,
+        persistence.settings.mode,
+        active_student.as_deref(),
+        player_session.as_deref(),
+        selected_lesson.as_deref(),
+        &mut persistence,
+    );
 }
 
 /// Clear `ActiveStudent` at the start of each question in class mode,
@@ -122,13 +122,23 @@ fn clear_active_student_for_question(mut commands: Commands, settings: Res<GameS
 fn advance_question(
     mut session: ResMut<LessonSession>,
     mut next_phase: ResMut<NextState<LessonPhase>>,
+    launch_selection: Option<Res<LessonLaunchSelection>>,
     mut next_app_state: ResMut<NextState<AppState>>,
 ) {
     session.current_index += 1;
     if session.current_index < session.questions.len() {
         next_phase.set(LessonPhase::ShowQuestion);
     } else {
-        next_app_state.set(AppState::LessonSummary);
+        let default_selection = LessonLaunchSelection::CompleteLesson;
+        let selection = launch_selection.as_deref().unwrap_or(&default_selection);
+        next_app_state.set(completed_session_destination(selection));
+    }
+}
+
+const fn completed_session_destination(selection: &LessonLaunchSelection) -> AppState {
+    match selection {
+        LessonLaunchSelection::CompleteLesson => AppState::LessonSummary,
+        LessonLaunchSelection::SingleQuestion { .. } => AppState::ThemeExploration,
     }
 }
 

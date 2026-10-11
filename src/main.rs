@@ -18,9 +18,10 @@ use questions::{
     NumericInputPlugin,
 };
 use screens::{
-    HomeScreenPlugin, LessonPlayScreenPlugin, LessonSummaryScreenPlugin, SaveSlotsScreenPlugin,
-    SettingsScreenPlugin, TeacherLessonsScreenPlugin, TeacherRosterScreenPlugin,
-    TeacherStatsScreenPlugin, ThemeExplorationScreenPlugin,
+    HomeScreenPlugin, LessonPlayScreenPlugin, LessonSummaryScreenPlugin,
+    QuestionSelectionScreenPlugin, SaveSlotsScreenPlugin, SettingsScreenPlugin,
+    TeacherLessonsScreenPlugin, TeacherRosterScreenPlugin, TeacherStatsScreenPlugin,
+    ThemeExplorationScreenPlugin,
 };
 use states::{ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase};
 use ui::{
@@ -77,6 +78,7 @@ fn main() {
             HomeScreenPlugin,
             SaveSlotsScreenPlugin,
             ThemeExplorationScreenPlugin,
+            QuestionSelectionScreenPlugin,
             LessonPlayScreenPlugin,
             LessonSummaryScreenPlugin,
             SettingsScreenPlugin,

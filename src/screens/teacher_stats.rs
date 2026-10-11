@@ -52,7 +52,7 @@ pub struct TeacherStatsRoot;
 #[derive(Component, Reflect)]
 struct ReturnToListButton;
 
-/// Marker for any reset button (global, lesson, or type level).
+/// Marker for any stats reset button.
 #[derive(Component, Clone, Debug, Reflect)]
 struct StatsResetButton(StatsResetTarget);
 
@@ -75,6 +75,8 @@ enum StatsResetTarget {
     Lesson(String),
     /// Reset stats for a specific question type within a lesson.
     Type(String, QuestionType),
+    /// Reset stats for one exercise within a lesson.
+    Question(String, String),
 }
 
 /// Builds the stats UI when its view or backing save data changes.
@@ -246,13 +248,38 @@ fn spawn_stats_title_row(parent: &mut ChildSpawner, title_text: &str, window: En
     ));
 }
 
+/// Pre-computed data for a single exercise score row.
+#[derive(Clone)]
+struct QuestionScoreRow {
+    question_label: String,
+    score_text: String,
+    score_color: Color,
+    lesson_id: String,
+    exercise_id: String,
+}
+
+/// Temporary totals derived from persisted exercise scores.
+#[derive(Clone, Copy, Default)]
+struct DerivedTypeScore {
+    correct: u32,
+    total: u32,
+}
+
+impl DerivedTypeScore {
+    fn percentage(self) -> u32 {
+        (self.correct * 100).checked_div(self.total).unwrap_or(0)
+    }
+}
+
 /// Pre-computed data for a single question type score row.
+#[derive(Clone)]
 struct TypeScoreRow {
     type_label: String,
     score_text: String,
     score_color: Color,
     lesson_id: String,
     question_type: QuestionType,
+    question_rows: Vec<QuestionScoreRow>,
 }
 
 /// Pre-computed data for a lesson section.
@@ -288,25 +315,79 @@ const fn pct_color(pct: u32) -> Color {
     }
 }
 
-/// Builds the type score rows for a single lesson, sorted by question type name.
+/// Aggregates scores by type using the cumulative exercise records.
+fn aggregate_type_scores(progress: &LessonProgress) -> HashMap<QuestionType, DerivedTypeScore> {
+    let mut totals: HashMap<QuestionType, DerivedTypeScore> = HashMap::new();
+    for score in progress.question_scores.values() {
+        let total = totals.entry(score.question_type).or_default();
+        total.correct += score.correct;
+        total.total += score.total;
+    }
+    totals
+}
+
+fn question_label(
+    lesson_id: &str,
+    exercise_id: &str,
+    content: &ContentLibrary,
+    language: Language,
+) -> String {
+    content
+        .themes
+        .iter()
+        .flat_map(|theme| &theme.lessons)
+        .find(|lesson| lesson.id == lesson_id)
+        .and_then(|lesson| {
+            lesson
+                .questions
+                .iter()
+                .find(|question| question.id == exercise_id)
+        })
+        .map_or_else(
+            || exercise_id.to_owned(),
+            |question| question.definition.prompt_label(language),
+        )
+}
+
+/// Builds exercise rows grouped by question type, sorted by type and stable ID.
 fn collect_lesson_type_rows(
     lesson_id: &str,
     progress: &LessonProgress,
+    content: &ContentLibrary,
     i18n: &I18n,
 ) -> Vec<TypeScoreRow> {
-    let mut types: Vec<_> = progress.type_scores.iter().collect();
-    types.sort_by_key(|(qt, _)| format!("{qt:?}"));
-    types
-        .into_iter()
-        .filter(|(_, ts)| ts.total > 0)
-        .map(|(qt, ts)| {
-            let pct = ts.percentage();
-            TypeScoreRow {
-                type_label: question_type_label(*qt, i18n),
-                score_text: format!("{}/{} {} %", ts.correct, ts.total, pct),
+    let totals = aggregate_type_scores(progress);
+    let mut question_rows: HashMap<QuestionType, Vec<QuestionScoreRow>> = HashMap::new();
+    for (exercise_id, score) in &progress.question_scores {
+        let pct = (score.correct * 100).checked_div(score.total).unwrap_or(0);
+        question_rows
+            .entry(score.question_type)
+            .or_default()
+            .push(QuestionScoreRow {
+                question_label: question_label(lesson_id, exercise_id, content, i18n.language),
+                score_text: format!("{}/{} {} %", score.correct, score.total, pct),
                 score_color: pct_color(pct),
                 lesson_id: lesson_id.to_owned(),
-                question_type: *qt,
+                exercise_id: exercise_id.clone(),
+            });
+    }
+
+    let mut types: Vec<_> = totals.into_iter().collect();
+    types.sort_by_key(|(question_type, _)| format!("{question_type:?}"));
+    types
+        .into_iter()
+        .filter(|(_, total)| total.total > 0)
+        .map(|(question_type, total)| {
+            let pct = total.percentage();
+            let mut exercises = question_rows.remove(&question_type).unwrap_or_default();
+            exercises.sort_by(|left, right| left.exercise_id.cmp(&right.exercise_id));
+            TypeScoreRow {
+                type_label: question_type_label(question_type, i18n),
+                score_text: format!("{}/{} {} %", total.correct, total.total, pct),
+                score_color: pct_color(pct),
+                lesson_id: lesson_id.to_owned(),
+                question_type,
+                question_rows: exercises,
             }
         })
         .collect()
@@ -355,7 +436,7 @@ fn precompute_stats(
                 total_label: total_text.clone(),
                 total_score: format!("{lesson_correct}/{lesson_total} {lesson_pct} %"),
                 total_color: pct_color(lesson_pct),
-                type_rows: collect_lesson_type_rows(&lesson.id, lp, i18n),
+                type_rows: collect_lesson_type_rows(&lesson.id, lp, content, i18n),
             });
         }
 
@@ -438,24 +519,12 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
             let total_label = lesson.total_label.clone();
             let total_score = lesson.total_score.clone();
             let total_color = lesson.total_color;
-            let type_rows_data: Vec<_> = lesson
-                .type_rows
-                .iter()
-                .map(|r| {
-                    (
-                        r.type_label.clone(),
-                        r.score_text.clone(),
-                        r.score_color,
-                        r.lesson_id.clone(),
-                        r.question_type,
-                    )
-                })
-                .collect();
+            let type_rows_data = lesson.type_rows.clone();
             move |section: &mut ChildSpawner| {
                 spawn_lesson_header(section, &lesson_name, &lesson_id, window);
 
-                for (type_label, score_text, color, lid, qt) in &type_rows_data {
-                    spawn_type_row(section, type_label, score_text, *color, lid, *qt, window);
+                for type_row in &type_rows_data {
+                    spawn_type_row(section, type_row, window);
                 }
                 spawn_lesson_total(section, &total_label, &total_score, total_color, window);
             }
@@ -536,19 +605,62 @@ fn spawn_global_total(parent: &mut ChildSpawner, total: &GlobalTotal, window: En
         ));
 }
 
-fn spawn_type_row(
-    parent: &mut ChildSpawner,
-    type_label: &str,
-    score_text: &str,
-    score_color: Color,
-    lesson_id: &str,
-    qt: QuestionType,
-    window: Entity,
-) {
-    let type_label = type_label.to_owned();
-    let score_text = score_text.to_owned();
-    let lesson_id = lesson_id.to_owned();
+fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: Entity) {
+    let type_label = type_row.type_label.clone();
+    let score_text = type_row.score_text.clone();
+    let score_color = type_row.score_color;
+    let lesson_id = type_row.lesson_id.clone();
+    let question_type = type_row.question_type;
+    let question_rows = type_row.question_rows.clone();
 
+    parent.spawn((
+        Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: theme::scaled(theme::spacing::SMALL),
+            ..default()
+        },
+        Children::spawn(SpawnWith(move |group: &mut ChildSpawner| {
+            group.spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Center,
+                    padding: theme::scaled(theme::spacing::MEDIUM).left(),
+                    ..default()
+                },
+                children![
+                    (
+                        Text::new(type_label),
+                        theme::typography::text(theme::fonts::SMALL, window),
+                        TextColor(theme::colors::TEXT_DARK),
+                        Node {
+                            flex_grow: 1.0,
+                            ..default()
+                        },
+                    ),
+                    (
+                        Text::new(score_text),
+                        theme::typography::text(theme::fonts::SMALL, window),
+                        TextColor(score_color),
+                        Node {
+                            margin: UiRect::right(theme::scaled(theme::spacing::MEDIUM)),
+                            ..default()
+                        },
+                    ),
+                    (
+                        reset_icon_button(window),
+                        StatsResetButton(StatsResetTarget::Type(lesson_id, question_type)),
+                    ),
+                ],
+            ));
+            for question_row in &question_rows {
+                spawn_question_row(group, question_row, window);
+            }
+        })),
+    ));
+}
+
+fn spawn_question_row(parent: &mut ChildSpawner, question_row: &QuestionScoreRow, window: Entity) {
     parent.spawn((
         Node {
             flex_direction: FlexDirection::Row,
@@ -557,32 +669,36 @@ fn spawn_type_row(
             padding: theme::scaled(theme::spacing::MEDIUM).left(),
             ..default()
         },
-        Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
-            // Type label
-            row.spawn((
-                Text::new(type_label),
-                theme::typography::text(theme::fonts::SMALL, window),
-                TextColor(theme::colors::TEXT_DARK),
-                Node {
-                    flex_grow: 1.0,
-                    ..default()
-                },
-            ));
-            // Score (colored by percentage)
-            row.spawn((
-                Text::new(score_text),
-                theme::typography::text(theme::fonts::SMALL, window),
-                TextColor(score_color),
-                Node {
-                    margin: UiRect::right(theme::scaled(theme::spacing::MEDIUM)),
-                    ..default()
-                },
-            ));
-            // Reset button for this type
-            row.spawn((
-                reset_icon_button(window),
-                StatsResetButton(StatsResetTarget::Type(lesson_id, qt)),
-            ));
+        Children::spawn(SpawnWith({
+            let label = question_row.question_label.clone();
+            let score = question_row.score_text.clone();
+            let color = question_row.score_color;
+            let lesson_id = question_row.lesson_id.clone();
+            let exercise_id = question_row.exercise_id.clone();
+            move |row: &mut ChildSpawner| {
+                row.spawn((
+                    Text::new(label),
+                    theme::typography::text(theme::fonts::SMALL, window),
+                    TextColor(theme::colors::TEXT_DARK),
+                    Node {
+                        flex_grow: 1.0,
+                        ..default()
+                    },
+                ));
+                row.spawn((
+                    Text::new(score),
+                    theme::typography::text(theme::fonts::SMALL, window),
+                    TextColor(color),
+                    Node {
+                        margin: UiRect::right(theme::scaled(theme::spacing::MEDIUM)),
+                        ..default()
+                    },
+                ));
+                row.spawn((
+                    reset_icon_button(window),
+                    StatsResetButton(StatsResetTarget::Question(lesson_id, exercise_id)),
+                ));
+            }
         })),
     ));
 }
@@ -594,6 +710,7 @@ fn handle_reset_click(
     mut commands: Commands,
     existing_popover: Query<Entity, With<StatsResetPopover>>,
     i18n: Res<I18n>,
+    content: Res<ContentLibrary>,
     ctx: PlayerContext<'_>,
     teacher: TeacherWindowParam<'_, '_>,
     teacher_state: Query<&TeacherWindowState, With<TeacherWindow>>,
@@ -641,6 +758,12 @@ fn handle_reset_click(
                 .t(&TranslationKey::ResetTypeStatsConfirm(
                     lid.clone(),
                     question_type_label(*qt, &i18n),
+                ))
+                .into_owned(),
+            StatsResetTarget::Question(lid, exercise_id) => i18n
+                .t(&TranslationKey::ResetQuestionStatsConfirm(
+                    lid.clone(),
+                    question_label(lid, exercise_id, &content, i18n.language),
                 ))
                 .into_owned(),
         };
@@ -694,24 +817,35 @@ fn handle_confirm_reset(
         let Some(student) = class_save.students.get_mut(student_index) else {
             return;
         };
-        match target {
-            StatsResetTarget::All => {
-                student.progress.clear();
-            }
-            StatsResetTarget::Lesson(ref lid) => {
-                student.progress.remove(lid);
-            }
-            StatsResetTarget::Type(ref lid, qt) => {
-                if let Some(lp) = student.progress.get_mut(lid) {
-                    lp.type_scores.remove(&qt);
-                    // If no types left, remove the lesson entry entirely
-                    if lp.type_scores.is_empty() {
-                        student.progress.remove(lid);
-                    }
+        apply_stats_reset(&mut student.progress, &target);
+    });
+}
+
+fn apply_stats_reset(progress: &mut HashMap<String, LessonProgress>, target: &StatsResetTarget) {
+    match target {
+        StatsResetTarget::All => progress.clear(),
+        StatsResetTarget::Lesson(lesson_id) => {
+            progress.remove(lesson_id);
+        }
+        StatsResetTarget::Type(lesson_id, question_type) => {
+            if let Some(lesson) = progress.get_mut(lesson_id) {
+                lesson
+                    .question_scores
+                    .retain(|_, score| score.question_type != *question_type);
+                if lesson.question_scores.is_empty() {
+                    progress.remove(lesson_id);
                 }
             }
         }
-    });
+        StatsResetTarget::Question(lesson_id, exercise_id) => {
+            if let Some(lesson) = progress.get_mut(lesson_id) {
+                lesson.question_scores.remove(exercise_id);
+                if lesson.question_scores.is_empty() {
+                    progress.remove(lesson_id);
+                }
+            }
+        }
+    }
 }
 
 fn handle_return_to_list(

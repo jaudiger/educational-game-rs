@@ -1,10 +1,7 @@
-use std::collections::HashMap;
-
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::content::{AnswerResult, QuestionType, ResolvedQuestion};
-use super::save::TypeScore;
+use super::content::{AnswerResult, ResolvedQuestion};
 
 pub use crate::i18n::Language;
 
@@ -55,6 +52,16 @@ impl Default for GameSettings {
 #[derive(Resource, Clone, Debug, Default, Deref, Reflect)]
 pub struct SelectedLesson(pub Option<String>);
 
+/// Selects whether a lesson launches its configured series or one exercise.
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Reflect)]
+pub enum LessonLaunchSelection {
+    #[default]
+    CompleteLesson,
+    SingleQuestion {
+        exercise_id: String,
+    },
+}
+
 /// Runtime state for an active lesson: question list, index, and scores.
 #[derive(Resource, Clone, Debug, Default, Reflect)]
 pub struct LessonSession {
@@ -63,9 +70,6 @@ pub struct LessonSession {
     pub current_index: usize,
     pub correct_count: u32,
     pub total_answered: u32,
-    /// Per-question-type score breakdown for the current session.
-    #[reflect(ignore)]
-    pub type_scores: HashMap<QuestionType, TypeScore>,
 }
 
 impl LessonSession {

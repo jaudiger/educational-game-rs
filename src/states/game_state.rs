@@ -18,4 +18,5 @@ pub enum ExplorationView {
     #[default]
     Themes,
     ThemeLessons,
+    QuestionSelection,
 }

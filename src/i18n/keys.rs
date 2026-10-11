@@ -40,6 +40,7 @@ pub enum TranslationKey {
     IncorrectAnswer,
     NextQuestion,
     QuestionProgress(usize, usize),
+    ReturnToQuestionList,
 
     // Lesson Summary
     SummaryEncouragement,
@@ -55,8 +56,11 @@ pub enum TranslationKey {
     LessonMultiplyByPowerOf10,
 
     // Theme Exploration
+    BackToLessons,
     BackToThemes,
     BestPercent(u32),
+    ChooseQuestion,
+    PlaySeries,
     LessonsCompleted(usize, usize),
     Themes,
 
@@ -99,6 +103,7 @@ pub enum TranslationKey {
     ResetAllStatsConfirm,
     ResetConfig,
     ResetLessonStatsConfirm(String),
+    ResetQuestionStatsConfirm(String, String),
     ResetTypeStatsConfirm(String, String),
     SaveConfig,
     StudentStats(String),
@@ -180,6 +185,7 @@ impl TranslationKey {
                 FinishLesson              => ("Terminer la le\u{00e7}on",                  "Finish lesson"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
                 NextQuestion              => ("Question suivante",                          "Next question"),
+                ReturnToQuestionList      => ("Retour a la liste des questions",            "Return to question list"),
                 // Lesson Summary
                 SummaryEncouragement      => ("Continue, tu vas y arriver !",              "Keep going, you'll get there!"),
                 SummaryGood               => ("Bon travail !",                             "Good job!"),
@@ -190,7 +196,10 @@ impl TranslationKey {
                 LessonMultiplicationTables => ("Tables de multiplication",                 "Multiplication Tables"),
                 LessonMultiplyByPowerOf10 => ("Multiplier par 10, 100, 1000",             "Multiply by 10, 100, 1000"),
                 // Theme Exploration
+                BackToLessons           => ("Retour aux le\u{00e7}ons",                      "Back to lessons"),
                 BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
+                ChooseQuestion          => ("Choisir une question",                      "Choose a question"),
+                PlaySeries              => ("Jouer toute la s\u{00e9}rie",                    "Play full series"),
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
                 // Save Slots
                 Empty                     => ("Vide",                                      "Empty"),
@@ -276,6 +285,10 @@ impl TranslationKey {
             Self::ResetTypeStatsConfirm(lesson, qtype) => match language {
                 Language::French  => format!("R\u{00e9}initialiser les stats {qtype} pour {lesson} ?").into(),
                 Language::English => format!("Reset {qtype} stats for {lesson}?").into(),
+            },
+            Self::ResetQuestionStatsConfirm(lesson, question) => match language {
+                Language::French  => format!("R\u{00e9}initialiser les stats {question} pour {lesson} ?").into(),
+                Language::English => format!("Reset {question} stats for {lesson}?").into(),
             },
             Self::StudentStats(name) => match language {
                 Language::French  => format!("{name} - Statistiques").into(),

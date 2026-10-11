@@ -6,8 +6,7 @@ use super::{GameSettings, SaveData, write_json_atomic};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Reflect)]
 pub enum PersistenceAction {
-    ClassAnswer,
-    IndividualLessonProgress,
+    QuestionAnswer,
     TeacherStatsReset,
     SaveSlot,
     TeacherRoster,

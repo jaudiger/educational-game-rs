@@ -55,41 +55,56 @@ impl<'de> Deserialize<'de> for LessonSessionConfig {
     }
 }
 
-/// Score for a single question type within a lesson.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct TypeScore {
+/// Score for one stable exercise ID within a lesson.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct QuestionScore {
+    pub question_type: QuestionType,
     pub correct: u32,
     pub total: u32,
 }
 
-impl TypeScore {
-    /// Computes the percentage of correct answers for this question type.
-    pub fn percentage(&self) -> u32 {
-        (self.correct * 100).checked_div(self.total).unwrap_or(0)
-    }
-}
-
-/// Progress for a single lesson, broken down by question type.
-///
-/// - **Class mode**: cumulative, scores add up across sessions.
-/// - **Individual mode**: last score, replaced entirely each session.
+/// Cumulative lesson progress, broken down by stable exercise ID.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LessonProgress {
-    pub type_scores: HashMap<QuestionType, TypeScore>,
+    pub question_scores: HashMap<String, QuestionScore>,
 }
 
 impl LessonProgress {
-    /// Total correct answers across all question types.
+    /// Adds one answer to the cumulative score for an exercise.
+    pub fn record_answer(
+        &mut self,
+        exercise_id: &str,
+        question_type: QuestionType,
+        is_correct: bool,
+    ) {
+        let score = self
+            .question_scores
+            .entry(exercise_id.to_owned())
+            .or_insert(QuestionScore {
+                question_type,
+                correct: 0,
+                total: 0,
+            });
+        score.total += 1;
+        if is_correct {
+            score.correct += 1;
+        }
+    }
+
+    /// Total correct answers across all persisted exercise scores.
     pub fn total_correct(&self) -> u32 {
-        self.type_scores.values().map(|ts| ts.correct).sum()
+        self.question_scores
+            .values()
+            .map(|score| score.correct)
+            .sum()
     }
 
-    /// Total questions answered across all question types.
+    /// Total answers across all persisted exercise scores.
     pub fn total_questions(&self) -> u32 {
-        self.type_scores.values().map(|ts| ts.total).sum()
+        self.question_scores.values().map(|score| score.total).sum()
     }
 
-    /// Overall percentage across all question types.
+    /// Overall percentage derived from all persisted exercise scores.
     pub fn percentage(&self) -> u32 {
         (self.total_correct() * 100)
             .checked_div(self.total_questions())

@@ -1,6 +1,7 @@
 pub mod home;
 pub mod lesson_play;
 pub mod lesson_summary;
+pub mod question_selection;
 pub mod save_slots;
 pub mod settings;
 pub mod theme_exploration;
@@ -13,6 +14,7 @@ pub mod teacher_stats;
 pub use home::HomeScreenPlugin;
 pub use lesson_play::LessonPlayScreenPlugin;
 pub use lesson_summary::LessonSummaryScreenPlugin;
+pub use question_selection::QuestionSelectionScreenPlugin;
 pub use save_slots::SaveSlotsScreenPlugin;
 pub use settings::SettingsScreenPlugin;
 pub use theme_exploration::ThemeExplorationScreenPlugin;

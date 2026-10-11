@@ -6,9 +6,9 @@ use bevy::ui::Pressed;
 use bevy::window::PrimaryWindow;
 
 use crate::data::{
-    ActiveStudent, ActiveTheme, ContentLibrary, ExplorationTheme, GameSettings, LessonProgress,
-    PersistenceAction, PersistenceStatus, PlayerContext, PlayerSession, SaveData, SelectedLesson,
-    get_current_progress,
+    ActiveStudent, ActiveTheme, ContentLibrary, ExplorationTheme, GameSettings,
+    LessonLaunchSelection, LessonProgress, PersistenceAction, PersistenceStatus, PlayerContext,
+    PlayerSession, SaveData, SelectedLesson, get_current_progress,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, ExplorationView, InLessonFlow, StateScopedResourceExt};
@@ -56,8 +56,17 @@ struct ExplorationScreenRoot;
 #[derive(Component, Reflect)]
 struct ThemeButton(String);
 
+#[derive(Clone, Copy, Reflect)]
+enum LessonLaunchAction {
+    CompleteSeries,
+    ChooseQuestion,
+}
+
 #[derive(Component, Reflect)]
-struct LessonButton(String);
+struct LessonActionButton {
+    lesson_id: String,
+    action: LessonLaunchAction,
+}
 
 #[derive(Component, Reflect)]
 enum ExplorationProgressText {
@@ -170,6 +179,19 @@ struct ThemeButtonData {
     completed_text: String,
 }
 
+const fn restored_exploration_view(
+    has_active_theme: bool,
+    launch_selection: Option<&LessonLaunchSelection>,
+) -> Option<ExplorationView> {
+    if !has_active_theme {
+        return None;
+    }
+    Some(match launch_selection {
+        Some(LessonLaunchSelection::SingleQuestion { .. }) => ExplorationView::QuestionSelection,
+        Some(LessonLaunchSelection::CompleteLesson) | None => ExplorationView::ThemeLessons,
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn setup_themes(
     mut commands: Commands,
@@ -177,15 +199,17 @@ fn setup_themes(
     i18n: Res<I18n>,
     status: Res<PersistenceStatus>,
     active_theme: Option<Res<ActiveTheme>>,
+    launch_selection: Option<Res<LessonLaunchSelection>>,
     mut next_exploration_view: ResMut<NextState<ExplorationView>>,
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
     existing_roots: Query<Entity, With<ExplorationScreenRoot>>,
 ) {
-    // If ActiveTheme exists, the user is returning from LessonPlay/LessonSummary.
-    // Skip Themes and go directly to ThemeLessons.
-    if active_theme.is_some() {
-        next_exploration_view.set(ExplorationView::ThemeLessons);
+    // Preserve the lesson grid or question list when returning from play.
+    if let Some(view) =
+        restored_exploration_view(active_theme.is_some(), launch_selection.as_deref())
+    {
+        next_exploration_view.set(view);
         return;
     }
 
@@ -565,6 +589,11 @@ struct LessonButtonData {
     best_percent_text: Option<String>,
 }
 
+struct LessonActionLabels {
+    play_series: String,
+    choose_question: String,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn setup_theme_lessons(
     mut commands: Commands,
@@ -603,6 +632,11 @@ fn setup_theme_lessons(
     let card_style = ExplorationCardStyle::for_exploration_theme(ctx.settings.exploration_theme);
     let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
 
+    let action_labels = LessonActionLabels {
+        play_series: i18n.t(&TranslationKey::PlaySeries).into_owned(),
+        choose_question: i18n.t(&TranslationKey::ChooseQuestion).into_owned(),
+    };
+
     let lesson_buttons: Vec<LessonButtonData> = theme_data
         .lessons
         .iter()
@@ -625,7 +659,7 @@ fn setup_theme_lessons(
         screen_root(),
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
-        DespawnOnEnter(ExplorationView::Themes),
+        DespawnOnEnter(ExplorationView::QuestionSelection),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             // Title
             let mut title_cmd = parent.spawn((
@@ -642,7 +676,8 @@ fn setup_theme_lessons(
 
             parent.spawn(write_notice);
 
-            // Lesson buttons
+            // Lesson actions
+            let first_available = lesson_buttons.iter().position(|lesson| lesson.available);
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Row,
@@ -655,7 +690,15 @@ fn setup_theme_lessons(
                 })
                 .with_children(|grid| {
                     for (i, data) in lesson_buttons.iter().enumerate() {
-                        spawn_lesson_button(grid, data, i == 0, window, card_style, i);
+                        spawn_lesson_button(
+                            grid,
+                            data,
+                            Some(i) == first_available,
+                            &action_labels,
+                            window,
+                            card_style,
+                            i,
+                        );
                     }
                 });
 
@@ -753,45 +796,35 @@ fn spawn_lesson_button(
     parent: &mut ChildSpawner,
     data: &LessonButtonData,
     auto_focus: bool,
+    action_labels: &LessonActionLabels,
     window: Entity,
     card_style: Option<ExplorationCardStyle>,
     index: usize,
 ) {
-    let (bg, text_color, progress_color) = card_colors(
-        card_style,
-        data.available,
-        theme::colors::SUCCESS, // default progress color for lesson buttons
-    );
+    let (bg, text_color, progress_color) =
+        card_colors(card_style, data.available, theme::colors::SUCCESS);
     let dims = card_dimensions(card_style);
-
-    let mut button = parent.spawn((
-        button_base(bg),
-        card_node_layout(&dims),
-        LessonButton(data.id.clone()),
+    let mut card = parent.spawn((
+        Node {
+            border: px(1.0).all(),
+            ..card_node_layout(&dims)
+        },
+        BackgroundColor(bg),
+        BorderColor::all(theme::colors::INPUT_BORDER),
+        Hovered::default(),
     ));
-    button.remove::<AnimatedButton>();
-
-    button.insert(ExplorationCardHover {
-        base: bg,
-        hovered: bg.lighter(0.08),
-        pressed: bg.darker(0.08),
-    });
-
     if let Some(style) = card_style {
-        insert_card_overlay(&mut button, style, data.available, index, &dims);
-    }
-    if auto_focus {
-        button.insert(AutoFocus);
+        insert_card_overlay(&mut card, style, data.available, index, &dims);
     }
     if !data.available {
-        button.insert(HoverTooltip {
+        card.insert(HoverTooltip {
             message: data.coming_soon_text.clone(),
             window,
         });
     }
 
-    button.with_children(|btn| {
-        let mut title_cmd = btn.spawn(card_text(
+    card.with_children(|contents| {
+        let mut title_cmd = contents.spawn(card_text(
             &data.title_text,
             theme::fonts::BUTTON,
             text_color,
@@ -808,9 +841,9 @@ fn spawn_lesson_button(
 
         if data.available {
             let has_progress = data.best_percent_text.is_some();
-            let text = data.best_percent_text.as_deref().unwrap_or_default();
-            btn.spawn((
-                card_text(text, theme::fonts::SMALL, progress_color, window),
+            let progress = data.best_percent_text.as_deref().unwrap_or_default();
+            contents.spawn((
+                card_text(progress, theme::fonts::SMALL, progress_color, window),
                 ExplorationProgressText::Lesson(data.id.clone()),
                 Node {
                     display: if has_progress {
@@ -821,14 +854,90 @@ fn spawn_lesson_button(
                     ..default()
                 },
             ));
+            contents
+                .spawn(Node {
+                    width: percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: theme::scaled(theme::spacing::SMALL),
+                    ..default()
+                })
+                .with_children(|actions| {
+                    spawn_lesson_action(
+                        actions,
+                        data,
+                        LessonLaunchAction::CompleteSeries,
+                        &action_labels.play_series,
+                        auto_focus,
+                        window,
+                    );
+                    spawn_lesson_action(
+                        actions,
+                        data,
+                        LessonLaunchAction::ChooseQuestion,
+                        &action_labels.choose_question,
+                        false,
+                        window,
+                    );
+                });
+        } else {
+            contents.spawn(card_text(
+                &data.coming_soon_text,
+                theme::fonts::SMALL,
+                theme::colors::TEXT_MUTED,
+                window,
+            ));
         }
     });
+}
+
+fn spawn_lesson_action(
+    parent: &mut ChildSpawner,
+    data: &LessonButtonData,
+    action: LessonLaunchAction,
+    label: &str,
+    auto_focus: bool,
+    window: Entity,
+) {
+    let color = match action {
+        LessonLaunchAction::CompleteSeries => theme::colors::PRIMARY,
+        LessonLaunchAction::ChooseQuestion => theme::colors::SECONDARY,
+    };
+    let mut button = parent.spawn((
+        button_base(color),
+        Node {
+            width: percent(100.0),
+            min_height: theme::scaled(40.0),
+            padding: UiRect::axes(theme::scaled(theme::spacing::SMALL), theme::scaled(4.0)),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
+            ..default()
+        },
+        LessonActionButton {
+            lesson_id: data.id.clone(),
+            action,
+        },
+        ExplorationCardHover {
+            base: color,
+            hovered: color.lighter(0.08),
+            pressed: color.darker(0.08),
+        },
+        children![(
+            Text::new(label.to_owned()),
+            theme::typography::text(theme::fonts::SMALL, window),
+            TextColor(theme::colors::TEXT_LIGHT),
+            TextLayout::justify(Justify::Center),
+        )],
+    ));
+    if auto_focus {
+        button.insert(AutoFocus);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn handle_theme_lessons(
     mut activations: MessageReader<ButtonActivated>,
-    lesson_query: Query<&LessonButton>,
+    lesson_query: Query<&LessonActionButton>,
     back_query: Query<(), With<BackToThemesButton>>,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
@@ -840,11 +949,19 @@ fn handle_theme_lessons(
         if let Ok(lesson_btn) = lesson_query.get(activation.0) {
             if let Some(theme_data) = content.theme(&active_theme)
                 && theme_data
-                    .lesson(&lesson_btn.0)
+                    .lesson(&lesson_btn.lesson_id)
                     .is_some_and(|lesson| lesson.available)
             {
-                commands.insert_resource(SelectedLesson(Some(lesson_btn.0.clone())));
-                next_app_state.set(AppState::LessonPlay);
+                commands.insert_resource(SelectedLesson(Some(lesson_btn.lesson_id.clone())));
+                match lesson_btn.action {
+                    LessonLaunchAction::CompleteSeries => {
+                        commands.insert_resource(LessonLaunchSelection::CompleteLesson);
+                        next_app_state.set(AppState::LessonPlay);
+                    }
+                    LessonLaunchAction::ChooseQuestion => {
+                        next_exploration_view.set(ExplorationView::QuestionSelection);
+                    }
+                }
             }
         } else if back_query.contains(activation.0) {
             commands.remove_resource::<ActiveTheme>();

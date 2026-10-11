@@ -3,8 +3,8 @@ use bevy::window::PrimaryWindow;
 
 use crate::data::content::{LocalizedExplanation, QuestionInstance};
 use crate::data::{
-    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, PersistenceAction,
-    PersistenceStatus, QuestionContainer,
+    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonLaunchSelection,
+    LessonSession, PersistenceAction, PersistenceStatus, QuestionContainer,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
@@ -39,11 +39,19 @@ pub(super) fn setup_feedback_ui(
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
     write_status: Res<PersistenceStatus>,
+    launch_selection: Option<Res<LessonLaunchSelection>>,
 ) {
     let window = *primary_window;
     let is_correct = matches!(**last_answer, AnswerResult::Correct);
     let is_last = session.current_index + 1 >= session.questions.len();
-    let save_failed = write_status.failed(PersistenceAction::ClassAnswer);
+    let default_selection = LessonLaunchSelection::CompleteLesson;
+    let selection = launch_selection.as_deref().unwrap_or(&default_selection);
+    let next_button_label = match selection {
+        LessonLaunchSelection::SingleQuestion { .. } => TranslationKey::ReturnToQuestionList,
+        LessonLaunchSelection::CompleteLesson if is_last => TranslationKey::FinishLesson,
+        LessonLaunchSelection::CompleteLesson => TranslationKey::NextQuestion,
+    };
+    let save_failed = write_status.failed(PersistenceAction::QuestionAnswer);
     let explanation = session.current().map_or(FeedbackExplanation::Hidden, |q| {
         build_feedback_explanation(settings.show_explanations, &q.instance)
     });
@@ -53,7 +61,7 @@ pub(super) fn setup_feedback_ui(
             parent,
             &i18n,
             is_correct,
-            is_last,
+            &next_button_label,
             save_failed,
             &explanation,
             window,
@@ -102,7 +110,7 @@ fn spawn_feedback_content(
     parent: &mut ChildSpawnerCommands,
     i18n: &I18n,
     is_correct: bool,
-    is_last: bool,
+    next_button_label: &TranslationKey,
     save_failed: bool,
     explanation: &FeedbackExplanation,
     window: Entity,
@@ -128,7 +136,7 @@ fn spawn_feedback_content(
                 ));
             }
             spawn_explanation_section(feedback, i18n, explanation, window);
-            spawn_next_button(feedback, i18n, is_last, window);
+            spawn_next_button(feedback, i18n, next_button_label, window);
         });
 }
 
@@ -195,18 +203,12 @@ fn spawn_result_text(
 fn spawn_next_button(
     parent: &mut ChildSpawnerCommands,
     i18n: &I18n,
-    is_last: bool,
+    label: &TranslationKey,
     window: Entity,
 ) {
-    let key = if is_last {
-        TranslationKey::FinishLesson
-    } else {
-        TranslationKey::NextQuestion
-    };
-
     parent.spawn((
         standard_button(
-            &i18n.t(&key),
+            &i18n.t(label),
             theme::colors::PRIMARY,
             theme::scaled(theme::sizes::BUTTON_WIDTH),
             window,

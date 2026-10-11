@@ -10,8 +10,8 @@ pub use assessment::{QuestionResponse, assess_response};
 pub use content::{AnswerResult, ContentLibrary, ExplanationVisual, QuestionInstance};
 pub use persistence::{PersistencePaths, load_or_default, write_json_atomic};
 pub use progress::{
-    ActiveTheme, ExplorationTheme, GameMode, GameSettings, Language, LastAnswer, LessonSession,
-    QuestionContainer, SelectedLesson,
+    ActiveTheme, ExplorationTheme, GameMode, GameSettings, Language, LastAnswer,
+    LessonLaunchSelection, LessonSession, QuestionContainer, SelectedLesson,
 };
 pub use save::{
     ActiveStudent, ClassSave, ClassStudent, IndividualSave, LessonProgress, LessonSessionConfig,

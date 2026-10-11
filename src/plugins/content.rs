@@ -84,7 +84,7 @@ fn build_content_library() -> ContentLibrary {
 fn build_fractions_questions() -> Vec<QuestionEntry> {
     let mut questions = build_static_and_template_questions();
 
-    // FractionIdentification template, resolved per-session in build_session()
+    // The template is resolved when the lesson session is built.
     questions.push(QuestionEntry::new(
         "fraction_identification",
         QuestionDefinition::FractionIdentificationTemplate(FractionIdentificationTemplate {

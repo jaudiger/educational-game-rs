@@ -2,10 +2,10 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::data::content::build_session;
+use crate::data::content::build_session_with_selection;
 use crate::data::{
-    ActiveTheme, ContentLibrary, GameMode, PersistenceStatus, PlayerContext, QuestionContainer,
-    SelectedLesson,
+    ActiveTheme, ContentLibrary, GameMode, LessonLaunchSelection, PersistenceStatus, PlayerContext,
+    QuestionContainer, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
@@ -21,6 +21,7 @@ pub(super) fn setup_lesson_play(
     asset_server: Res<AssetServer>,
     images: Res<GameImages>,
     selected_lesson: Res<SelectedLesson>,
+    launch_selection: Option<Res<LessonLaunchSelection>>,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
     i18n: Res<I18n>,
@@ -31,8 +32,12 @@ pub(super) fn setup_lesson_play(
 ) {
     let window = *primary_window;
     write_status.clear_save_data();
-    // Look up teacher config for class mode
-    let lesson_config = if ctx.settings.mode == GameMode::Group {
+    let default_selection = LessonLaunchSelection::CompleteLesson;
+    let selection = launch_selection.as_deref().unwrap_or(&default_selection);
+    // Teacher configuration applies only to complete lesson launches.
+    let lesson_config = if matches!(selection, LessonLaunchSelection::CompleteLesson)
+        && ctx.settings.mode == GameMode::Group
+    {
         ctx.session.as_ref().and_then(|slot| {
             ctx.save_data.class_slots[slot.slot_index]
                 .as_ref()
@@ -46,7 +51,13 @@ pub(super) fn setup_lesson_play(
     } else {
         None
     };
-    let session = match build_session(&selected_lesson, &content, &active_theme, lesson_config) {
+    let session = match build_session_with_selection(
+        &selected_lesson,
+        selection,
+        &content,
+        &active_theme,
+        lesson_config,
+    ) {
         Ok(session) if !session.questions.is_empty() => session,
         Ok(_) => {
             bevy::log::error!("Cannot start lesson: the session has no exercises");

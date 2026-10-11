@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -6,15 +6,17 @@ use rand::seq::SliceRandom;
 use super::generation::resolve_question;
 use super::types::{Lesson, QuestionEntry, QuestionInstance, ResolvedQuestion};
 use crate::data::{
-    ActiveTheme, ContentLibrary, LessonSession, LessonSessionConfig, SelectedLesson,
+    ActiveTheme, ContentLibrary, LessonLaunchSelection, LessonSession, LessonSessionConfig,
+    SelectedLesson,
 };
 
 /// Maximum re-roll attempts when deduplicating generated question instances.
 const MAX_DEDUP_RETRIES: u32 = 20;
 
-/// Build a lesson session from the selected catalog lesson and teacher settings.
-pub fn build_session(
+/// Build a session for the selected lesson launch mode.
+pub fn build_session_with_selection(
     selected_lesson: &SelectedLesson,
+    selection: &LessonLaunchSelection,
     content: &ContentLibrary,
     active_theme: &ActiveTheme,
     lesson_config: Option<&LessonSessionConfig>,
@@ -59,11 +61,44 @@ pub fn build_session(
     }
 
     let mut rng = rand::rng();
-    plan_session(lesson, lesson_config, &mut rng)
+    match selection {
+        LessonLaunchSelection::CompleteLesson => plan_session(lesson, lesson_config, &mut rng),
+        selection @ LessonLaunchSelection::SingleQuestion { .. } => {
+            plan_session_with_selection(lesson, selection, lesson_config, &mut rng)
+        }
+    }
 }
 
-/// Plan question instances using only the lesson catalog, settings, and RNG.
+/// Plan a complete-series session using only the lesson catalog, settings, and RNG.
 pub fn plan_session(
+    lesson: &Lesson,
+    lesson_config: Option<&LessonSessionConfig>,
+    rng: &mut impl Rng,
+) -> Result<LessonSession, Vec<String>> {
+    plan_session_with_selection(
+        lesson,
+        &LessonLaunchSelection::CompleteLesson,
+        lesson_config,
+        rng,
+    )
+}
+
+/// Plan either the configured series or one exercise selected by stable ID.
+pub fn plan_session_with_selection(
+    lesson: &Lesson,
+    selection: &LessonLaunchSelection,
+    lesson_config: Option<&LessonSessionConfig>,
+    rng: &mut impl Rng,
+) -> Result<LessonSession, Vec<String>> {
+    match selection {
+        LessonLaunchSelection::CompleteLesson => plan_complete_session(lesson, lesson_config, rng),
+        LessonLaunchSelection::SingleQuestion { exercise_id } => {
+            plan_single_question(lesson, exercise_id, rng)
+        }
+    }
+}
+
+fn plan_complete_session(
     lesson: &Lesson,
     lesson_config: Option<&LessonSessionConfig>,
     rng: &mut impl Rng,
@@ -103,7 +138,51 @@ pub fn plan_session(
         current_index: 0,
         correct_count: 0,
         total_answered: 0,
-        type_scores: HashMap::new(),
+    })
+}
+
+fn plan_single_question(
+    lesson: &Lesson,
+    exercise_id: &str,
+    rng: &mut impl Rng,
+) -> Result<LessonSession, Vec<String>> {
+    let matches: Vec<&QuestionEntry> = lesson
+        .questions
+        .iter()
+        .filter(|entry| entry.id == exercise_id)
+        .collect();
+    let entry = match matches.as_slice() {
+        [] => return Err(vec![format!("Unknown exercise ID {exercise_id}")]),
+        [entry] => *entry,
+        _ => return Err(vec![format!("Exercise {exercise_id} is ambiguous")]),
+    };
+    if entry.id.is_empty() {
+        return Err(vec!["Selected exercise ID must not be empty".to_owned()]);
+    }
+    let issues = entry
+        .definition
+        .validation_issues()
+        .into_iter()
+        .map(|issue| format!("Exercise {}: {issue}", entry.id))
+        .collect::<Vec<_>>();
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+
+    let hide_optional_visual = entry
+        .definition
+        .effective_show_visual(None)
+        .is_some_and(|show| !show);
+    let question = ResolvedQuestion {
+        exercise_id: entry.id.clone(),
+        instance: resolve_question(&entry.definition, rng),
+        hide_optional_visual,
+    };
+    Ok(LessonSession {
+        questions: vec![question],
+        current_index: 0,
+        correct_count: 0,
+        total_answered: 0,
     })
 }
 

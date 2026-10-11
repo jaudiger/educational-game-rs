@@ -2,10 +2,7 @@ use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::data::{
-    GameMode, LessonProgress, LessonSession, PersistenceAction, PersistenceMut, PersistenceStatus,
-    PlayerSession, SelectedLesson,
-};
+use crate::data::{LessonSession, PersistenceAction, PersistenceStatus};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
 use crate::ui::components::{save_write_failure_notice, screen_root, standard_button};
@@ -17,54 +14,8 @@ pub struct LessonSummaryScreenPlugin;
 
 impl Plugin for LessonSummaryScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            OnEnter(AppState::LessonSummary),
-            (save_lesson_progress, setup_lesson_summary).chain(),
-        );
+        app.add_systems(OnEnter(AppState::LessonSummary), setup_lesson_summary);
     }
-}
-
-fn save_lesson_progress(
-    session: Res<LessonSession>,
-    selected_lesson: Option<Res<SelectedLesson>>,
-    player_session: Option<Res<PlayerSession>>,
-    mut persistence: PersistenceMut<'_>,
-) {
-    // Class mode: scores are already recorded per-answer during LessonPlay.
-    if persistence.settings.mode == GameMode::Group {
-        return;
-    }
-    persistence.status.clear_save_data();
-
-    // Guard: need lesson ID and active slot
-    let Some(ref selected) = selected_lesson else {
-        return;
-    };
-    let Some(ref lesson_id) = selected.0 else {
-        return;
-    };
-    let Some(ref slot) = player_session else {
-        return;
-    };
-
-    if session.total_answered == 0 {
-        return;
-    }
-
-    // Build LessonProgress from the session's per-type breakdown.
-    let new_progress = LessonProgress {
-        type_scores: session.type_scores.clone(),
-    };
-    let lesson_id = lesson_id.clone();
-    let slot_index = slot.slot_index;
-
-    persistence.update_save_data(PersistenceAction::IndividualLessonProgress, |data| {
-        // Individual mode: replace the existing entry (last score policy).
-        if let Some(ref mut save) = data.individual_slots[slot_index] {
-            save.progress
-                .insert(lesson_id.clone(), new_progress.clone());
-        }
-    });
 }
 
 fn setup_lesson_summary(
@@ -87,8 +38,7 @@ fn setup_lesson_summary(
         TranslationKey::SummaryEncouragement
     };
 
-    let show_save_failure = write_status.failed(PersistenceAction::ClassAnswer)
-        || write_status.failed(PersistenceAction::IndividualLessonProgress);
+    let show_save_failure = write_status.failed(PersistenceAction::QuestionAnswer);
 
     commands
         .spawn((screen_root(), DespawnOnExit(AppState::LessonSummary)))
