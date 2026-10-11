@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
@@ -9,6 +9,44 @@ use crate::i18n::{Language, TranslationKey};
 
 /// Maximum number of times a single question can appear in a teacher-configured session.
 pub const MAX_QUESTION_REPETITIONS: usize = 5;
+pub const MAX_FRACTION_PARTS: u32 = 1_000;
+pub const MAX_MULTIPLICATION_GRID_CELLS: u32 = 10_000;
+pub const MAX_NUMERIC_INPUT_ANSWER: u32 = 9_999_999;
+pub const MAX_PLACE_VALUE_COLUMNS: usize = 5;
+pub const MAX_CONTENT_RANGE_VALUES: usize = 100;
+pub const MAX_TEMPLATE_CANDIDATES: usize = 10_000;
+pub const MAX_LESSON_EXERCISES: usize = 1_000;
+
+/// Returns whether the place-value renderer can display this multiplication.
+pub fn place_value_table_fits(number: u32, multiplier: u32) -> bool {
+    if multiplier == 0 {
+        return false;
+    }
+    let Some(result) = number.checked_mul(multiplier) else {
+        return false;
+    };
+    decimal_digit_count(number).max(decimal_digit_count(result)) <= MAX_PLACE_VALUE_COLUMNS
+}
+
+const fn decimal_digit_count(mut value: u32) -> usize {
+    let mut digits = 1;
+    while value >= 10 {
+        value /= 10;
+        digits += 1;
+    }
+    digits
+}
+
+pub(super) fn fraction_value_pair_is_safe(a: i32, b: i32) -> bool {
+    if a <= 0 || b <= 0 || a % b != 0 || b > MAX_FRACTION_PARTS.cast_signed() {
+        return false;
+    }
+    let result = a / b;
+    result <= i32::MAX / 2
+        && result.checked_mul(b).is_some_and(|parts| {
+            parts > 0 && parts.cast_unsigned() <= MAX_MULTIPLICATION_GRID_CELLS
+        })
+}
 
 /// A plain text string available in both French and English.
 /// Used for prompts and as localized prose within structured explanations.
@@ -217,6 +255,32 @@ impl ContentLibrary {
     pub fn theme(&self, id: &str) -> Option<&Theme> {
         self.theme_index.get(id).map(|&i| &self.themes[i])
     }
+
+    pub fn validation_issues(&self) -> Vec<String> {
+        let mut issues = Vec::new();
+        let mut theme_ids = HashSet::new();
+        for theme in &self.themes {
+            if theme.id.is_empty() || !theme_ids.insert(theme.id.as_str()) {
+                issues.push(format!("Invalid or duplicate theme ID: {}", theme.id));
+            }
+            let mut lesson_ids = HashSet::new();
+            for lesson in &theme.lessons {
+                if lesson.id.is_empty() || !lesson_ids.insert(lesson.id.as_str()) {
+                    issues.push(format!(
+                        "Invalid or duplicate lesson ID in theme {}: {}",
+                        theme.id, lesson.id
+                    ));
+                }
+                issues.extend(
+                    lesson
+                        .validation_issues()
+                        .into_iter()
+                        .map(|issue| format!("Theme {}, lesson {}: {issue}", theme.id, lesson.id)),
+                );
+            }
+        }
+        issues
+    }
 }
 
 /// A pedagogical theme grouping related lessons.
@@ -254,7 +318,47 @@ pub struct Lesson {
     #[serde(skip)]
     pub title_key: TranslationKey,
     pub available: bool,
-    pub questions: Vec<QuestionDefinition>,
+    pub questions: Vec<QuestionEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct QuestionEntry {
+    pub id: String,
+    pub definition: QuestionDefinition,
+}
+
+impl QuestionEntry {
+    pub fn new(id: impl Into<String>, definition: QuestionDefinition) -> Self {
+        Self {
+            id: id.into(),
+            definition,
+        }
+    }
+}
+
+impl Lesson {
+    pub fn validation_issues(&self) -> Vec<String> {
+        let mut issues = Vec::new();
+        if self.questions.len() > MAX_LESSON_EXERCISES {
+            issues.push(format!(
+                "Lesson exceeds the {MAX_LESSON_EXERCISES} exercise limit"
+            ));
+        }
+        let mut ids = HashSet::new();
+        for entry in &self.questions {
+            if entry.id.is_empty() || !ids.insert(entry.id.as_str()) {
+                issues.push(format!("Invalid or duplicate exercise ID: {}", entry.id));
+            }
+            issues.extend(
+                entry
+                    .definition
+                    .validation_issues()
+                    .into_iter()
+                    .map(|issue| format!("Exercise {}: {issue}", entry.id)),
+            );
+        }
+        issues
+    }
 }
 
 /// Classifies a question by its pedagogical type, regardless of whether it
@@ -284,7 +388,144 @@ pub enum QuestionDefinition {
     NumericInputTemplate(NumericInputTemplate),
 }
 
+/// A fully generated question instance ready for interaction and presentation.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum QuestionInstance {
+    Mcq(McqDefinition),
+    FractionVisualization(FractionVisualizationDefinition),
+    FractionComparison(FractionComparisonDefinition),
+    FractionIdentification(FractionIdentificationDefinition),
+    NumericInput(NumericInputDefinition),
+}
+
+impl QuestionInstance {
+    pub const fn question_type(&self) -> QuestionType {
+        match self {
+            Self::Mcq(_) => QuestionType::Mcq,
+            Self::FractionVisualization(_) => QuestionType::Visualization,
+            Self::FractionComparison(_) => QuestionType::Comparison,
+            Self::FractionIdentification(_) => QuestionType::Identification,
+            Self::NumericInput(_) => QuestionType::NumericInput,
+        }
+    }
+
+    pub fn fingerprint(&self) -> Option<u64> {
+        let mut hasher = DefaultHasher::new();
+        self.question_type().hash(&mut hasher);
+        match self {
+            Self::Mcq(definition) => {
+                definition.prompt.hash(&mut hasher);
+                definition
+                    .choices
+                    .get(definition.correct_index)?
+                    .hash(&mut hasher);
+            }
+            Self::FractionVisualization(definition) => {
+                definition.prompt.hash(&mut hasher);
+                definition.numerator.hash(&mut hasher);
+                definition.denominator.hash(&mut hasher);
+            }
+            Self::FractionComparison(definition) => {
+                definition.prompt.hash(&mut hasher);
+                definition.fraction_a.hash(&mut hasher);
+                definition.fraction_b.hash(&mut hasher);
+                definition.answer.hash(&mut hasher);
+            }
+            Self::FractionIdentification(definition) => {
+                definition.numerator.hash(&mut hasher);
+                definition.denominator.hash(&mut hasher);
+                definition
+                    .choices
+                    .get(definition.correct_index)?
+                    .hash(&mut hasher);
+            }
+            Self::NumericInput(definition) => {
+                definition.prompt.hash(&mut hasher);
+                definition.correct_answer.hash(&mut hasher);
+            }
+        }
+        Some(hasher.finish())
+    }
+}
+
 impl QuestionDefinition {
+    pub fn validation_issues(&self) -> Vec<String> {
+        let mut issues = Vec::new();
+        match self {
+            Self::Mcq(definition) => {
+                validate_choices(&definition.choices, definition.correct_index, &mut issues);
+                validate_question_visual(definition.question_visual.as_ref(), &mut issues);
+                validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+            }
+            Self::McqTemplate(template) => validate_mcq_template(template, &mut issues),
+            Self::FractionVisualization(definition) => {
+                validate_fraction(
+                    definition.numerator,
+                    definition.denominator,
+                    true,
+                    &mut issues,
+                );
+            }
+            Self::FractionVisualizationTemplate(template) => {
+                validate_fraction_ranges(
+                    &template.numerator_range,
+                    &template.denominator_range,
+                    true,
+                    &mut issues,
+                );
+            }
+            Self::FractionComparison(definition) => {
+                validate_fraction(
+                    definition.fraction_a.0,
+                    definition.fraction_a.1,
+                    true,
+                    &mut issues,
+                );
+                validate_fraction(
+                    definition.fraction_b.0,
+                    definition.fraction_b.1,
+                    true,
+                    &mut issues,
+                );
+                validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+            }
+            Self::FractionComparisonTemplate(template) => {
+                validate_comparison_template(template, &mut issues);
+            }
+            Self::FractionIdentification(definition) => {
+                validate_fraction(
+                    definition.numerator,
+                    definition.denominator,
+                    false,
+                    &mut issues,
+                );
+                validate_choices(&definition.choices, definition.correct_index, &mut issues);
+                validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+            }
+            Self::FractionIdentificationTemplate(template) => {
+                validate_fraction_ranges(
+                    &template.numerator_range,
+                    &template.denominator_range,
+                    false,
+                    &mut issues,
+                );
+            }
+            Self::NumericInput(definition) => {
+                if definition.correct_answer > MAX_NUMERIC_INPUT_ANSWER {
+                    issues.push(format!(
+                        "Numeric answer exceeds keypad limit {MAX_NUMERIC_INPUT_ANSWER}"
+                    ));
+                }
+                validate_question_visual(definition.question_visual.as_ref(), &mut issues);
+                validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+            }
+            Self::NumericInputTemplate(template) => {
+                validate_numeric_template(template, &mut issues);
+            }
+        }
+        issues
+    }
+
     /// Returns the pedagogical category regardless of static vs template origin.
     pub const fn question_type(&self) -> QuestionType {
         match self {
@@ -395,43 +636,461 @@ impl QuestionDefinition {
             _ => false,
         }
     }
+}
 
-    /// Returns a `u64` hash that uniquely identifies a resolved question's
-    /// semantic content. Used by session building to avoid duplicate questions.
-    /// Returns `None` for unresolved templates or malformed multiple-choice definitions.
-    pub fn fingerprint(&self) -> Option<u64> {
-        let mut hasher = DefaultHasher::new();
-        self.question_type().hash(&mut hasher);
-        match self {
-            Self::Mcq(d) => {
-                d.prompt.hash(&mut hasher);
-                d.choices.get(d.correct_index)?.hash(&mut hasher);
-            }
-            Self::FractionVisualization(d) => {
-                d.prompt.hash(&mut hasher);
-                d.numerator.hash(&mut hasher);
-                d.denominator.hash(&mut hasher);
-            }
-            Self::FractionComparison(d) => {
-                d.prompt.hash(&mut hasher);
-                d.fraction_a.hash(&mut hasher);
-                d.fraction_b.hash(&mut hasher);
-                d.answer.hash(&mut hasher);
-            }
-            Self::FractionIdentification(d) => {
-                d.numerator.hash(&mut hasher);
-                d.denominator.hash(&mut hasher);
-                d.choices.get(d.correct_index)?.hash(&mut hasher);
-            }
-            Self::NumericInput(d) => {
-                d.prompt.hash(&mut hasher);
-                d.correct_answer.hash(&mut hasher);
-            }
-            // Templates are not resolved yet, so no fingerprint.
-            _ => return None,
-        }
-        Some(hasher.finish())
+fn validate_choices(choices: &[String], correct_index: usize, issues: &mut Vec<String>) {
+    if choices.len() < 2 {
+        issues.push("Multiple-choice definitions need at least two choices".to_owned());
     }
+    if correct_index >= choices.len() {
+        issues.push(format!(
+            "Correct choice index {correct_index} is out of range"
+        ));
+    }
+    if choices.iter().any(String::is_empty) {
+        issues.push("Multiple-choice values must not be empty".to_owned());
+    }
+    let mut unique = HashSet::new();
+    if choices.iter().any(|choice| !unique.insert(choice)) {
+        issues.push("Multiple-choice values must be unique".to_owned());
+    }
+}
+
+fn validate_fraction(
+    numerator: u32,
+    denominator: u32,
+    allow_equal: bool,
+    issues: &mut Vec<String>,
+) {
+    if denominator == 0 || denominator > MAX_FRACTION_PARTS {
+        issues.push(format!(
+            "Fraction denominator must be in 1..={MAX_FRACTION_PARTS}"
+        ));
+    }
+    if numerator == 0 || numerator > denominator || (!allow_equal && numerator == denominator) {
+        issues.push("Fraction numerator is outside its valid range".to_owned());
+    }
+}
+
+fn validate_fraction_ranges(
+    numerators: &[u32],
+    denominators: &[u32],
+    allow_equal: bool,
+    issues: &mut Vec<String>,
+) {
+    if numerators.len() > MAX_CONTENT_RANGE_VALUES || denominators.len() > MAX_CONTENT_RANGE_VALUES
+    {
+        issues.push(format!(
+            "Fraction ranges exceed {MAX_CONTENT_RANGE_VALUES} values"
+        ));
+    }
+    if numerators.is_empty() || denominators.is_empty() {
+        issues.push("Fraction generation ranges must not be empty".to_owned());
+        return;
+    }
+    if numerators.contains(&0) || denominators.contains(&0) {
+        issues.push("Fraction generation values must be positive".to_owned());
+    }
+    if has_duplicates(numerators) || has_duplicates(denominators) {
+        issues.push("Fraction generation ranges must not contain duplicates".to_owned());
+    }
+    if denominators.iter().any(|&d| d > MAX_FRACTION_PARTS) {
+        issues.push(format!("Fraction denominator exceeds {MAX_FRACTION_PARTS}"));
+    }
+    if numerators.iter().any(|&n| n > MAX_FRACTION_PARTS)
+        || numerators.iter().any(|&n| {
+            !denominators
+                .iter()
+                .any(|&d| n <= d && (allow_equal || n < d))
+        })
+        || denominators
+            .iter()
+            .any(|&d| !numerators.iter().any(|&n| n <= d && (allow_equal || n < d)))
+    {
+        issues.push("Every fraction range value needs a valid pair".to_owned());
+    }
+}
+
+fn validate_question_visual(visual: Option<&QuestionVisual>, issues: &mut Vec<String>) {
+    match visual {
+        Some(QuestionVisual::MultiplicationGrid { rows, cols }) => {
+            validate_grid(*rows, *cols, issues);
+        }
+        Some(QuestionVisual::FractionAddition { a, b, c })
+            if *b == 0
+                || *b > MAX_FRACTION_PARTS
+                || *a == 0
+                || *a > *b
+                || *c == 0
+                || *c > *b
+                || a.checked_add(*c).is_none() =>
+        {
+            issues.push("Fraction addition visual has invalid values".to_owned());
+        }
+        Some(QuestionVisual::FractionAddition { .. }) | None => {}
+    }
+}
+
+fn validate_grid(rows: u32, cols: u32, issues: &mut Vec<String>) {
+    if rows == 0
+        || cols == 0
+        || rows
+            .checked_mul(cols)
+            .is_none_or(|cells| cells > MAX_MULTIPLICATION_GRID_CELLS)
+    {
+        issues.push(format!(
+            "Multiplication grid must contain 1..={MAX_MULTIPLICATION_GRID_CELLS} cells"
+        ));
+    }
+}
+
+fn validate_explanation_visual(visual: Option<&ExplanationVisual>, issues: &mut Vec<String>) {
+    match visual {
+        Some(ExplanationVisual::FractionBar {
+            numerator,
+            denominator,
+        }) => {
+            validate_fraction(*numerator, *denominator, true, issues);
+        }
+        Some(ExplanationVisual::FractionAddition { a, b, c }) => {
+            validate_question_visual(
+                Some(&QuestionVisual::FractionAddition {
+                    a: *a,
+                    b: *b,
+                    c: *c,
+                }),
+                issues,
+            );
+        }
+        Some(ExplanationVisual::WholeFractions { count, denominator }) => {
+            if *count == 0
+                || *denominator == 0
+                || count
+                    .checked_mul(*denominator)
+                    .is_none_or(|parts| parts > MAX_MULTIPLICATION_GRID_CELLS)
+            {
+                issues.push("Whole-fraction visual exceeds its safe bounds".to_owned());
+            }
+        }
+        Some(ExplanationVisual::FractionComparison { a, b }) => {
+            validate_fraction(a.fraction.0, a.fraction.1, true, issues);
+            validate_fraction(b.fraction.0, b.fraction.1, true, issues);
+        }
+        Some(ExplanationVisual::FractionComparisonWithConversion { a, b }) => {
+            validate_fraction(a.fraction.0, a.fraction.1, true, issues);
+            validate_fraction(b.fraction.0, b.fraction.1, true, issues);
+            validate_fraction(a.converted.0, a.converted.1, true, issues);
+            validate_fraction(b.converted.0, b.converted.1, true, issues);
+        }
+        Some(ExplanationVisual::MultiplicationGrid { rows, cols }) => {
+            validate_grid(*rows, *cols, issues);
+        }
+        Some(ExplanationVisual::PlaceValueTable { number, multiplier })
+            if !place_value_table_fits(*number, *multiplier) =>
+        {
+            issues.push("Place-value visual exceeds the five-column limit".to_owned());
+        }
+        Some(ExplanationVisual::PlaceValueTable { .. }) | None => {}
+    }
+}
+
+fn validate_parameter_ranges(template: &McqTemplate, required: &[&str], issues: &mut Vec<String>) {
+    let mut names = HashSet::new();
+    for parameter in &template.parameters {
+        if parameter.name.is_empty() || !names.insert(parameter.name.as_ref()) {
+            issues.push(format!(
+                "Invalid or duplicate parameter name: {}",
+                parameter.name
+            ));
+        }
+        if parameter.values.len() > MAX_CONTENT_RANGE_VALUES {
+            issues.push(format!(
+                "Parameter {} exceeds the value limit",
+                parameter.name
+            ));
+        }
+        if parameter.values.is_empty() || parameter.values.iter().any(|value| *value <= 0) {
+            issues.push(format!(
+                "Parameter {} must contain positive values",
+                parameter.name
+            ));
+        }
+        let mut values = HashSet::new();
+        if parameter.values.iter().any(|value| !values.insert(value)) {
+            issues.push(format!(
+                "Parameter {} contains duplicate values",
+                parameter.name
+            ));
+        }
+    }
+    for name in required {
+        if !template
+            .parameters
+            .iter()
+            .any(|parameter| parameter.name == *name)
+        {
+            issues.push(format!("Missing required parameter: {name}"));
+        }
+    }
+}
+
+fn mcq_values<'a>(template: &'a McqTemplate, name: &str) -> &'a [i32] {
+    template
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name == name)
+        .map_or(&[], |parameter| parameter.values.as_slice())
+}
+
+fn validate_fraction_value_parameters(
+    values_a: &[i32],
+    values_b: &[i32],
+    issues: &mut Vec<String>,
+) {
+    let mut has_safe_pair = false;
+    let mut has_unsafe_pair = false;
+    for &a in values_a {
+        for &b in values_b {
+            if a > 0 && b > 0 && a % b == 0 {
+                if fraction_value_pair_is_safe(a, b) {
+                    has_safe_pair = true;
+                } else {
+                    has_unsafe_pair = true;
+                }
+            }
+        }
+    }
+    if has_unsafe_pair {
+        issues.push("Fraction-value parameters contain unsafe divisible pairs".to_owned());
+    }
+    if !has_safe_pair {
+        issues.push("Fraction-value parameters have no safe divisible pair".to_owned());
+    }
+}
+
+fn validate_mcq_template(template: &McqTemplate, issues: &mut Vec<String>) {
+    let required: &[&str] = match template.resolver {
+        McqResolver::FractionValue
+        | McqResolver::Multiplication
+        | McqResolver::MultiplyByPowerOf10 => &["a", "b"],
+        McqResolver::FractionAddition => &["a", "b", "c"],
+        McqResolver::FractionName => &["d"],
+    };
+    validate_parameter_ranges(template, required, issues);
+    let values_a = mcq_values(template, "a");
+    let values_b = mcq_values(template, "b");
+    let candidate_count = required.iter().try_fold(1_usize, |total, name| {
+        total.checked_mul(mcq_values(template, name).len())
+    });
+    if candidate_count.is_none_or(|count| count > MAX_TEMPLATE_CANDIDATES) {
+        issues.push(format!(
+            "Template combinations exceed {MAX_TEMPLATE_CANDIDATES} candidates"
+        ));
+    }
+    match template.resolver {
+        McqResolver::FractionValue => {
+            validate_fraction_value_parameters(values_a, values_b, issues);
+        }
+        McqResolver::FractionAddition => {
+            let values_c = mcq_values(template, "c");
+            if values_b
+                .iter()
+                .any(|b| *b > MAX_FRACTION_PARTS.cast_signed())
+            {
+                issues.push(format!(
+                    "Fraction-addition denominator exceeds {MAX_FRACTION_PARTS}"
+                ));
+            }
+            if values_b.iter().any(|b| *b > i32::MAX / 2)
+                || !values_a.iter().any(|a| {
+                    values_b.iter().any(|b| {
+                        values_c.iter().any(|c| {
+                            a < b && c < b && a.checked_add(*c).is_some_and(|sum| sum <= *b)
+                        })
+                    })
+                })
+            {
+                issues.push("Fraction-addition parameters have no valid triplet".to_owned());
+            }
+        }
+        McqResolver::FractionName => {
+            if mcq_values(template, "d")
+                .iter()
+                .any(|d| !matches!(*d, 2 | 3 | 4 | 5 | 6 | 8))
+            {
+                issues.push("Fraction-name denominator is not supported".to_owned());
+            }
+        }
+        McqResolver::Multiplication | McqResolver::MultiplyByPowerOf10 => {
+            let safe_products = values_a.iter().all(|a| {
+                values_b.iter().all(|b| {
+                    a.checked_mul(*b)
+                        .is_some_and(|product| product <= i32::MAX - 10)
+                })
+            });
+            if !safe_products {
+                issues.push("Multiplication parameters exceed safe arithmetic bounds".to_owned());
+            }
+            if matches!(template.resolver, McqResolver::MultiplyByPowerOf10)
+                && values_b.iter().any(|value| !is_power_of_ten(*value))
+            {
+                issues.push("Place-value multiplier must be a power of ten".to_owned());
+            }
+            if matches!(template.resolver, McqResolver::MultiplyByPowerOf10)
+                && values_a.iter().any(|a| {
+                    values_b
+                        .iter()
+                        .any(|b| !place_value_table_fits(a.cast_unsigned(), b.cast_unsigned()))
+                })
+            {
+                issues.push("Place-value result exceeds the five-column limit".to_owned());
+            }
+            if (template.with_grid || matches!(template.resolver, McqResolver::Multiplication))
+                && values_a.iter().any(|a| {
+                    values_b.iter().any(|b| {
+                        a.checked_mul(*b).is_none_or(|cells| {
+                            cells <= 0 || cells.cast_unsigned() > MAX_MULTIPLICATION_GRID_CELLS
+                        })
+                    })
+                })
+            {
+                issues.push("Multiplication grid parameters exceed the cell limit".to_owned());
+            }
+        }
+    }
+}
+
+fn validate_comparison_template(template: &FractionComparisonTemplate, issues: &mut Vec<String>) {
+    if template.numerator_range.len() > MAX_CONTENT_RANGE_VALUES
+        || template.denominator_range.len() > MAX_CONTENT_RANGE_VALUES
+    {
+        issues.push(format!(
+            "Comparison ranges exceed {MAX_CONTENT_RANGE_VALUES} values"
+        ));
+    }
+    if template.numerator_range.is_empty() || template.denominator_range.is_empty() {
+        issues.push("Comparison generation ranges must not be empty".to_owned());
+        return;
+    }
+    if has_duplicates(&template.numerator_range) || has_duplicates(&template.denominator_range) {
+        issues.push("Comparison ranges must not contain duplicates".to_owned());
+    }
+    if template.numerator_range.contains(&0)
+        || template.denominator_range.contains(&0)
+        || template
+            .numerator_range
+            .iter()
+            .any(|&n| n > MAX_FRACTION_PARTS)
+        || template
+            .denominator_range
+            .iter()
+            .any(|&d| d > MAX_FRACTION_PARTS)
+    {
+        issues.push("Comparison ranges contain values outside safe fraction bounds".to_owned());
+    }
+    let eligible_denominators: Vec<u32> = template
+        .denominator_range
+        .iter()
+        .copied()
+        .filter(|&denominator| {
+            template
+                .numerator_range
+                .iter()
+                .any(|&numerator| numerator > 0 && numerator < denominator)
+        })
+        .collect();
+    let can_make_question = match template.difficulty {
+        ComparisonDifficulty::SameDenominator => template.denominator_range.iter().all(|&d| {
+            template
+                .numerator_range
+                .iter()
+                .filter(|&&n| n > 0 && n < d)
+                .count()
+                >= 2
+        }),
+        ComparisonDifficulty::SameNumerator => template.numerator_range.iter().all(|&n| {
+            template
+                .denominator_range
+                .iter()
+                .filter(|&&d| d > n)
+                .count()
+                >= 2
+        }),
+        ComparisonDifficulty::MultipleDenominator => eligible_denominators.iter().any(|&a| {
+            eligible_denominators
+                .iter()
+                .any(|&b| a != b && (a % b == 0 || b % a == 0))
+        }),
+    };
+    if !can_make_question {
+        issues.push("Comparison ranges cannot generate the selected difficulty".to_owned());
+    }
+}
+
+fn validate_numeric_template(template: &NumericInputTemplate, issues: &mut Vec<String>) {
+    if template.factor_a_range.len() > MAX_CONTENT_RANGE_VALUES
+        || template.factor_b_range.len() > MAX_CONTENT_RANGE_VALUES
+    {
+        issues.push(format!(
+            "Numeric ranges exceed {MAX_CONTENT_RANGE_VALUES} values"
+        ));
+    }
+    if template.factor_a_range.is_empty() || template.factor_b_range.is_empty() {
+        issues.push("Numeric multiplication ranges must not be empty".to_owned());
+        return;
+    }
+    if has_duplicates(&template.factor_a_range) || has_duplicates(&template.factor_b_range) {
+        issues.push("Numeric multiplication ranges must not contain duplicates".to_owned());
+    }
+    if template.factor_a_range.contains(&0) || template.factor_b_range.contains(&0) {
+        issues.push("Numeric multiplication factors must be positive".to_owned());
+    }
+    if template.factor_a_range.iter().any(|a| {
+        template.factor_b_range.iter().any(|b| {
+            a.checked_mul(*b)
+                .is_none_or(|product| product > MAX_NUMERIC_INPUT_ANSWER)
+        })
+    }) {
+        issues.push(format!(
+            "Numeric answers must not exceed {MAX_NUMERIC_INPUT_ANSWER}"
+        ));
+    }
+    if (template.with_grid || !template.place_value_explanation)
+        && template.factor_a_range.iter().any(|a| {
+            template.factor_b_range.iter().any(|b| {
+                a.checked_mul(*b)
+                    .is_none_or(|cells| cells > MAX_MULTIPLICATION_GRID_CELLS)
+            })
+        })
+    {
+        issues.push("Multiplication grid parameters exceed the cell limit".to_owned());
+    }
+    if template.place_value_explanation
+        && template.factor_a_range.iter().any(|&a| {
+            template
+                .factor_b_range
+                .iter()
+                .any(|&b| !place_value_table_fits(a, b))
+        })
+    {
+        issues.push("Place-value result exceeds the five-column limit".to_owned());
+    }
+}
+
+fn has_duplicates<T: Eq + Hash>(values: &[T]) -> bool {
+    let mut seen = HashSet::new();
+    values.iter().any(|value| !seen.insert(value))
+}
+
+const fn is_power_of_ten(value: i32) -> bool {
+    if value < 10 {
+        return false;
+    }
+    let mut remainder = value;
+    while remainder % 10 == 0 {
+        remainder /= 10;
+    }
+    remainder == 1
 }
 
 /// One character's side in a fraction comparison visual.
@@ -677,15 +1336,303 @@ pub struct NumericInputTemplate {
 /// A concrete question ready for the session, with visual toggle state.
 #[derive(Clone, Debug)]
 pub struct ResolvedQuestion {
-    pub definition: QuestionDefinition,
-    /// When `true`, the optional question visual is hidden for this instance.
-    pub hide_visual: bool,
+    pub exercise_id: String,
+    pub instance: QuestionInstance,
+    /// When `true`, the optional question aid is hidden for this instance.
+    pub hide_optional_visual: bool,
 }
 
 /// Whether the student answered correctly or not.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum AnswerResult {
     #[default]
     Correct,
     Incorrect,
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+
+    use super::*;
+
+    fn parameter(name: &'static str, values: Vec<i32>) -> ParameterRange {
+        ParameterRange {
+            name: name.into(),
+            values,
+        }
+    }
+
+    fn template(resolver: McqResolver, parameters: Vec<ParameterRange>) -> McqTemplate {
+        McqTemplate {
+            prompt_template: LocalizedText::new("prompt", "prompt"),
+            parameters,
+            resolver,
+            explanation_template: LocalizedText::new("", ""),
+            teacher_label: None,
+            with_grid: false,
+        }
+    }
+
+    fn mcq(choices: Vec<&str>, correct_index: usize) -> QuestionDefinition {
+        QuestionDefinition::Mcq(McqDefinition {
+            prompt: LocalizedText::new("prompt", "prompt"),
+            choices: choices.into_iter().map(str::to_owned).collect(),
+            correct_index,
+            explanation: LocalizedExplanation::plain(LocalizedText::new("", "")),
+            explanation_visual: None,
+            question_visual: None,
+        })
+    }
+
+    #[test]
+    fn multiple_choice_accepts_last_choice_and_rejects_out_of_range_index() {
+        assert_eq!(
+            mcq(vec!["first", "last"], 1).validation_issues(),
+            Vec::<String>::new()
+        );
+        assert!(
+            mcq(vec!["first", "last"], 2)
+                .validation_issues()
+                .iter()
+                .any(|issue| issue.contains("out of range"))
+        );
+    }
+
+    #[test]
+    fn fraction_generation_rejects_zero_denominators_and_empty_ranges() {
+        let invalid_static =
+            QuestionDefinition::FractionVisualization(FractionVisualizationDefinition {
+                prompt: LocalizedText::new("prompt", "prompt"),
+                numerator: 1,
+                denominator: 0,
+                explanation: LocalizedExplanation::plain(LocalizedText::new("", "")),
+            });
+        assert!(
+            invalid_static
+                .validation_issues()
+                .iter()
+                .any(|issue| issue.contains("denominator"))
+        );
+
+        let invalid_template =
+            QuestionDefinition::FractionIdentificationTemplate(FractionIdentificationTemplate {
+                numerator_range: vec![1],
+                denominator_range: Vec::new(),
+            });
+        assert!(
+            invalid_template
+                .validation_issues()
+                .iter()
+                .any(|issue| issue.contains("ranges"))
+        );
+    }
+
+    #[test]
+    fn optional_visual_defaults_are_preserved() {
+        let grid = QuestionDefinition::Mcq(McqDefinition {
+            prompt: LocalizedText::new("prompt", "prompt"),
+            choices: vec!["a".to_owned(), "b".to_owned()],
+            correct_index: 0,
+            explanation: LocalizedExplanation::plain(LocalizedText::new("", "")),
+            explanation_visual: None,
+            question_visual: Some(QuestionVisual::MultiplicationGrid { rows: 2, cols: 3 }),
+        });
+        let addition = QuestionDefinition::Mcq(McqDefinition {
+            prompt: LocalizedText::new("prompt", "prompt"),
+            choices: vec!["a".to_owned(), "b".to_owned()],
+            correct_index: 0,
+            explanation: LocalizedExplanation::plain(LocalizedText::new("", "")),
+            explanation_visual: None,
+            question_visual: Some(QuestionVisual::FractionAddition { a: 1, b: 4, c: 2 }),
+        });
+        assert_eq!(grid.effective_show_visual(None), Some(false));
+        assert_eq!(addition.effective_show_visual(None), Some(true));
+
+        let comparison =
+            QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
+                prompt: LocalizedText::new("prompt", "prompt"),
+                character_a: "A".into(),
+                character_b: "B".into(),
+                difficulty: ComparisonDifficulty::SameNumerator,
+                denominator_range: vec![4, 8],
+                numerator_range: vec![2],
+                explanation_template: LocalizedText::new("", ""),
+            });
+        assert_eq!(comparison.effective_show_visual(None), Some(true));
+
+        let simple_comparison =
+            QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
+                prompt: LocalizedText::new("prompt", "prompt"),
+                character_a: "A".into(),
+                character_b: "B".into(),
+                difficulty: ComparisonDifficulty::SameDenominator,
+                denominator_range: vec![4],
+                numerator_range: vec![1, 2],
+                explanation_template: LocalizedText::new("", ""),
+            });
+        assert_eq!(simple_comparison.effective_show_visual(None), Some(false));
+    }
+
+    #[test]
+    fn fraction_value_rejects_unsafe_pairs_and_resolves_only_safe_pairs() {
+        let template = template(
+            McqResolver::FractionValue,
+            vec![parameter("a", vec![2, i32::MAX]), parameter("b", vec![1])],
+        );
+        let issues = QuestionDefinition::McqTemplate(template.clone()).validation_issues();
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("unsafe divisible pairs"))
+        );
+        assert!(
+            !issues
+                .iter()
+                .any(|issue| issue.contains("no safe divisible pair"))
+        );
+
+        let mut rng = StdRng::seed_from_u64(7);
+        for _ in 0..20 {
+            let resolved = template.resolve(&mut rng);
+            assert_eq!(resolved.choices[resolved.correct_index], "2");
+            assert_eq!(
+                QuestionDefinition::Mcq(resolved).validation_issues(),
+                Vec::<String>::new()
+            );
+        }
+    }
+
+    #[test]
+    fn fraction_addition_bounds_denominator_and_generated_visuals() {
+        let invalid = template(
+            McqResolver::FractionAddition,
+            vec![
+                parameter("a", vec![1]),
+                parameter("b", vec![1_001]),
+                parameter("c", vec![1]),
+            ],
+        );
+        let issues = QuestionDefinition::McqTemplate(invalid).validation_issues();
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("denominator exceeds"))
+        );
+
+        let accepted = template(
+            McqResolver::FractionAddition,
+            vec![
+                parameter("a", vec![1]),
+                parameter("b", vec![4]),
+                parameter("c", vec![2]),
+            ],
+        );
+        assert_eq!(
+            QuestionDefinition::McqTemplate(accepted.clone()).validation_issues(),
+            Vec::<String>::new()
+        );
+        let mut rng = StdRng::seed_from_u64(13);
+        let resolved = accepted.resolve(&mut rng);
+        assert_eq!(
+            QuestionDefinition::Mcq(resolved).validation_issues(),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn place_value_visuals_reject_values_beyond_five_columns() {
+        assert!(place_value_table_fits(10, 1_000));
+        assert!(!place_value_table_fits(100, 1_000));
+
+        let accepted_mcq = QuestionDefinition::McqTemplate(template(
+            McqResolver::MultiplyByPowerOf10,
+            vec![parameter("a", vec![10]), parameter("b", vec![1_000])],
+        ));
+        assert_eq!(accepted_mcq.validation_issues(), Vec::<String>::new());
+        let rejected_mcq = QuestionDefinition::McqTemplate(template(
+            McqResolver::MultiplyByPowerOf10,
+            vec![parameter("a", vec![100]), parameter("b", vec![1_000])],
+        ));
+        assert!(
+            rejected_mcq
+                .validation_issues()
+                .iter()
+                .any(|issue| issue.contains("five-column limit"))
+        );
+
+        let accepted_numeric = QuestionDefinition::NumericInputTemplate(NumericInputTemplate {
+            prompt_template: LocalizedText::new("prompt", "prompt"),
+            factor_a_range: vec![10],
+            factor_b_range: vec![1_000],
+            difficulty: Difficulty::Beginner,
+            explanation_template: LocalizedText::new("", ""),
+            teacher_label: None,
+            with_grid: false,
+            place_value_explanation: true,
+        });
+        assert_eq!(accepted_numeric.validation_issues(), Vec::<String>::new());
+        let rejected_numeric = QuestionDefinition::NumericInputTemplate(NumericInputTemplate {
+            prompt_template: LocalizedText::new("prompt", "prompt"),
+            factor_a_range: vec![100],
+            factor_b_range: vec![1_000],
+            difficulty: Difficulty::Beginner,
+            explanation_template: LocalizedText::new("", ""),
+            teacher_label: None,
+            with_grid: false,
+            place_value_explanation: true,
+        });
+        assert!(
+            rejected_numeric
+                .validation_issues()
+                .iter()
+                .any(|issue| issue.contains("five-column limit"))
+        );
+
+        let static_visual = QuestionDefinition::Mcq(McqDefinition {
+            prompt: LocalizedText::new("prompt", "prompt"),
+            choices: vec!["one".to_owned(), "two".to_owned()],
+            correct_index: 0,
+            explanation: LocalizedExplanation::plain(LocalizedText::new("", "")),
+            explanation_visual: Some(ExplanationVisual::PlaceValueTable {
+                number: 100,
+                multiplier: 1_000,
+            }),
+            question_visual: None,
+        });
+        assert!(
+            static_visual
+                .validation_issues()
+                .iter()
+                .any(|issue| issue.contains("five-column limit"))
+        );
+    }
+
+    #[test]
+    fn multiplication_template_rejects_overflowing_arithmetic() {
+        let template = QuestionDefinition::McqTemplate(McqTemplate {
+            prompt_template: LocalizedText::new("prompt", "prompt"),
+            parameters: vec![
+                ParameterRange {
+                    name: "a".into(),
+                    values: vec![50_000],
+                },
+                ParameterRange {
+                    name: "b".into(),
+                    values: vec![50_000],
+                },
+            ],
+            resolver: McqResolver::Multiplication,
+            explanation_template: LocalizedText::new("", ""),
+            teacher_label: None,
+            with_grid: false,
+        });
+        assert!(
+            template
+                .validation_issues()
+                .iter()
+                .any(|issue| issue.contains("arithmetic bounds"))
+        );
+    }
 }

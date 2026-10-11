@@ -3,12 +3,10 @@ use bevy::window::PrimaryWindow;
 
 use super::fraction_bar::fraction_bar;
 use super::multiplication_grid::spawn_prompt_and_grid;
-use super::registry::{QuestionRoot, register_question_systems, submit_answer};
+use super::registry::{QuestionRoot, register_question_systems};
 use crate::data::content::QuestionVisual;
-use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
+use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::I18n;
-use crate::states::LessonPhase;
-use crate::ui::components::ButtonActivated;
 use crate::ui::components::operator_visual_group;
 use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
@@ -20,9 +18,9 @@ impl Plugin for McqPlugin {
     fn build(&self, app: &mut App) {
         register_question_systems(
             app,
-            |d| matches!(d, QuestionDefinition::Mcq(_)),
+            |d| matches!(d, QuestionInstance::Mcq(_)),
             spawn_mcq_ui,
-            handle_mcq_click,
+            interaction::handle_mcq_click,
         );
     }
 }
@@ -47,11 +45,11 @@ fn spawn_mcq_ui(
     let Some(question) = session.current() else {
         return;
     };
-    let QuestionDefinition::Mcq(mcq) = &question.definition else {
+    let QuestionInstance::Mcq(mcq) = &question.instance else {
         return;
     };
 
-    let hide_visual = question.hide_visual;
+    let hide_visual = question.hide_optional_visual;
     let show_grid = !hide_visual;
 
     commands.entity(*container).with_children(|parent| {
@@ -170,32 +168,4 @@ fn spawn_prompt_and_fraction_bars(
         });
 }
 
-fn handle_mcq_click(
-    mut activations: MessageReader<ButtonActivated>,
-    query: Query<&McqChoice>,
-    session: Res<LessonSession>,
-    mut commands: Commands,
-    mut next_phase: ResMut<NextState<LessonPhase>>,
-) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    for entity in activated_entities {
-        let Ok(choice) = query.get(entity) else {
-            continue;
-        };
-        let Some(question) = session.current() else {
-            return;
-        };
-        let QuestionDefinition::Mcq(mcq) = &question.definition else {
-            return;
-        };
-
-        let result = if choice.index == mcq.correct_index {
-            AnswerResult::Correct
-        } else {
-            AnswerResult::Incorrect
-        };
-
-        submit_answer(&mut commands, &mut next_phase, result);
-        return;
-    }
-}
+mod interaction;

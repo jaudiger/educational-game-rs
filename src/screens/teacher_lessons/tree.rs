@@ -126,10 +126,12 @@ fn lesson_has_custom_config(
         .and_then(|player_session| save_data.class_slots[player_session.slot_index].as_ref())
         .and_then(|cs| cs.lesson_configs.get(&lesson.id))
         .is_some_and(|config| {
-            let count_changed = config.counts.iter().any(|&c| c != 1);
-            let visual_changed = lesson.questions.iter().enumerate().any(|(i, q)| {
-                q.effective_show_visual(config.show_visuals.get(i).copied())
-                    != q.effective_show_visual(None)
+            let count_changed = config.counts.values().any(|&count| count != 1);
+            let visual_changed = lesson.questions.iter().any(|entry| {
+                entry
+                    .definition
+                    .effective_show_visual(config.show_visuals.get(&entry.id).copied())
+                    != entry.definition.effective_show_visual(None)
             });
             count_changed || visual_changed
         })

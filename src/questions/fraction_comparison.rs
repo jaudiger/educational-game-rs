@@ -9,12 +9,10 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use super::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, fraction_bar};
-use super::registry::{QuestionRoot, register_question_systems, submit_answer};
+use super::registry::{QuestionRoot, register_question_systems};
 use crate::data::content::ComparisonAnswer;
-use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
+use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
-use crate::states::LessonPhase;
-use crate::ui::components::ButtonActivated;
 use crate::ui::components::standard_button;
 use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
@@ -26,9 +24,9 @@ impl Plugin for FractionComparisonPlugin {
     fn build(&self, app: &mut App) {
         register_question_systems(
             app,
-            |d| matches!(d, QuestionDefinition::FractionComparison(_)),
+            |d| matches!(d, QuestionInstance::FractionComparison(_)),
             spawn_comparison_ui,
-            handle_comparison_click,
+            interaction::handle_comparison_click,
         );
     }
 }
@@ -53,11 +51,11 @@ fn spawn_comparison_ui(
     let Some(question) = session.current() else {
         return;
     };
-    let QuestionDefinition::FractionComparison(def) = &question.definition else {
+    let QuestionInstance::FractionComparison(def) = &question.instance else {
         return;
     };
 
-    let show_bar = !question.hide_visual;
+    let show_bar = !question.hide_optional_visual;
 
     commands.entity(*container).with_children(|parent| {
         parent
@@ -180,32 +178,4 @@ fn comparison_button(label: &str, answer: ComparisonAnswer, window: Entity) -> i
     )
 }
 
-fn handle_comparison_click(
-    mut activations: MessageReader<ButtonActivated>,
-    query: Query<&ComparisonChoice>,
-    session: Res<LessonSession>,
-    mut commands: Commands,
-    mut next_phase: ResMut<NextState<LessonPhase>>,
-) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    for entity in activated_entities {
-        let Ok(choice) = query.get(entity) else {
-            continue;
-        };
-        let Some(question) = session.current() else {
-            return;
-        };
-        let QuestionDefinition::FractionComparison(def) = &question.definition else {
-            return;
-        };
-
-        let result = if choice.answer == def.answer {
-            AnswerResult::Correct
-        } else {
-            AnswerResult::Incorrect
-        };
-
-        submit_answer(&mut commands, &mut next_phase, result);
-        return;
-    }
-}
+mod interaction;

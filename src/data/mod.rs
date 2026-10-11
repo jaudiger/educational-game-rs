@@ -1,3 +1,4 @@
+pub mod assessment;
 pub mod content;
 pub mod persistence;
 pub mod progress;
@@ -5,9 +6,8 @@ pub mod save;
 pub mod save_write;
 pub mod system_params;
 
-pub use content::{
-    AnswerResult, ContentLibrary, ExplanationVisual, QuestionDefinition, ResolvedQuestion,
-};
+pub use assessment::{QuestionResponse, assess_response};
+pub use content::{AnswerResult, ContentLibrary, ExplanationVisual, QuestionInstance};
 pub use persistence::{PersistencePaths, load_or_default, write_json_atomic};
 pub use progress::{
     ActiveTheme, ExplorationTheme, GameMode, GameSettings, Language, LastAnswer, LessonSession,

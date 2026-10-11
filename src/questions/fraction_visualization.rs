@@ -7,12 +7,10 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use super::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, COLOR_UNCOLORED, FractionSlice, fraction_bar};
-use super::registry::{QuestionRoot, register_question_systems, submit_answer};
-use crate::data::{AnswerResult, LessonSession, QuestionContainer, QuestionDefinition};
+use super::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, fraction_bar};
+use super::registry::{QuestionRoot, register_question_systems};
+use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
-use crate::states::LessonPhase;
-use crate::ui::components::ButtonActivated;
 use crate::ui::components::standard_button;
 use crate::ui::theme;
 
@@ -23,9 +21,13 @@ impl Plugin for FractionVisualizationPlugin {
     fn build(&self, app: &mut App) {
         register_question_systems(
             app,
-            |d| matches!(d, QuestionDefinition::FractionVisualization(_)),
+            |d| matches!(d, QuestionInstance::FractionVisualization(_)),
             spawn_fraction_vis_ui,
-            (handle_slice_toggle, handle_validate).chain(),
+            (
+                interaction::handle_slice_toggle,
+                interaction::handle_validate,
+            )
+                .chain(),
         );
     }
 }
@@ -48,7 +50,7 @@ fn spawn_fraction_vis_ui(
     let Some(question) = session.current() else {
         return;
     };
-    let QuestionDefinition::FractionVisualization(def) = &question.definition else {
+    let QuestionInstance::FractionVisualization(def) = &question.instance else {
         return;
     };
 
@@ -87,55 +89,4 @@ fn spawn_validate_button(parent: &mut ChildSpawnerCommands, i18n: &I18n, window:
         ));
 }
 
-fn handle_slice_toggle(
-    mut activations: MessageReader<ButtonActivated>,
-    mut slice_query: Query<(&mut FractionSlice, &mut BackgroundColor)>,
-) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    for entity in activated_entities {
-        let Ok((mut slice, mut bg)) = slice_query.get_mut(entity) else {
-            continue;
-        };
-        slice.colored = !slice.colored;
-        *bg = if slice.colored {
-            BackgroundColor(theme::colors::PRIMARY)
-        } else {
-            BackgroundColor(COLOR_UNCOLORED)
-        };
-    }
-}
-
-#[allow(clippy::cast_possible_truncation)]
-fn handle_validate(
-    mut activations: MessageReader<ButtonActivated>,
-    validate_query: Query<(), With<ValidateButton>>,
-    slices: Query<&FractionSlice>,
-    session: Res<LessonSession>,
-    mut commands: Commands,
-    mut next_phase: ResMut<NextState<LessonPhase>>,
-) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    for entity in activated_entities {
-        if !validate_query.contains(entity) {
-            continue;
-        }
-
-        let Some(question) = session.current() else {
-            return;
-        };
-        let QuestionDefinition::FractionVisualization(def) = &question.definition else {
-            return;
-        };
-
-        let colored_count = slices.iter().filter(|s| s.colored).count() as u32;
-
-        let result = if colored_count == def.numerator {
-            AnswerResult::Correct
-        } else {
-            AnswerResult::Incorrect
-        };
-
-        submit_answer(&mut commands, &mut next_phase, result);
-        return;
-    }
-}
+mod interaction;

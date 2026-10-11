@@ -64,7 +64,7 @@ struct ConfigLessonButton {
 
 #[derive(Component, Reflect)]
 struct CountButton {
-    index: usize,
+    id: String,
     count_text: Entity,
     delta: isize,
 }
@@ -82,7 +82,7 @@ struct ResetConfigButton;
 struct CountText;
 
 #[derive(Component, Reflect)]
-struct VisualToggleButton(usize);
+struct VisualToggleButton(String);
 
 #[derive(Component, Reflect)]
 struct QuestionRow(String);

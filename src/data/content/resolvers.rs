@@ -11,6 +11,7 @@ use super::types::{
     FractionIdentificationTemplate, FractionVisualizationDefinition, FractionVisualizationTemplate,
     LocalizedExplanation, LocalizedText, McqDefinition, McqResolver, McqTemplate,
     NumericInputDefinition, NumericInputTemplate, ParameterRange, QuestionVisual,
+    fraction_value_pair_is_safe,
 };
 
 /// Shuffle `correct` together with `distractors` and return the shuffled list
@@ -25,11 +26,12 @@ fn shuffle_choices<T>(correct: T, mut distractors: Vec<T>, rng: &mut impl Rng) -
 }
 
 impl McqTemplate {
-    fn param_values(&self, name: &str, default: &[i32]) -> Vec<i32> {
+    fn param_values(&self, name: &str) -> &[i32] {
         self.parameters
             .iter()
             .find(|p: &&ParameterRange| p.name == name)
-            .map_or_else(|| default.to_vec(), |p| p.values.clone())
+            .map(|parameter| parameter.values.as_slice())
+            .expect("validated templates contain every required parameter")
     }
 
     /// Dispatch to the resolver strategy matching `self.resolver`, producing a
@@ -47,17 +49,18 @@ impl McqTemplate {
 
     #[allow(clippy::literal_string_with_formatting_args)]
     fn resolve_fraction_value(&self, rng: &mut impl Rng) -> McqDefinition {
-        let a_values = self.param_values("a", &[2]);
-        let b_values = self.param_values("b", &[2]);
+        let a_values = self.param_values("a");
+        let b_values = self.param_values("b");
 
-        // Keep only pairs where a is exactly divisible by b.
         let valid_pairs: Vec<(i32, i32)> = a_values
             .iter()
             .flat_map(|&a| b_values.iter().map(move |&b| (a, b)))
-            .filter(|&(a, b)| b != 0 && a % b == 0)
+            .filter(|&(a, b)| fraction_value_pair_is_safe(a, b))
             .collect();
 
-        let &(a, b) = valid_pairs.choose(rng).unwrap_or(&(2, 1));
+        let &(a, b) = valid_pairs
+            .choose(rng)
+            .expect("validated fraction-value template has a valid pair");
         let result = a / b;
 
         let prompt = LocalizedText::new(
@@ -125,16 +128,16 @@ impl McqTemplate {
     /// Correct answer: `(a+c)/b`.
     #[allow(clippy::literal_string_with_formatting_args)]
     fn resolve_fraction_addition(&self, rng: &mut impl Rng) -> McqDefinition {
-        let a_values = self.param_values("a", &[1]);
-        let b_values = self.param_values("b", &[4]);
-        let c_values = self.param_values("c", &[1]);
+        let a_values = self.param_values("a");
+        let b_values = self.param_values("b");
+        let c_values = self.param_values("c");
 
         // Valid triplets: a > 0, c > 0, b > 0, a < b, c < b, and a+c <= b
         // (no improper fractions in the result).
         let mut valid_triplets: Vec<(i32, i32, i32)> = vec![];
-        for &a in &a_values {
-            for &b in &b_values {
-                for &c in &c_values {
+        for &a in a_values {
+            for &b in b_values {
+                for &c in c_values {
                     if a > 0 && b > 0 && c > 0 && a < b && c < b && a + c <= b {
                         valid_triplets.push((a, b, c));
                     }
@@ -142,7 +145,9 @@ impl McqTemplate {
             }
         }
 
-        let &(a, b, c) = valid_triplets.choose(rng).unwrap_or(&(1, 4, 1));
+        let &(a, b, c) = valid_triplets
+            .choose(rng)
+            .expect("validated fraction-addition template has a valid triplet");
         let sum = a + c;
 
         let prompt = LocalizedText::new(
@@ -209,9 +214,11 @@ impl McqTemplate {
     /// templates. Correct answer: `1/d`.
     #[allow(clippy::literal_string_with_formatting_args)]
     fn resolve_fraction_name(&self, rng: &mut impl Rng) -> McqDefinition {
-        let d_values = self.param_values("d", &[2, 3, 4]);
+        let d_values = self.param_values("d");
 
-        let &d = d_values.choose(rng).unwrap_or(&2);
+        let &d = d_values
+            .choose(rng)
+            .expect("validated fraction-name template has a denominator");
 
         let (name_fr, name_en) = fraction_name(d);
 
@@ -279,11 +286,15 @@ impl McqTemplate {
     /// Correct answer: `a * b` (string). Distractors are neighbouring products.
     #[allow(clippy::literal_string_with_formatting_args)]
     fn resolve_multiplication(&self, rng: &mut impl Rng) -> McqDefinition {
-        let a_values = self.param_values("a", &[2]);
-        let b_values = self.param_values("b", &[3]);
+        let a_values = self.param_values("a");
+        let b_values = self.param_values("b");
 
-        let &a = a_values.choose(rng).unwrap_or(&2);
-        let &b = b_values.choose(rng).unwrap_or(&3);
+        let &a = a_values
+            .choose(rng)
+            .expect("validated multiplication template has factor a");
+        let &b = b_values
+            .choose(rng)
+            .expect("validated multiplication template has factor b");
         let result = a * b;
 
         let prompt = LocalizedText::new(
@@ -373,15 +384,18 @@ impl FractionVisualizationTemplate {
     /// Pick a random numerator/denominator pair from the configured ranges and
     /// produce a `FractionVisualizationDefinition`.
     pub fn resolve(&self, rng: &mut impl Rng) -> FractionVisualizationDefinition {
-        let denominator = *self.denominator_range.choose(rng).unwrap_or(&4);
-
-        let valid_nums: Vec<u32> = self
+        let &denominator = self
+            .denominator_range
+            .choose(rng)
+            .expect("validated fraction-visualization template has a denominator");
+        let numerator = *self
             .numerator_range
             .iter()
+            .filter(|&&numerator| numerator > 0 && numerator <= denominator)
             .copied()
-            .filter(|&n| n > 0 && n <= denominator)
-            .collect();
-        let numerator = *valid_nums.choose(rng).unwrap_or(&1);
+            .collect::<Vec<_>>()
+            .choose(rng)
+            .expect("validated fraction-visualization denominator has a numerator");
 
         let prompt = LocalizedText::new(
             substitute_template(
@@ -423,65 +437,7 @@ impl FractionComparisonTemplate {
     /// which side is larger.
     #[allow(clippy::literal_string_with_formatting_args)]
     pub fn resolve(&self, rng: &mut impl Rng) -> FractionComparisonDefinition {
-        let (fraction_a, fraction_b) = match self.difficulty {
-            ComparisonDifficulty::SameDenominator => {
-                let d = *self.denominator_range.choose(rng).unwrap_or(&8);
-                let mut valid_nums: Vec<u32> = self
-                    .numerator_range
-                    .iter()
-                    .copied()
-                    .filter(|&n| n > 0 && n < d)
-                    .collect();
-                valid_nums.shuffle(rng);
-                let na = valid_nums.first().copied().unwrap_or(1);
-                let nb = valid_nums.get(1).copied().unwrap_or(2);
-                ((na, d), (nb, d))
-            }
-            ComparisonDifficulty::MultipleDenominator => {
-                // Pick two distinct denominators where one divides the other.
-                let mut denom_pairs: Vec<(u32, u32)> = vec![];
-                for &d1 in &self.denominator_range {
-                    for &d2 in &self.denominator_range {
-                        if d1 != d2 && (d1 % d2 == 0 || d2 % d1 == 0) {
-                            denom_pairs.push((d1, d2));
-                        }
-                    }
-                }
-                denom_pairs.shuffle(rng);
-                let &(da, db) = denom_pairs.first().unwrap_or(&(4, 8));
-
-                let mut nums_for_a: Vec<u32> = self
-                    .numerator_range
-                    .iter()
-                    .copied()
-                    .filter(|&n| n > 0 && n < da)
-                    .collect();
-                let mut nums_for_b: Vec<u32> = self
-                    .numerator_range
-                    .iter()
-                    .copied()
-                    .filter(|&n| n > 0 && n < db)
-                    .collect();
-                nums_for_a.shuffle(rng);
-                nums_for_b.shuffle(rng);
-                let na = nums_for_a.first().copied().unwrap_or(1);
-                let nb = nums_for_b.first().copied().unwrap_or(1);
-                ((na, da), (nb, db))
-            }
-            ComparisonDifficulty::SameNumerator => {
-                let n = *self.numerator_range.choose(rng).unwrap_or(&3);
-                let mut valid_dens: Vec<u32> = self
-                    .denominator_range
-                    .iter()
-                    .copied()
-                    .filter(|&d| d > n)
-                    .collect();
-                valid_dens.shuffle(rng);
-                let da = valid_dens.first().copied().unwrap_or(n + 1);
-                let db = valid_dens.get(1).copied().unwrap_or(n + 2);
-                ((n, da), (n, db))
-            }
-        };
+        let (fraction_a, fraction_b) = self.select_fractions(rng);
 
         // Determine which side is larger.
         let val_a = f64::from(fraction_a.0) / f64::from(fraction_a.1);
@@ -518,6 +474,83 @@ impl FractionComparisonTemplate {
             difficulty: self.difficulty,
             explanation,
             explanation_visual,
+        }
+    }
+
+    fn select_fractions(&self, rng: &mut impl Rng) -> ((u32, u32), (u32, u32)) {
+        match self.difficulty {
+            ComparisonDifficulty::SameDenominator => {
+                let &denominator = self
+                    .denominator_range
+                    .choose(rng)
+                    .expect("validated comparison template has a denominator");
+                let mut numerators: Vec<u32> = self
+                    .numerator_range
+                    .iter()
+                    .copied()
+                    .filter(|&numerator| numerator > 0 && numerator < denominator)
+                    .collect();
+                numerators.shuffle(rng);
+                let na = numerators[0];
+                let nb = numerators[1];
+                ((na, denominator), (nb, denominator))
+            }
+            ComparisonDifficulty::MultipleDenominator => {
+                let eligible_denominators: Vec<u32> = self
+                    .denominator_range
+                    .iter()
+                    .copied()
+                    .filter(|&denominator| {
+                        self.numerator_range
+                            .iter()
+                            .any(|&numerator| numerator > 0 && numerator < denominator)
+                    })
+                    .collect();
+                let mut denominator_pairs = Vec::new();
+                for &da in &eligible_denominators {
+                    for &db in &eligible_denominators {
+                        if da != db && (da % db == 0 || db % da == 0) {
+                            denominator_pairs.push((da, db));
+                        }
+                    }
+                }
+                let &(da, db) = denominator_pairs
+                    .choose(rng)
+                    .expect("validated multiple-denominator template has a pair");
+                let na = *self
+                    .numerator_range
+                    .iter()
+                    .filter(|&&n| n > 0 && n < da)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .choose(rng)
+                    .expect("validated first denominator has a numerator");
+                let nb = *self
+                    .numerator_range
+                    .iter()
+                    .filter(|&&n| n > 0 && n < db)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .choose(rng)
+                    .expect("validated second denominator has a numerator");
+                ((na, da), (nb, db))
+            }
+            ComparisonDifficulty::SameNumerator => {
+                let &numerator = self
+                    .numerator_range
+                    .choose(rng)
+                    .expect("validated comparison template has a numerator");
+                let mut denominators: Vec<u32> = self
+                    .denominator_range
+                    .iter()
+                    .copied()
+                    .filter(|&denominator| denominator > numerator)
+                    .collect();
+                denominators.shuffle(rng);
+                let da = denominators[0];
+                let db = denominators[1];
+                ((numerator, da), (numerator, db))
+            }
         }
     }
 
@@ -638,15 +671,18 @@ impl FractionIdentificationTemplate {
     /// Pick a random fraction from the configured ranges and build the
     /// identification MCQ with distractors.
     pub fn resolve(&self, rng: &mut impl Rng) -> FractionIdentificationDefinition {
-        let denominator = *self.denominator_range.choose(rng).unwrap_or(&4);
-
-        let valid_nums: Vec<u32> = self
+        let &denominator = self
+            .denominator_range
+            .choose(rng)
+            .expect("validated fraction-visualization template has a denominator");
+        let numerator = *self
             .numerator_range
             .iter()
+            .filter(|&&numerator| numerator > 0 && numerator < denominator)
             .copied()
-            .filter(|&n| n > 0 && n <= denominator)
-            .collect();
-        let numerator = *valid_nums.choose(rng).unwrap_or(&1);
+            .collect::<Vec<_>>()
+            .choose(rng)
+            .expect("validated fraction-visualization denominator has a numerator");
 
         generate_fraction_identification(numerator, denominator, rng)
     }
@@ -657,8 +693,14 @@ impl NumericInputTemplate {
     /// multiplication question.
     #[allow(clippy::literal_string_with_formatting_args)]
     pub fn resolve(&self, rng: &mut impl Rng) -> NumericInputDefinition {
-        let a = *self.factor_a_range.choose(rng).unwrap_or(&2);
-        let b = *self.factor_b_range.choose(rng).unwrap_or(&3);
+        let &a = self
+            .factor_a_range
+            .choose(rng)
+            .expect("validated numeric template has factor a");
+        let &b = self
+            .factor_b_range
+            .choose(rng)
+            .expect("validated numeric template has factor b");
         let correct_answer = a * b;
 
         let prompt = LocalizedText::new(
@@ -760,7 +802,10 @@ fn generate_multiplication_distractors(a: u32, b: u32, rng: &mut impl Rng) -> (V
     let candidates = [
         a.checked_sub(1).map(|v| v * b),
         Some((a + 1) * b),
-        a.checked_mul(b.checked_sub(1).unwrap_or(b)),
+        a.checked_mul(
+            b.checked_sub(1)
+                .expect("validated multiplication factor is positive"),
+        ),
         Some(a * (b + 1)),
         correct.checked_sub(1),
         Some(correct + 1),

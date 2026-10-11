@@ -1,138 +1,7 @@
-use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
-
-use rand::seq::SliceRandom;
-
-use crate::data::content::QuestionDefinition;
 use crate::data::{
-    ActiveStudent, ActiveTheme, AnswerResult, ContentLibrary, LessonSession, LessonSessionConfig,
-    PersistenceAction, PersistenceMut, PlayerSession, ResolvedQuestion, SelectedLesson,
+    ActiveStudent, AnswerResult, LessonSession, PersistenceAction, PersistenceMut, PlayerSession,
+    SelectedLesson,
 };
-
-/// Maximum re-roll attempts when deduplicating resolved template questions.
-const MAX_DEDUP_RETRIES: u32 = 20;
-
-pub(super) fn build_session(
-    selected_lesson: &SelectedLesson,
-    content: &ContentLibrary,
-    active_theme: &ActiveTheme,
-    lesson_config: Option<&LessonSessionConfig>,
-) -> LessonSession {
-    let Some(lesson_id) = selected_lesson.as_ref() else {
-        return LessonSession::default();
-    };
-
-    let Some(theme_data) = content.theme(active_theme) else {
-        return LessonSession::default();
-    };
-
-    let Some(lesson) = theme_data.lesson(lesson_id) else {
-        return LessonSession::default();
-    };
-
-    let mut rng = rand::rng();
-
-    let resolved: Vec<(QuestionDefinition, bool)> = if let Some(config) = lesson_config {
-        // Teacher config: repetition counts per question + visual toggles
-        let mut pool: Vec<(QuestionDefinition, bool)> = Vec::new();
-        let mut seen = HashSet::new();
-        for (i, question) in lesson.questions.iter().enumerate() {
-            let count = config.counts.get(i).copied().unwrap_or(1);
-            let configured_visual = config.show_visuals.get(i).copied();
-            let hide = question
-                .effective_show_visual(configured_visual)
-                .is_some_and(|show| !show);
-            for _ in 0..count {
-                pool.push((resolve_unique(question, &mut rng, &mut seen), hide));
-            }
-        }
-        pool.shuffle(&mut rng);
-        pool
-    } else {
-        // No config: default behavior (all questions once).
-        let mut seen = HashSet::new();
-        let mut pool: Vec<(QuestionDefinition, bool)> = lesson
-            .questions
-            .iter()
-            .map(|q| {
-                let hide = q.effective_show_visual(None).is_some_and(|show| !show);
-                (resolve_unique(q, &mut rng, &mut seen), hide)
-            })
-            .collect();
-        pool.shuffle(&mut rng);
-        pool
-    };
-
-    let questions = resolved
-        .into_iter()
-        .map(|(definition, hide_visual)| ResolvedQuestion {
-            definition,
-            hide_visual,
-        })
-        .collect();
-
-    LessonSession {
-        questions,
-        current_index: 0,
-        correct_count: 0,
-        total_answered: 0,
-        type_scores: HashMap::new(),
-    }
-}
-
-/// Resolve a single `QuestionDefinition`. Templates are turned into their
-/// concrete counterpart; static definitions are borrowed as-is.
-fn resolve_question<'a>(
-    def: &'a QuestionDefinition,
-    rng: &mut impl rand::Rng,
-) -> Cow<'a, QuestionDefinition> {
-    match def {
-        // Static definitions: borrow.
-        QuestionDefinition::Mcq(_)
-        | QuestionDefinition::FractionVisualization(_)
-        | QuestionDefinition::FractionComparison(_)
-        | QuestionDefinition::FractionIdentification(_)
-        | QuestionDefinition::NumericInput(_) => Cow::Borrowed(def),
-
-        // Templates: resolve into a fresh owned value.
-        QuestionDefinition::McqTemplate(t) => Cow::Owned(QuestionDefinition::Mcq(t.resolve(rng))),
-        QuestionDefinition::FractionVisualizationTemplate(t) => {
-            Cow::Owned(QuestionDefinition::FractionVisualization(t.resolve(rng)))
-        }
-        QuestionDefinition::FractionComparisonTemplate(t) => {
-            Cow::Owned(QuestionDefinition::FractionComparison(t.resolve(rng)))
-        }
-        QuestionDefinition::FractionIdentificationTemplate(t) => {
-            Cow::Owned(QuestionDefinition::FractionIdentification(t.resolve(rng)))
-        }
-        QuestionDefinition::NumericInputTemplate(t) => {
-            Cow::Owned(QuestionDefinition::NumericInput(t.resolve(rng)))
-        }
-    }
-}
-
-/// Resolve a template, re-rolling up to `MAX_DEDUP_RETRIES` times to avoid
-/// producing a question already present in `seen`. The fingerprint is
-/// inserted into `seen` on success.
-fn resolve_unique(
-    def: &QuestionDefinition,
-    rng: &mut impl rand::Rng,
-    seen: &mut HashSet<u64>,
-) -> QuestionDefinition {
-    for _ in 0..MAX_DEDUP_RETRIES {
-        let resolved = resolve_question(def, rng);
-        if let Some(fp) = resolved.fingerprint() {
-            if seen.insert(fp) {
-                return resolved.into_owned();
-            }
-        } else {
-            // Static definition or no fingerprint; accept as-is.
-            return resolved.into_owned();
-        }
-    }
-    // Exhausted retries; accept the last attempt to avoid an infinite loop.
-    resolve_question(def, rng).into_owned()
-}
 
 pub(super) fn update_session_score(session: &mut LessonSession, result: &AnswerResult) {
     let is_correct = matches!(result, AnswerResult::Correct);
@@ -141,10 +10,9 @@ pub(super) fn update_session_score(session: &mut LessonSession, result: &AnswerR
         session.correct_count += 1;
     }
 
-    // Track per-question-type scores in the session.
     if let Some(question) = session.questions.get(session.current_index) {
-        let qt = question.definition.question_type();
-        let entry = session.type_scores.entry(qt).or_default();
+        let question_type = question.instance.question_type();
+        let entry = session.type_scores.entry(question_type).or_default();
         entry.total += 1;
         if is_correct {
             entry.correct += 1;
@@ -180,7 +48,7 @@ pub(super) fn record_class_answer(
     };
 
     let is_correct = matches!(last_answer, AnswerResult::Correct);
-    let qt = question.definition.question_type();
+    let question_type = question.instance.question_type();
     let lesson_id = lesson_id.clone();
     let slot_index = player_session.slot_index;
     let student_index = student.0;
@@ -193,7 +61,10 @@ pub(super) fn record_class_answer(
             return;
         };
         let lesson_progress = student_data.progress.entry(lesson_id.clone()).or_default();
-        let type_score = lesson_progress.type_scores.entry(qt).or_default();
+        let type_score = lesson_progress
+            .type_scores
+            .entry(question_type)
+            .or_default();
         type_score.total += 1;
         if is_correct {
             type_score.correct += 1;

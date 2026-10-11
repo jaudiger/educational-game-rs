@@ -86,7 +86,7 @@ impl TeacherView {
 
 #[derive(Clone, Debug)]
 pub struct TeacherQuestionDraft {
-    pub index: usize,
+    pub id: String,
     pub question_type: QuestionType,
     pub full_prompt: String,
     pub count: usize,

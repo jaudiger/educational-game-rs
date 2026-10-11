@@ -6,6 +6,9 @@ use crate::data::{
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
+use crate::questions::registry::{
+    QuestionInteractionSet, QuestionResponseSubmitted, assess_question_responses,
+};
 use crate::states::cleanup_root;
 use crate::states::{ActiveLesson, AppState, LessonPhase, StateScopedResourceExt};
 use crate::ui::components::ButtonActivated;
@@ -20,10 +23,17 @@ pub struct LessonPlayScreenPlugin;
 
 impl Plugin for LessonPlayScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.register_state_scoped_resource::<ActiveLesson, LessonSession>(ActiveLesson)
+        app.add_message::<QuestionResponseSubmitted>()
+            .register_state_scoped_resource::<ActiveLesson, LessonSession>(ActiveLesson)
             .register_state_scoped_resource::<ActiveLesson, SelectedLesson>(ActiveLesson)
             .register_state_scoped_resource::<ActiveLesson, LastAnswer>(ActiveLesson)
             .add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
+            .add_systems(
+                Update,
+                assess_question_responses
+                    .run_if(in_state(LessonPhase::WaitingAnswer))
+                    .after(QuestionInteractionSet),
+            )
             .add_systems(
                 OnEnter(LessonPhase::ShowQuestion),
                 (

@@ -2,6 +2,7 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
+use crate::data::content::build_session;
 use crate::data::{
     ActiveTheme, ContentLibrary, GameMode, PersistenceStatus, PlayerContext, QuestionContainer,
     SelectedLesson,
@@ -12,7 +13,7 @@ use crate::states::AppState;
 use crate::ui::components::icon_button;
 use crate::ui::theme::{self, GameImages};
 
-use super::{ProgressText, QuitLessonButton, session};
+use super::{ProgressText, QuitLessonButton};
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn setup_lesson_play(
@@ -26,6 +27,7 @@ pub(super) fn setup_lesson_play(
     ctx: PlayerContext<'_>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
     mut write_status: ResMut<PersistenceStatus>,
+    mut next_app_state: ResMut<NextState<AppState>>,
 ) {
     let window = *primary_window;
     write_status.clear_save_data();
@@ -44,7 +46,19 @@ pub(super) fn setup_lesson_play(
     } else {
         None
     };
-    let session = session::build_session(&selected_lesson, &content, &active_theme, lesson_config);
+    let session = match build_session(&selected_lesson, &content, &active_theme, lesson_config) {
+        Ok(session) if !session.questions.is_empty() => session,
+        Ok(_) => {
+            bevy::log::error!("Cannot start lesson: the session has no exercises");
+            next_app_state.set(AppState::ThemeExploration);
+            return;
+        }
+        Err(issues) => {
+            bevy::log::error!("Cannot start lesson: {}", issues.join("; "));
+            next_app_state.set(AppState::ThemeExploration);
+            return;
+        }
+    };
     let progress = i18n.t(&TranslationKey::QuestionProgress(
         1,
         session.questions.len(),

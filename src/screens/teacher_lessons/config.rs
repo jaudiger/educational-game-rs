@@ -197,7 +197,7 @@ fn spawn_question_counter_section(
 fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &TeacherQuestionDraft, window: Entity) {
     let full_prompt = q.full_prompt.clone();
     let count_str = q.count.to_string();
-    let idx = q.index;
+    let id = q.id.clone();
     let has_visual = q.has_visual;
     let show_visual = q.show_visual;
     parent
@@ -230,13 +230,13 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &TeacherQuestionDraf
             ));
 
             // Controls: [visual toggle]  [-] count [+]
-            spawn_counter_controls(row, idx, has_visual, show_visual, &count_str, window);
+            spawn_counter_controls(row, &id, has_visual, show_visual, &count_str, window);
         });
 }
 
 fn spawn_counter_controls(
     row: &mut ChildSpawner,
-    idx: usize,
+    id: &str,
     has_visual: bool,
     show_visual: bool,
     count_str: &str,
@@ -274,7 +274,7 @@ fn spawn_counter_controls(
                         theme::colors::TEXT_LIGHT,
                         window,
                     ),
-                    VisualToggleButton(idx),
+                    VisualToggleButton(id.to_owned()),
                 ));
         }
 
@@ -287,7 +287,7 @@ fn spawn_counter_controls(
         controls.world_mut().entity_mut(dec_entity).insert((
             counter_button("\u{2212}", theme::colors::ERROR, window),
             CountButton {
-                index: idx,
+                id: id.to_owned(),
                 count_text: text_entity,
                 delta: -1_isize,
             },
@@ -306,7 +306,7 @@ fn spawn_counter_controls(
         controls.world_mut().entity_mut(inc_entity).insert((
             counter_button("+", theme::colors::SUCCESS, window),
             CountButton {
-                index: idx,
+                id: id.to_owned(),
                 count_text: text_entity,
                 delta: 1_isize,
             },
@@ -381,18 +381,19 @@ pub(super) fn build_draft_questions(
     lesson
         .questions
         .iter()
-        .enumerate()
-        .map(|(i, q)| {
+        .map(|entry| {
+            let q = &entry.definition;
             let full_prompt = q.prompt_label(language);
             let count = existing_config
-                .and_then(|c| c.counts.get(i).copied())
+                .and_then(|config| config.counts.get(&entry.id).copied())
                 .unwrap_or(1);
             let default_show_visual = q.effective_show_visual(None).unwrap_or(false);
-            let configured_visual = existing_config.and_then(|c| c.show_visuals.get(i).copied());
+            let configured_visual =
+                existing_config.and_then(|config| config.show_visuals.get(&entry.id).copied());
             let show_visual = q.effective_show_visual(configured_visual).unwrap_or(false);
             let has_visual = q.has_optional_visual();
             TeacherQuestionDraft {
-                index: i,
+                id: entry.id.clone(),
                 question_type: q.question_type(),
                 full_prompt,
                 count,
@@ -471,8 +472,8 @@ pub(super) fn handle_count_change(
         let Ok(btn) = query.get(entity) else {
             continue;
         };
-        let idx = btn.index;
-        let Some(q) = questions.iter_mut().find(|q| q.index == idx) else {
+        let id = &btn.id;
+        let Some(q) = questions.iter_mut().find(|q| q.id == *id) else {
             continue;
         };
         if let Some(new_count) = q.count.checked_add_signed(btn.delta) {
@@ -507,8 +508,8 @@ pub(super) fn handle_visual_toggle(
         let Ok(btn) = query.get(entity) else {
             continue;
         };
-        let idx = btn.0;
-        let Some(q) = questions.iter_mut().find(|q| q.index == idx) else {
+        let id = &btn.0;
+        let Some(q) = questions.iter_mut().find(|q| q.id == *id) else {
             continue;
         };
         q.show_visual = !q.show_visual;
@@ -518,7 +519,7 @@ pub(super) fn handle_visual_toggle(
             theme::colors::TOGGLE_INACTIVE
         };
         for (mut bg, toggle) in &mut bg_query {
-            if toggle.0 == idx {
+            if toggle.0 == *id {
                 *bg = BackgroundColor(new_bg);
             }
         }
@@ -541,10 +542,7 @@ fn reset_visual_toggles(
     questions: &[TeacherQuestionDraft],
 ) {
     for (mut bg, toggle) in toggle_bg_query {
-        if let Some(q) = questions
-            .iter()
-            .find(|q| q.index == toggle.0 && q.has_visual)
-        {
+        if let Some(q) = questions.iter().find(|q| q.id == toggle.0 && q.has_visual) {
             *bg = BackgroundColor(if q.default_show_visual {
                 theme::colors::PRIMARY
             } else {
@@ -737,10 +735,14 @@ pub(super) fn handle_save_config(
             (
                 lesson_id.clone(),
                 LessonSessionConfig {
-                    counts: questions.iter().map(|question| question.count).collect(),
+                    counts: questions
+                        .iter()
+                        .map(|question| (question.id.clone(), question.count))
+                        .collect(),
                     show_visuals: questions
                         .iter()
-                        .map(|question| question.show_visual)
+                        .filter(|question| question.has_visual)
+                        .map(|question| (question.id.clone(), question.show_visual))
                         .collect(),
                 },
             )

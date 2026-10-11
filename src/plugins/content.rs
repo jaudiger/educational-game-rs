@@ -4,7 +4,7 @@ use crate::data::ContentLibrary;
 use crate::data::content::{
     ComparisonDifficulty, Difficulty, FractionComparisonTemplate, FractionIdentificationTemplate,
     FractionVisualizationTemplate, Lesson, LocalizedText, McqResolver, McqTemplate,
-    NumericInputTemplate, ParameterRange, QuestionDefinition, Theme,
+    NumericInputTemplate, ParameterRange, QuestionDefinition, QuestionEntry, Theme,
 };
 use crate::i18n::TranslationKey;
 
@@ -75,161 +75,195 @@ fn build_content_library() -> ContentLibrary {
         ..Default::default()
     };
     library.build_indexes();
+    for issue in library.validation_issues() {
+        bevy::log::error!("Invalid content: {issue}");
+    }
     library
 }
 
-fn build_fractions_questions() -> Vec<QuestionDefinition> {
+fn build_fractions_questions() -> Vec<QuestionEntry> {
     let mut questions = build_static_and_template_questions();
 
     // FractionIdentification template, resolved per-session in build_session()
-    questions.push(QuestionDefinition::FractionIdentificationTemplate(
-        FractionIdentificationTemplate {
+    questions.push(QuestionEntry::new(
+        "fraction_identification",
+        QuestionDefinition::FractionIdentificationTemplate(FractionIdentificationTemplate {
             numerator_range: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
             denominator_range: vec![3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        },
+        }),
     ));
 
     questions
 }
 
-fn build_static_and_template_questions() -> Vec<QuestionDefinition> {
+fn build_static_and_template_questions() -> Vec<QuestionEntry> {
     let mut questions = build_mcq_questions();
     questions.extend(build_visual_fraction_questions());
     questions
 }
 
 #[allow(clippy::literal_string_with_formatting_args)]
-fn build_mcq_questions() -> Vec<QuestionDefinition> {
+fn build_mcq_questions() -> Vec<QuestionEntry> {
     vec![
-        QuestionDefinition::McqTemplate(McqTemplate {
-            prompt_template: LocalizedText::new(
-                "Quelle fraction représente {name} ?",
-                "Which fraction represents {name}?",
-            ),
-            parameters: vec![ParameterRange {
-                name: "d".into(),
-                values: vec![2, 3, 4, 5, 6, 8],
-            }],
-            resolver: McqResolver::FractionName,
-            explanation_template: LocalizedText::new(
-                "Si on coupe un gâteau en {d} parts égales, {name} c'est la fraction {fraction}.",
-                "If you cut a cake into {d} equal pieces, {name} is the fraction {fraction}.",
-            ),
-            teacher_label: None,
-            with_grid: false,
-        }),
-        QuestionDefinition::McqTemplate(McqTemplate {
-            prompt_template: LocalizedText::new(
-                "Combien font {a}/{b} + {c}/{b} ?",
-                "What is {a}/{b} + {c}/{b}?",
-            ),
-            parameters: vec![
-                ParameterRange {
-                    name: "a".into(),
-                    values: vec![1, 2, 3],
-                },
-                ParameterRange {
-                    name: "b".into(),
-                    values: vec![4, 6, 8],
-                },
-                ParameterRange {
-                    name: "c".into(),
-                    values: vec![1, 2, 3],
-                },
-            ],
-            resolver: McqResolver::FractionAddition,
-            explanation_template: LocalizedText::new(
-                "Les deux fractions ont le même dénominateur ({b}), on additionne les numérateurs : {a} + {c} = {sum}. Donc {fraction_a} + {fraction_c} = {result}.",
-                "Both fractions have the same denominator ({b}), so we add the numerators: {a} + {c} = {sum}. So {fraction_a} + {fraction_c} = {result}.",
-            ),
-            teacher_label: None,
-            with_grid: false,
-        }),
-        QuestionDefinition::McqTemplate(McqTemplate {
-            prompt_template: LocalizedText::new(
-                "Quel nombre est représenté par {a}/{b} ?",
-                "What number is represented by {a}/{b}?",
-            ),
-            parameters: vec![
-                ParameterRange {
-                    name: "a".into(),
-                    values: vec![2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 20],
-                },
-                ParameterRange {
-                    name: "b".into(),
-                    values: vec![2, 3, 4, 5],
-                },
-            ],
-            resolver: McqResolver::FractionValue,
-            explanation_template: LocalizedText::new(
-                "Si on partage {a} parts en groupes de {b}, on obtient {result} groupes. Donc {fraction} = {result}.",
-                "If we share {a} parts into groups of {b}, we get {result} groups. So {fraction} = {result}.",
-            ),
-            teacher_label: None,
-            with_grid: false,
-        }),
+        QuestionEntry::new(
+            "fraction_name",
+            QuestionDefinition::McqTemplate(McqTemplate {
+                prompt_template: LocalizedText::new(
+                    "Quelle fraction représente {name} ?",
+                    "Which fraction represents {name}?",
+                ),
+                parameters: vec![ParameterRange {
+                    name: "d".into(),
+                    values: vec![2, 3, 4, 5, 6, 8],
+                }],
+                resolver: McqResolver::FractionName,
+                explanation_template: LocalizedText::new(
+                    "Si on coupe un gâteau en {d} parts égales, {name} c'est la fraction {fraction}.",
+                    "If you cut a cake into {d} equal pieces, {name} is the fraction {fraction}.",
+                ),
+                teacher_label: None,
+                with_grid: false,
+            }),
+        ),
+        QuestionEntry::new(
+            "fraction_addition",
+            QuestionDefinition::McqTemplate(McqTemplate {
+                prompt_template: LocalizedText::new(
+                    "Combien font {a}/{b} + {c}/{b} ?",
+                    "What is {a}/{b} + {c}/{b}?",
+                ),
+                parameters: vec![
+                    ParameterRange {
+                        name: "a".into(),
+                        values: vec![1, 2, 3],
+                    },
+                    ParameterRange {
+                        name: "b".into(),
+                        values: vec![4, 6, 8],
+                    },
+                    ParameterRange {
+                        name: "c".into(),
+                        values: vec![1, 2, 3],
+                    },
+                ],
+                resolver: McqResolver::FractionAddition,
+                explanation_template: LocalizedText::new(
+                    "Les deux fractions ont le même dénominateur ({b}), on additionne les numérateurs : {a} + {c} = {sum}. Donc {fraction_a} + {fraction_c} = {result}.",
+                    "Both fractions have the same denominator ({b}), so we add the numerators: {a} + {c} = {sum}. So {fraction_a} + {fraction_c} = {result}.",
+                ),
+                teacher_label: None,
+                with_grid: false,
+            }),
+        ),
+        QuestionEntry::new(
+            "fraction_value",
+            QuestionDefinition::McqTemplate(McqTemplate {
+                prompt_template: LocalizedText::new(
+                    "Quel nombre est représenté par {a}/{b} ?",
+                    "What number is represented by {a}/{b}?",
+                ),
+                parameters: vec![
+                    ParameterRange {
+                        name: "a".into(),
+                        values: vec![2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 20],
+                    },
+                    ParameterRange {
+                        name: "b".into(),
+                        values: vec![2, 3, 4, 5],
+                    },
+                ],
+                resolver: McqResolver::FractionValue,
+                explanation_template: LocalizedText::new(
+                    "Si on partage {a} parts en groupes de {b}, on obtient {result} groupes. Donc {fraction} = {result}.",
+                    "If we share {a} parts into groups of {b}, we get {result} groups. So {fraction} = {result}.",
+                ),
+                teacher_label: None,
+                with_grid: false,
+            }),
+        ),
     ]
 }
 
-fn build_visual_fraction_questions() -> Vec<QuestionDefinition> {
+fn build_visual_fraction_questions() -> Vec<QuestionEntry> {
     vec![
         // ----- FractionVisualization template -----
-        QuestionDefinition::FractionVisualizationTemplate(FractionVisualizationTemplate {
-            prompt_template: LocalizedText::new(
-                "Colorie {n}/{d} du gâteau",
-                "Colour {n}/{d} of the pie",
-            ),
-            numerator_range: vec![1, 2, 3, 4, 5, 6, 7],
-            denominator_range: vec![3, 4, 5, 6, 8, 10, 12],
-            explanation_template: LocalizedText::new(
-                "Il y a {d} parts au total et {n} sont coloriées : c'est la fraction {fraction}.",
-                "There are {d} parts in total and {n} are colored: that's the fraction {fraction}.",
-            ),
-        }),
+        QuestionEntry::new(
+            "fraction_visualization",
+            QuestionDefinition::FractionVisualizationTemplate(FractionVisualizationTemplate {
+                prompt_template: LocalizedText::new(
+                    "Colorie {n}/{d} du gâteau",
+                    "Colour {n}/{d} of the pie",
+                ),
+                numerator_range: vec![1, 2, 3, 4, 5, 6, 7],
+                denominator_range: vec![3, 4, 5, 6, 8, 10, 12],
+                explanation_template: LocalizedText::new(
+                    "Il y a {d} parts au total et {n} sont coloriées : c'est la fraction {fraction}.",
+                    "There are {d} parts in total and {n} are colored: that's the fraction {fraction}.",
+                ),
+            }),
+        ),
         // ----- FractionComparison template (same denominator) -----
-        QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
-            prompt: LocalizedText::new("Qui a mangé le plus de gâteau ?", "Who ate the most pie?"),
-            character_a: "Léa".into(),
-            character_b: "Tom".into(),
-            difficulty: ComparisonDifficulty::SameDenominator,
-            denominator_range: vec![4, 5, 6, 8, 10, 12],
-            numerator_range: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-            explanation_template: LocalizedText::new(
-                "Les deux gâteaux sont divisés en {da} parts chacun. On compare les numérateurs : {na} et {nb}. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
-                "Each pie is divided into {da} slices. Compare the numerators, {na} and {nb}. So {greater_fraction} is greater than {lesser_fraction}.",
-            ),
-        }),
+        QuestionEntry::new(
+            "fraction_comparison_same_denominator",
+            QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
+                prompt: LocalizedText::new(
+                    "Qui a mangé le plus de gâteau ?",
+                    "Who ate the most pie?",
+                ),
+                character_a: "Léa".into(),
+                character_b: "Tom".into(),
+                difficulty: ComparisonDifficulty::SameDenominator,
+                denominator_range: vec![4, 5, 6, 8, 10, 12],
+                numerator_range: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                explanation_template: LocalizedText::new(
+                    "Les deux gâteaux sont divisés en {da} parts chacun. On compare les numérateurs : {na} et {nb}. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                    "Each pie is divided into {da} slices. Compare the numerators, {na} and {nb}. So {greater_fraction} is greater than {lesser_fraction}.",
+                ),
+            }),
+        ),
         // ----- FractionComparison template (same numerator) -----
-        QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
-            prompt: LocalizedText::new("Qui a mangé le plus de gâteau ?", "Who ate the most pie?"),
-            character_a: "Emma".into(),
-            character_b: "Hugo".into(),
-            difficulty: ComparisonDifficulty::SameNumerator,
-            denominator_range: vec![3, 4, 5, 6, 8, 10, 12],
-            numerator_range: vec![2, 3, 4, 5],
-            explanation_template: LocalizedText::new(
-                "Ils mangent le même nombre de parts ({na}), mais moins il y a de parts dans le gâteau, plus chaque part est grosse. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
-                "They eat the same number of slices ({na}), but the fewer slices the pie has, the larger each slice is. So {greater_fraction} is greater than {lesser_fraction}.",
-            ),
-        }),
+        QuestionEntry::new(
+            "fraction_comparison_same_numerator",
+            QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
+                prompt: LocalizedText::new(
+                    "Qui a mangé le plus de gâteau ?",
+                    "Who ate the most pie?",
+                ),
+                character_a: "Emma".into(),
+                character_b: "Hugo".into(),
+                difficulty: ComparisonDifficulty::SameNumerator,
+                denominator_range: vec![3, 4, 5, 6, 8, 10, 12],
+                numerator_range: vec![2, 3, 4, 5],
+                explanation_template: LocalizedText::new(
+                    "Ils mangent le même nombre de parts ({na}), mais moins il y a de parts dans le gâteau, plus chaque part est grosse. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                    "They eat the same number of slices ({na}), but the fewer slices the pie has, the larger each slice is. So {greater_fraction} is greater than {lesser_fraction}.",
+                ),
+            }),
+        ),
         // ----- FractionComparison template (multiple denominator) -----
-        QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
-            prompt: LocalizedText::new("Qui a mangé le plus de gâteau ?", "Who ate the most pie?"),
-            character_a: "Jade".into(),
-            character_b: "Noah".into(),
-            difficulty: ComparisonDifficulty::MultipleDenominator,
-            denominator_range: vec![3, 4, 6, 8, 12],
-            numerator_range: vec![1, 2, 3, 4, 5, 6, 7],
-            explanation_template: LocalizedText::new(
-                "Pour comparer {fraction_a} et {fraction_b}, on partage les gâteaux en parts de même taille. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
-                "To compare {fraction_a} and {fraction_b}, divide the pies into slices of the same size. So {greater_fraction} is greater than {lesser_fraction}.",
-            ),
-        }),
+        QuestionEntry::new(
+            "fraction_comparison_multiple_denominators",
+            QuestionDefinition::FractionComparisonTemplate(FractionComparisonTemplate {
+                prompt: LocalizedText::new(
+                    "Qui a mangé le plus de gâteau ?",
+                    "Who ate the most pie?",
+                ),
+                character_a: "Jade".into(),
+                character_b: "Noah".into(),
+                difficulty: ComparisonDifficulty::MultipleDenominator,
+                denominator_range: vec![3, 4, 6, 8, 12],
+                numerator_range: vec![1, 2, 3, 4, 5, 6, 7],
+                explanation_template: LocalizedText::new(
+                    "Pour comparer {fraction_a} et {fraction_b}, on partage les gâteaux en parts de même taille. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                    "To compare {fraction_a} and {fraction_b}, divide the pies into slices of the same size. So {greater_fraction} is greater than {lesser_fraction}.",
+                ),
+            }),
+        ),
     ]
 }
 
 #[allow(clippy::literal_string_with_formatting_args)]
-fn build_multiplication_tables_questions() -> Vec<QuestionDefinition> {
+fn build_multiplication_tables_questions() -> Vec<QuestionEntry> {
     let mut questions = vec![];
 
     // Two difficulty levels:
@@ -243,6 +277,11 @@ fn build_multiplication_tables_questions() -> Vec<QuestionDefinition> {
     let factor_b: Vec<u32> = (1..=9).collect();
 
     for &(difficulty, tables) in levels {
+        let level_id = match difficulty {
+            Difficulty::Beginner => "even",
+            Difficulty::Intermediate => "odd",
+            Difficulty::Advanced => "advanced",
+        };
         let factor_a: Vec<u32> = tables.to_vec();
 
         let table_label_fr = match difficulty {
@@ -259,30 +298,37 @@ fn build_multiplication_tables_questions() -> Vec<QuestionDefinition> {
         let teacher_label = Some(LocalizedText::new(table_label_fr, table_label_en));
 
         // 1. McqTemplate with Multiplication resolver
-        questions.push(QuestionDefinition::McqTemplate(McqTemplate {
-            prompt_template: LocalizedText::new("Combien font {a} × {b} ?", "What is {a} × {b}?"),
-            parameters: vec![
-                ParameterRange {
-                    name: "a".into(),
-                    values: factor_a.iter().map(|&v| v.cast_signed()).collect(),
-                },
-                ParameterRange {
-                    name: "b".into(),
-                    values: factor_b.iter().map(|&v| v.cast_signed()).collect(),
-                },
-            ],
-            resolver: McqResolver::Multiplication,
-            explanation_template: LocalizedText::new(
-                "Dans la grille, on compte {a} lignes de {b}. {a} × {b} = {result}.",
-                "In the grid, count {a} rows of {b}. {a} × {b} = {result}.",
-            ),
-            teacher_label: teacher_label.clone(),
-            with_grid: true,
-        }));
+        questions.push(QuestionEntry::new(
+            format!("multiplication_tables_{level_id}_mcq"),
+            QuestionDefinition::McqTemplate(McqTemplate {
+                prompt_template: LocalizedText::new(
+                    "Combien font {a} × {b} ?",
+                    "What is {a} × {b}?",
+                ),
+                parameters: vec![
+                    ParameterRange {
+                        name: "a".into(),
+                        values: factor_a.iter().map(|&v| v.cast_signed()).collect(),
+                    },
+                    ParameterRange {
+                        name: "b".into(),
+                        values: factor_b.iter().map(|&v| v.cast_signed()).collect(),
+                    },
+                ],
+                resolver: McqResolver::Multiplication,
+                explanation_template: LocalizedText::new(
+                    "Dans la grille, on compte {a} lignes de {b}. {a} × {b} = {result}.",
+                    "In the grid, count {a} rows of {b}. {a} × {b} = {result}.",
+                ),
+                teacher_label: teacher_label.clone(),
+                with_grid: true,
+            }),
+        ));
 
         // 2. NumericInputTemplate with grid visual
-        questions.push(QuestionDefinition::NumericInputTemplate(
-            NumericInputTemplate {
+        questions.push(QuestionEntry::new(
+            format!("multiplication_tables_{level_id}_numeric"),
+            QuestionDefinition::NumericInputTemplate(NumericInputTemplate {
                 prompt_template: LocalizedText::new("{a} × {b} = ?", "{a} × {b} = ?"),
                 factor_a_range: factor_a,
                 factor_b_range: factor_b.clone(),
@@ -294,7 +340,7 @@ fn build_multiplication_tables_questions() -> Vec<QuestionDefinition> {
                 teacher_label,
                 with_grid: true,
                 place_value_explanation: false,
-            },
+            }),
         ));
     }
 
@@ -302,7 +348,7 @@ fn build_multiplication_tables_questions() -> Vec<QuestionDefinition> {
 }
 
 #[allow(clippy::literal_string_with_formatting_args)]
-fn build_multiply_10_100_1000_questions() -> Vec<QuestionDefinition> {
+fn build_multiply_10_100_1000_questions() -> Vec<QuestionEntry> {
     let mut questions = vec![];
 
     let factor_b: Vec<u32> = vec![10, 100, 1000];
@@ -324,6 +370,11 @@ fn build_multiply_10_100_1000_questions() -> Vec<QuestionDefinition> {
     ];
 
     for (difficulty, factor_a) in levels {
+        let level_id = match difficulty {
+            Difficulty::Beginner => "beginner",
+            Difficulty::Intermediate => "intermediate",
+            Difficulty::Advanced => "advanced",
+        };
         let label_fr = match difficulty {
             Difficulty::Beginner => "Dizaines entières × 10/100/1000",
             Difficulty::Intermediate => "Nombres en 5 × 10/100/1000",
@@ -336,8 +387,9 @@ fn build_multiply_10_100_1000_questions() -> Vec<QuestionDefinition> {
         };
 
         // 1. NumericInputTemplate
-        questions.push(QuestionDefinition::NumericInputTemplate(
-            NumericInputTemplate {
+        questions.push(QuestionEntry::new(
+            format!("multiply_powers_{level_id}_numeric"),
+            QuestionDefinition::NumericInputTemplate(NumericInputTemplate {
                 prompt_template: LocalizedText::new("{a} × {b} = ?", "{a} × {b} = ?"),
                 factor_a_range: factor_a.clone(),
                 factor_b_range: factor_b.clone(),
@@ -349,31 +401,88 @@ fn build_multiply_10_100_1000_questions() -> Vec<QuestionDefinition> {
                 teacher_label: Some(LocalizedText::new(label_fr, label_en)),
                 with_grid: false,
                 place_value_explanation: true,
-            },
+            }),
         ));
 
         // 2. McqTemplate with MultiplyByPowerOf10 resolver
-        questions.push(QuestionDefinition::McqTemplate(McqTemplate {
-            prompt_template: LocalizedText::new("Combien font {a} × {b} ?", "What is {a} × {b}?"),
-            parameters: vec![
-                ParameterRange {
-                    name: "a".into(),
-                    values: factor_a.iter().map(|&v| v.cast_signed()).collect(),
-                },
-                ParameterRange {
-                    name: "b".into(),
-                    values: factor_b.iter().map(|&v| v.cast_signed()).collect(),
-                },
-            ],
-            resolver: McqResolver::MultiplyByPowerOf10,
-            explanation_template: LocalizedText::new(
-                "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
-                "Multiplying by {b} means adding zeros: {a} × {b} = {result}.",
-            ),
-            teacher_label: Some(LocalizedText::new(label_fr, label_en)),
-            with_grid: false,
-        }));
+        questions.push(QuestionEntry::new(
+            format!("multiply_powers_{level_id}_mcq"),
+            QuestionDefinition::McqTemplate(McqTemplate {
+                prompt_template: LocalizedText::new(
+                    "Combien font {a} × {b} ?",
+                    "What is {a} × {b}?",
+                ),
+                parameters: vec![
+                    ParameterRange {
+                        name: "a".into(),
+                        values: factor_a.iter().map(|&v| v.cast_signed()).collect(),
+                    },
+                    ParameterRange {
+                        name: "b".into(),
+                        values: factor_b.iter().map(|&v| v.cast_signed()).collect(),
+                    },
+                ],
+                resolver: McqResolver::MultiplyByPowerOf10,
+                explanation_template: LocalizedText::new(
+                    "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
+                    "Multiplying by {b} means adding zeros: {a} × {b} = {result}.",
+                ),
+                teacher_label: Some(LocalizedText::new(label_fr, label_en)),
+                with_grid: false,
+            }),
+        ));
     }
 
     questions
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::data::content::QuestionDefinition;
+
+    use super::build_content_library;
+
+    #[test]
+    fn built_in_content_passes_generation_validation() {
+        assert_eq!(
+            build_content_library().validation_issues(),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn resolved_builtin_templates_pass_static_validation() {
+        let library = build_content_library();
+        let mut rng = rand::rng();
+        for theme in &library.themes {
+            for lesson in &theme.lessons {
+                for entry in &lesson.questions {
+                    let definition = match &entry.definition {
+                        QuestionDefinition::McqTemplate(template) => {
+                            QuestionDefinition::Mcq(template.resolve(&mut rng))
+                        }
+                        QuestionDefinition::FractionVisualizationTemplate(template) => {
+                            QuestionDefinition::FractionVisualization(template.resolve(&mut rng))
+                        }
+                        QuestionDefinition::FractionComparisonTemplate(template) => {
+                            QuestionDefinition::FractionComparison(template.resolve(&mut rng))
+                        }
+                        QuestionDefinition::FractionIdentificationTemplate(template) => {
+                            QuestionDefinition::FractionIdentification(template.resolve(&mut rng))
+                        }
+                        QuestionDefinition::NumericInputTemplate(template) => {
+                            QuestionDefinition::NumericInput(template.resolve(&mut rng))
+                        }
+                        definition => definition.clone(),
+                    };
+                    assert_eq!(
+                        definition.validation_issues(),
+                        Vec::<String>::new(),
+                        "exercise {} generated invalid content",
+                        entry.id
+                    );
+                }
+            }
+        }
+    }
 }

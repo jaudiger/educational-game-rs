@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::data::content::place_value_table_fits;
 use crate::data::{ExplanationVisual, Language};
 use crate::questions::fraction_bar::{self as fraction_bar_mod, fraction_bar};
 use crate::ui::components::{operator_visual_group, stacked_fraction};
@@ -471,11 +472,21 @@ fn spawn_place_value_table_visual(
     language: Language,
     window: Entity,
 ) {
-    let result = number * multiplier;
+    if !place_value_table_fits(number, multiplier) {
+        warn!("Skipping invalid place-value visual");
+        return;
+    }
+    let Some(result) = number.checked_mul(multiplier) else {
+        return;
+    };
     let zeros_added = count_trailing_zeros(multiplier);
     let number_digits = digits_lsb(number);
     let result_digits = digits_lsb(result);
     let num_columns = number_digits.len().max(result_digits.len());
+    if num_columns > PV_COLUMNS.len() {
+        warn!("Skipping place-value visual beyond renderer capacity");
+        return;
+    }
 
     parent
         .spawn(Node {

@@ -1,24 +1,58 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use super::content::QuestionType;
 use super::progress::GameMode;
 
 /// Teacher-configured settings for a single lesson in a class slot.
-///
-/// Each entry in `counts` corresponds to a question in the lesson pool
-/// (by index). The value is the number of times that question should
-/// appear in the session (0 = excluded, 1 = once, up to
-/// `MAX_QUESTION_REPETITIONS`).
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct LessonSessionConfig {
-    pub counts: Vec<usize>,
-    /// Per-question visual toggle. `true` means the optional visual is shown.
-    /// Indexed the same way as `counts`.
-    #[serde(default)]
-    pub show_visuals: Vec<bool>,
+    pub counts: HashMap<String, usize>,
+    pub show_visuals: HashMap<String, bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LessonSessionConfigWire {
+    StableIds {
+        counts: HashMap<String, usize>,
+        #[serde(default)]
+        show_visuals: HashMap<String, bool>,
+    },
+    LegacyPositions {
+        counts: Vec<usize>,
+        #[serde(default)]
+        show_visuals: Vec<bool>,
+    },
+}
+
+impl<'de> Deserialize<'de> for LessonSessionConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match LessonSessionConfigWire::deserialize(deserializer)? {
+            LessonSessionConfigWire::StableIds {
+                counts,
+                show_visuals,
+            } => Ok(Self {
+                counts,
+                show_visuals,
+            }),
+            LessonSessionConfigWire::LegacyPositions {
+                counts,
+                show_visuals,
+            } => {
+                let _ = (counts, show_visuals);
+                Ok(Self {
+                    counts: HashMap::new(),
+                    show_visuals: HashMap::new(),
+                })
+            }
+        }
+    }
 }
 
 /// Score for a single question type within a lesson.
@@ -134,5 +168,31 @@ pub fn get_current_progress(
                 .get(student_idx)
                 .map(|s| &s.progress)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LessonSessionConfig;
+    use std::collections::HashMap;
+
+    #[test]
+    fn old_position_based_settings_are_discarded_without_remapping() {
+        let old = r#"{"counts":[3,0],"show_visuals":[true,false]}"#;
+        let config: LessonSessionConfig = serde_json::from_str(old).unwrap();
+        assert!(config.counts.is_empty());
+        assert!(config.show_visuals.is_empty());
+    }
+
+    #[test]
+    fn stable_id_settings_round_trip_as_keyed_values() {
+        let config = LessonSessionConfig {
+            counts: HashMap::from([("exercise-a".to_owned(), 3)]),
+            show_visuals: HashMap::from([("exercise-a".to_owned(), true)]),
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let decoded: LessonSessionConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.counts.get("exercise-a"), Some(&3));
+        assert_eq!(decoded.show_visuals.get("exercise-a"), Some(&true));
     }
 }
