@@ -37,7 +37,7 @@ impl PersistenceStatus {
         self.settings_failure = None;
     }
 
-    fn fail(&mut self, action: PersistenceAction) {
+    pub(crate) fn fail(&mut self, action: PersistenceAction) {
         if action == PersistenceAction::GameSettings {
             self.settings_failure = Some(action);
         } else {
@@ -46,14 +46,14 @@ impl PersistenceStatus {
     }
 }
 
-pub fn update_save_data(
+pub fn update_save_data<R>(
     save_data: &mut SaveData,
     path: &Path,
     status: &mut PersistenceStatus,
     action: PersistenceAction,
-    update: impl FnOnce(&mut SaveData),
-) {
-    update(save_data);
+    update: impl FnOnce(&mut SaveData) -> R,
+) -> R {
+    let result = update(save_data);
     match write_json_atomic(path, save_data) {
         Ok(()) => status.clear_save_data(),
         Err(error) => {
@@ -61,6 +61,7 @@ pub fn update_save_data(
             log_write_failure(action, path, &error);
         }
     }
+    result
 }
 
 pub fn update_game_settings(

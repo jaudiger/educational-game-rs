@@ -126,18 +126,23 @@ pub fn operator_visual_group<B: Bundle>(
 #[derive(Component, Reflect)]
 pub struct PersistenceNotice(PersistenceAction);
 
+pub fn persistence_message(
+    action: PersistenceAction,
+    status: PersistenceStatus,
+    i18n: &I18n,
+) -> Option<String> {
+    status
+        .failed(action)
+        .then(|| i18n.t(&TranslationKey::SaveWriteFailed).into_owned())
+}
+
 pub fn persistence_notice(
     action: PersistenceAction,
     status: PersistenceStatus,
     i18n: &I18n,
     window: Entity,
 ) -> impl Bundle + use<> {
-    let message = if status.failed(action) {
-        i18n.t(&TranslationKey::SaveWriteFailed).into_owned()
-    } else {
-        String::new()
-    };
-
+    let message = persistence_message(action, status, i18n).unwrap_or_default();
     (
         Text::new(message),
         PersistenceNotice(action),

@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use bevy::prelude::*;
 
-use crate::data::{GameSettings, PersistencePaths, PersistenceStatus, SaveData, load_or_default};
+use crate::data::{
+    ContentLibrary, GameSettings, PersistencePaths, PersistenceStatus, SaveData, load_or_default,
+};
 use crate::i18n::I18n;
 use crate::ui::components::sync_persistence_notices;
 
@@ -27,10 +29,19 @@ impl PersistencePlugin {
 
 impl Plugin for PersistencePlugin {
     fn build(&self, app: &mut App) {
-        let save_data = load_or_default(self.paths.save_data_file(), SaveData::default())
-            .expect("failed to initialize save data");
-        let settings = load_or_default(self.paths.settings_file(), GameSettings::default())
-            .expect("failed to initialize game settings");
+        let save_data = {
+            let content = app.world().resource::<ContentLibrary>();
+            load_or_default(self.paths.save_data_file(), SaveData::default(), |data| {
+                data.validate_persisted(content)
+            })
+            .expect("failed to initialize save data")
+        };
+        let settings = load_or_default(
+            self.paths.settings_file(),
+            GameSettings::default(),
+            GameSettings::validate_persisted,
+        )
+        .expect("failed to initialize game settings");
         let language = settings.language;
 
         app.insert_resource(self.paths.clone())

@@ -27,18 +27,18 @@ pub struct PersistenceMut<'w> {
 }
 
 impl PersistenceMut<'_> {
-    pub fn update_save_data(
+    pub fn update_save_data<R>(
         &mut self,
         action: PersistenceAction,
-        update: impl FnOnce(&mut SaveData),
-    ) {
+        update: impl FnOnce(&mut SaveData) -> R,
+    ) -> R {
         update_save_data(
             &mut self.save_data,
             self.paths.save_data_file(),
             &mut self.status,
             action,
             update,
-        );
+        )
     }
 }
 

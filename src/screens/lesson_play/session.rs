@@ -56,16 +56,20 @@ pub(super) fn record_answer(
         slot_index,
         student_index,
     };
-    persistence.update_save_data(PersistenceAction::QuestionAnswer, |data| {
-        let _ = apply_answer(
+    let recorded = persistence.update_save_data(PersistenceAction::QuestionAnswer, |data| {
+        apply_answer(
             data,
             target,
             &lesson_id,
             &exercise_id,
             question_type,
             is_correct,
-        );
+        )
     });
+    if !recorded {
+        bevy::log::error!("Could not record answer because a persisted score counter overflowed");
+        persistence.status.fail(PersistenceAction::QuestionAnswer);
+    }
 }
 
 fn has_answer_recipient(
@@ -135,6 +139,5 @@ fn apply_answer(
     progress
         .entry(lesson_id.to_owned())
         .or_default()
-        .record_answer(exercise_id, question_type, is_correct);
-    true
+        .record_answer(exercise_id, question_type, is_correct)
 }

@@ -9,7 +9,7 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
 use crate::ui::animation::AnimateScale;
-use crate::ui::components::{save_write_failure_notice, standard_button};
+use crate::ui::components::{persistence_message, save_write_failure_notice, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -51,7 +51,7 @@ pub(super) fn setup_feedback_ui(
         LessonLaunchSelection::CompleteLesson if is_last => TranslationKey::FinishLesson,
         LessonLaunchSelection::CompleteLesson => TranslationKey::NextQuestion,
     };
-    let save_failed = write_status.failed(PersistenceAction::QuestionAnswer);
+    let save_notice = persistence_message(PersistenceAction::QuestionAnswer, *write_status, &i18n);
     let explanation = session.current().map_or(FeedbackExplanation::Hidden, |q| {
         build_feedback_explanation(settings.show_explanations, &q.instance)
     });
@@ -62,7 +62,7 @@ pub(super) fn setup_feedback_ui(
             &i18n,
             is_correct,
             &next_button_label,
-            save_failed,
+            save_notice,
             &explanation,
             window,
         );
@@ -111,7 +111,7 @@ fn spawn_feedback_content(
     i18n: &I18n,
     is_correct: bool,
     next_button_label: &TranslationKey,
-    save_failed: bool,
+    save_notice: Option<String>,
     explanation: &FeedbackExplanation,
     window: Entity,
 ) {
@@ -129,11 +129,8 @@ fn spawn_feedback_content(
         ))
         .with_children(|feedback| {
             spawn_result_text(feedback, i18n, is_correct, window);
-            if save_failed {
-                feedback.spawn(save_write_failure_notice(
-                    i18n.t(&TranslationKey::SaveWriteFailed).into_owned(),
-                    window,
-                ));
+            if let Some(notice) = &save_notice {
+                feedback.spawn(save_write_failure_notice(notice.clone(), window));
             }
             spawn_explanation_section(feedback, i18n, explanation, window);
             spawn_next_button(feedback, i18n, next_button_label, window);

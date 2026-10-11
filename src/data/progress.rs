@@ -24,6 +24,7 @@ pub enum ExplorationTheme {
 
 /// Persistent user preferences (volume, language, mode, exploration theme).
 #[derive(Resource, Clone, Debug, Reflect, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct GameSettings {
     pub music_volume: f32,
     pub sfx_volume: f32,
@@ -44,6 +45,26 @@ impl Default for GameSettings {
             language: Language::default(),
             exploration_theme: ExplorationTheme::default(),
             gamepad_navigation: false,
+        }
+    }
+}
+
+impl GameSettings {
+    pub(crate) fn validate_persisted(&self) -> Result<(), String> {
+        let mut invalid_fields = Vec::new();
+        if !self.music_volume.is_finite() || !(0.0..=1.0).contains(&self.music_volume) {
+            invalid_fields.push("music_volume");
+        }
+        if !self.sfx_volume.is_finite() || !(0.0..=1.0).contains(&self.sfx_volume) {
+            invalid_fields.push("sfx_volume");
+        }
+        if invalid_fields.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "invalid setting fields: {}",
+                invalid_fields.join(", ")
+            ))
         }
     }
 }

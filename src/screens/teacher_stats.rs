@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 
 use crate::data::content::QuestionType;
+use crate::data::save::score_percentage;
 use crate::data::{
     ContentLibrary, GameMode, Language, LessonProgress, PersistenceAction, PersistenceStatus,
     PlayerContext, PlayerSession, SaveDataMut,
@@ -18,7 +19,7 @@ use crate::screens::teacher_shared::question_type_label;
 use crate::states::{AppState, cleanup_root};
 use crate::ui::components::{
     ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button,
-    save_write_failure_notice, spawn_confirmation_modal, standard_button,
+    persistence_message, save_write_failure_notice, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::theme;
 
@@ -147,9 +148,11 @@ fn rebuild_stats_ui(
             has_any_progress,
             stats_data,
             global_total,
-            save_failure_notice: write_status
-                .failed(PersistenceAction::TeacherStatsReset)
-                .then(|| ts.i18n.t(&TranslationKey::SaveWriteFailed).into_owned()),
+            save_failure_notice: persistence_message(
+                PersistenceAction::TeacherStatsReset,
+                *write_status,
+                &ts.i18n,
+            ),
         },
     );
 }
@@ -261,13 +264,13 @@ struct QuestionScoreRow {
 /// Temporary totals derived from persisted exercise scores.
 #[derive(Clone, Copy, Default)]
 struct DerivedTypeScore {
-    correct: u32,
-    total: u32,
+    correct: u128,
+    total: u128,
 }
 
 impl DerivedTypeScore {
     fn percentage(self) -> u32 {
-        (self.correct * 100).checked_div(self.total).unwrap_or(0)
+        score_percentage(self.correct, self.total)
     }
 }
 
@@ -320,8 +323,8 @@ fn aggregate_type_scores(progress: &LessonProgress) -> HashMap<QuestionType, Der
     let mut totals: HashMap<QuestionType, DerivedTypeScore> = HashMap::new();
     for score in progress.question_scores.values() {
         let total = totals.entry(score.question_type).or_default();
-        total.correct += score.correct;
-        total.total += score.total;
+        total.correct = total.correct.saturating_add(u128::from(score.correct));
+        total.total = total.total.saturating_add(u128::from(score.total));
     }
     totals
 }
@@ -359,7 +362,7 @@ fn collect_lesson_type_rows(
     let totals = aggregate_type_scores(progress);
     let mut question_rows: HashMap<QuestionType, Vec<QuestionScoreRow>> = HashMap::new();
     for (exercise_id, score) in &progress.question_scores {
-        let pct = (score.correct * 100).checked_div(score.total).unwrap_or(0);
+        let pct = score_percentage(u128::from(score.correct), u128::from(score.total));
         question_rows
             .entry(score.question_type)
             .or_default()
@@ -400,8 +403,8 @@ fn precompute_stats(
 ) -> (Vec<ThemeStatsData>, GlobalTotal) {
     let total_text = i18n.t(&TranslationKey::Total).into_owned();
     let mut result = Vec::new();
-    let mut grand_correct: u32 = 0;
-    let mut grand_total: u32 = 0;
+    let mut grand_correct: u128 = 0;
+    let mut grand_total: u128 = 0;
 
     for theme_data in &content.themes {
         if !theme_data.available {
@@ -424,8 +427,8 @@ fn precompute_stats(
             let lesson_correct = lp.total_correct();
             let lesson_total = lp.total_questions();
             let lesson_pct = lp.percentage();
-            grand_correct += lesson_correct;
-            grand_total += lesson_total;
+            grand_correct = grand_correct.saturating_add(lesson_correct);
+            grand_total = grand_total.saturating_add(lesson_total);
 
             lessons.push(LessonStatsData {
                 lesson_name: i18n.t(&lesson.title_key).into_owned(),
@@ -443,7 +446,7 @@ fn precompute_stats(
         });
     }
 
-    let grand_pct = (grand_correct * 100).checked_div(grand_total).unwrap_or(0);
+    let grand_pct = score_percentage(grand_correct, grand_total);
     let global_total = GlobalTotal {
         label: match i18n.language {
             Language::French => format!("{total_text} score : "),

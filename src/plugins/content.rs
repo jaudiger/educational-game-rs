@@ -8,17 +8,13 @@ use crate::data::content::{
 };
 use crate::i18n::TranslationKey;
 
-/// Builds and inserts the content library at startup.
+/// Builds and inserts the content library during plugin construction.
 pub struct ContentPlugin;
 
 impl Plugin for ContentPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, start_content_loading);
+        app.insert_resource(build_content_library());
     }
-}
-
-fn start_content_loading(mut commands: Commands) {
-    commands.insert_resource(build_content_library());
 }
 
 fn build_content_library() -> ContentLibrary {

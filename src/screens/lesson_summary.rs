@@ -5,7 +5,9 @@ use bevy::window::PrimaryWindow;
 use crate::data::{LessonSession, PersistenceAction, PersistenceStatus};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
-use crate::ui::components::{save_write_failure_notice, screen_root, standard_button};
+use crate::ui::components::{
+    persistence_message, save_write_failure_notice, screen_root, standard_button,
+};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -38,7 +40,7 @@ fn setup_lesson_summary(
         TranslationKey::SummaryEncouragement
     };
 
-    let show_save_failure = write_status.failed(PersistenceAction::QuestionAnswer);
+    let save_notice = persistence_message(PersistenceAction::QuestionAnswer, *write_status, &i18n);
 
     commands
         .spawn((screen_root(), DespawnOnExit(AppState::LessonSummary)))
@@ -47,11 +49,8 @@ fn setup_lesson_summary(
             parent.spawn(summary_score(&i18n, correct, total, window));
             parent.spawn(summary_percentage(&i18n, percentage, window));
             parent.spawn(summary_message(&i18n, &message_key, window));
-            if show_save_failure {
-                parent.spawn(save_write_failure_notice(
-                    i18n.t(&TranslationKey::SaveWriteFailed).into_owned(),
-                    window,
-                ));
+            if let Some(notice) = save_notice {
+                parent.spawn(save_write_failure_notice(notice, window));
             }
             parent.spawn(return_button(&i18n, window));
         });
