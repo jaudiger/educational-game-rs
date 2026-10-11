@@ -87,73 +87,131 @@ fn push_plain(segments: &mut Vec<TextSegment>, text: &str) {
     }
 }
 
-/// Spawn rich text that automatically renders `\d+/\d+` patterns as stacked
-/// fractions.
-///
-/// If the text contains no fractions, a simple [`Text`] entity is spawned.
-/// Otherwise, a horizontal flex row with mixed text and fraction children is
-/// created.
-///
-/// A full-width centering wrapper ensures the text block wraps at the correct
-/// width (the parent's content area) while appearing centered as a whole.
-pub fn spawn_rich_text(
+/// Spawns content inside the shared centered text container.
+pub fn spawn_text_block(
+    parent: &mut ChildSpawnerCommands,
+    spawn_content: impl FnOnce(&mut ChildSpawnerCommands),
+) {
+    parent.spawn(text_block_node()).with_children(spawn_content);
+}
+
+fn text_block_node() -> Node {
+    Node {
+        width: percent(TEXT_BLOCK_WIDTH_PERCENT),
+        margin: UiRect::horizontal(percent(TEXT_BLOCK_MARGIN_PERCENT)),
+        flex_direction: FlexDirection::Column,
+        ..default()
+    }
+}
+
+const TEXT_BLOCK_WIDTH_PERCENT: f32 = 90.0;
+const TEXT_BLOCK_MARGIN_PERCENT: f32 = 5.0;
+
+/// Spawns a question text block with centered text.
+pub fn spawn_question_text(
     parent: &mut ChildSpawnerCommands,
     text: &str,
     font_size: f32,
     text_color: Color,
     window: Entity,
 ) {
+    spawn_rich_text(
+        parent,
+        text,
+        font_size,
+        text_color,
+        window,
+        TextBlockAlignment::Center,
+    );
+}
+
+/// Spawns a response text block with left-aligned text.
+pub fn spawn_response_text(
+    parent: &mut ChildSpawnerCommands,
+    text: &str,
+    font_size: f32,
+    text_color: Color,
+    window: Entity,
+) {
+    spawn_rich_text(
+        parent,
+        text,
+        font_size,
+        text_color,
+        window,
+        TextBlockAlignment::Left,
+    );
+}
+
+#[derive(Clone, Copy)]
+enum TextBlockAlignment {
+    Left,
+    Center,
+}
+
+impl TextBlockAlignment {
+    const fn text_justify(self) -> Justify {
+        match self {
+            Self::Left => Justify::Left,
+            Self::Center => Justify::Center,
+        }
+    }
+
+    const fn flex_justify(self) -> JustifyContent {
+        match self {
+            Self::Left => JustifyContent::FlexStart,
+            Self::Center => JustifyContent::Center,
+        }
+    }
+}
+
+fn spawn_rich_text(
+    parent: &mut ChildSpawnerCommands,
+    text: &str,
+    font_size: f32,
+    text_color: Color,
+    window: Entity,
+    alignment: TextBlockAlignment,
+) {
     let segments = parse_fraction_segments(text);
     let has_fraction = segments
         .iter()
-        .any(|s| matches!(s, TextSegment::Fraction(_, _)));
+        .any(|segment| matches!(segment, TextSegment::Fraction(_, _)));
 
     if !has_fraction {
-        // Fast path: no fractions, single Text entity.
-        parent.spawn((
-            Text::new(text),
-            theme::typography::text(font_size, window),
-            TextColor(text_color),
-        ));
+        spawn_text_block(parent, |block| {
+            block.spawn((
+                Text::new(text),
+                Node {
+                    width: percent(100.0),
+                    ..default()
+                },
+                theme::typography::text(font_size, window),
+                TextColor(text_color),
+                TextLayout::justify(alignment.text_justify()),
+            ));
+        });
         return;
     }
 
-    // Slow path: mixed content, horizontal row with word-level wrapping.
-    //
-    // A two-layer structure is used:
-    //
-    //   Outer row:  `width: 100%`, `justify_content: Center`
-    //     Inner row: `width: Auto`, `flex_wrap: Wrap`
-    //       Word / fraction entities
-    //
-    // The outer row provides a definite main-axis width so the inner row
-    // wraps at the correct boundary.  After wrapping, the inner row sizes
-    // to its widest line and is centered by the outer row.  This avoids
-    // per-line centering (which `justify_content: Center` on a single row
-    // would produce) while still centering the text block as a whole.
     let gap = theme::scaled(font_size * 0.28);
 
-    parent
-        .spawn(Node {
-            align_self: AlignSelf::Stretch,
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::Center,
-            ..default()
-        })
-        .with_children(|wrapper| {
-            wrapper
-                .spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    flex_wrap: FlexWrap::Wrap,
-                    column_gap: gap,
-                    row_gap: theme::scaled(theme::spacing::SMALL),
-                    ..default()
-                })
-                .with_children(|row| {
-                    spawn_segments(row, &segments, font_size, text_color, window, gap);
-                });
-        });
+    spawn_text_block(parent, |block| {
+        block
+            .spawn(Node {
+                width: percent(100.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: alignment.flex_justify(),
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: gap,
+                row_gap: theme::scaled(theme::spacing::SMALL),
+                ..default()
+            })
+            .with_children(|row| {
+                spawn_segments(row, &segments, font_size, text_color, window, gap);
+            });
+    });
 }
 
 /// If the segment after `current` is a Plain segment whose first word is

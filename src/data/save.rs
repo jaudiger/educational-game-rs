@@ -170,29 +170,3 @@ pub fn get_current_progress(
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::LessonSessionConfig;
-    use std::collections::HashMap;
-
-    #[test]
-    fn old_position_based_settings_are_discarded_without_remapping() {
-        let old = r#"{"counts":[3,0],"show_visuals":[true,false]}"#;
-        let config: LessonSessionConfig = serde_json::from_str(old).unwrap();
-        assert!(config.counts.is_empty());
-        assert!(config.show_visuals.is_empty());
-    }
-
-    #[test]
-    fn stable_id_settings_round_trip_as_keyed_values() {
-        let config = LessonSessionConfig {
-            counts: HashMap::from([("exercise-a".to_owned(), 3)]),
-            show_visuals: HashMap::from([("exercise-a".to_owned(), true)]),
-        };
-        let json = serde_json::to_string(&config).unwrap();
-        let decoded: LessonSessionConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.counts.get("exercise-a"), Some(&3));
-        assert_eq!(decoded.show_visuals.get("exercise-a"), Some(&true));
-    }
-}

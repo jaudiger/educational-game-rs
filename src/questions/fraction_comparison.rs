@@ -14,7 +14,7 @@ use crate::data::content::ComparisonAnswer;
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
 use crate::ui::components::standard_button;
-use crate::ui::rich_text::spawn_rich_text;
+use crate::ui::rich_text::spawn_question_text;
 use crate::ui::theme;
 
 /// Handles fraction comparison question UI and answer submission.
@@ -117,7 +117,7 @@ fn spawn_character_row(
         })
         .with_children(|row| {
             // Label: "Alice mange 3/8"
-            spawn_rich_text(
+            spawn_question_text(
                 row,
                 &i18n.t(&TranslationKey::CharacterAte(
                     name.to_owned(),

@@ -19,7 +19,7 @@ use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 
 use crate::ui::components::{button_base, stacked_fraction, standard_button};
-use crate::ui::rich_text::{TextSegment, parse_fraction_segments, spawn_rich_text};
+use crate::ui::rich_text::{TextSegment, parse_fraction_segments, spawn_question_text};
 use crate::ui::theme;
 
 /// Shared [`Node`] layout for all question root markers.
@@ -38,7 +38,7 @@ pub fn question_root_node() -> Node {
 
 /// Spawns a heading-size question prompt, supporting inline fraction notation.
 pub fn spawn_question_prompt(parent: &mut ChildSpawnerCommands, text: &str, window: Entity) {
-    spawn_rich_text(
+    spawn_question_text(
         parent,
         text,
         theme::fonts::HEADING,

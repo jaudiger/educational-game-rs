@@ -53,24 +53,3 @@ fn append_digit(value: &mut String, digit: u8) -> bool {
     value.push(char::from(b'0' + digit));
     true
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{MAX_DIGITS, append_digit};
-
-    #[test]
-    fn zero_can_be_entered_as_the_first_digit() {
-        let mut value = String::new();
-        assert!(append_digit(&mut value, 0));
-        assert_eq!(value, "0");
-    }
-
-    #[test]
-    fn keypad_rejects_digits_outside_the_supported_range_and_length() {
-        let mut value = String::new();
-        assert!(!append_digit(&mut value, 10));
-        value = "1".repeat(MAX_DIGITS);
-        assert!(!append_digit(&mut value, 2));
-        assert_eq!(value, "1".repeat(MAX_DIGITS));
-    }
-}

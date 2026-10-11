@@ -5,7 +5,7 @@ use crate::data::content::{
 };
 use crate::i18n::Language;
 use crate::ui::components::stacked_fraction;
-use crate::ui::rich_text::spawn_rich_text;
+use crate::ui::rich_text::{spawn_response_text, spawn_text_block};
 use crate::ui::theme;
 
 use super::super::visuals::PV_ZERO_COLOR;
@@ -28,76 +28,71 @@ pub(super) fn spawn_explanation_text(
         .iter()
         .any(|segment| matches!(segment, Segment::Value(_)))
     {
-        spawn_rich_text(parent, text, font_size, theme::colors::TEXT_DARK, window);
+        spawn_response_text(parent, text, font_size, theme::colors::TEXT_DARK, window);
         return;
     }
 
     let punctuation = attach_value_punctuation(&mut segments);
     let gap = theme::scaled(font_size * 0.28);
-    parent
-        .spawn(Node {
-            align_self: AlignSelf::Stretch,
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::Center,
-            ..default()
-        })
-        .with_children(|wrapper| {
-            wrapper
-                .spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    flex_wrap: FlexWrap::Wrap,
-                    column_gap: gap,
-                    row_gap: theme::scaled(theme::spacing::SMALL),
-                    ..default()
-                })
-                .with_children(|row| {
-                    let mut index = 0;
-                    while index < segments.len() {
-                        match &segments[index] {
-                            Segment::Text(text) => {
-                                spawn_words(row, text, font_size, window);
-                            }
-                            Segment::Value(value) => {
-                                let value = (*value).clone();
-                                let (leading, trailing) = &punctuation[index];
-                                if leading.is_empty() && trailing.is_empty() {
-                                    spawn_value(row, &value, language, font_size, window);
-                                } else {
-                                    row.spawn(Node {
-                                        flex_direction: FlexDirection::Row,
-                                        align_items: AlignItems::Center,
-                                        flex_shrink: 0.0,
-                                        ..default()
-                                    })
-                                    .with_children(|group| {
-                                        if !leading.is_empty() {
-                                            spawn_text(
-                                                group,
-                                                leading,
-                                                theme::colors::TEXT_DARK,
-                                                font_size,
-                                                window,
-                                            );
-                                        }
-                                        spawn_value(group, &value, language, font_size, window);
-                                        if !trailing.is_empty() {
-                                            spawn_text(
-                                                group,
-                                                trailing,
-                                                theme::colors::TEXT_DARK,
-                                                font_size,
-                                                window,
-                                            );
-                                        }
-                                    });
-                                }
+    spawn_text_block(parent, |block| {
+        block
+            .spawn(Node {
+                width: percent(100.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::FlexStart,
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: gap,
+                row_gap: theme::scaled(theme::spacing::SMALL),
+                ..default()
+            })
+            .with_children(|row| {
+                let mut index = 0;
+                while index < segments.len() {
+                    match &segments[index] {
+                        Segment::Text(text) => {
+                            spawn_words(row, text, font_size, window);
+                        }
+                        Segment::Value(value) => {
+                            let value = (*value).clone();
+                            let (leading, trailing) = &punctuation[index];
+                            if leading.is_empty() && trailing.is_empty() {
+                                spawn_value(row, &value, language, font_size, window);
+                            } else {
+                                row.spawn(Node {
+                                    flex_direction: FlexDirection::Row,
+                                    align_items: AlignItems::Center,
+                                    flex_shrink: 0.0,
+                                    ..default()
+                                })
+                                .with_children(|group| {
+                                    if !leading.is_empty() {
+                                        spawn_text(
+                                            group,
+                                            leading,
+                                            theme::colors::TEXT_DARK,
+                                            font_size,
+                                            window,
+                                        );
+                                    }
+                                    spawn_value(group, &value, language, font_size, window);
+                                    if !trailing.is_empty() {
+                                        spawn_text(
+                                            group,
+                                            trailing,
+                                            theme::colors::TEXT_DARK,
+                                            font_size,
+                                            window,
+                                        );
+                                    }
+                                });
                             }
                         }
-                        index += 1;
                     }
-                });
-        });
+                    index += 1;
+                }
+            });
+    });
 }
 
 fn parse_segments<'a>(text: &str, placeholders: &'a [ExplanationPlaceholder]) -> Vec<Segment<'a>> {

@@ -8,7 +8,6 @@ use crate::data::content::QuestionVisual;
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::I18n;
 use crate::ui::components::operator_visual_group;
-use crate::ui::rich_text::spawn_rich_text;
 use crate::ui::theme;
 
 /// Handles multiple-choice question UI and answer submission.
@@ -122,13 +121,7 @@ fn spawn_prompt_and_fraction_bars(
     const MINI_BAR_HEIGHT: f32 = 40.0;
 
     // Prompt text
-    spawn_rich_text(
-        parent,
-        prompt_text,
-        theme::fonts::HEADING,
-        theme::colors::TEXT_DARK,
-        window,
-    );
+    super::spawn_question_prompt(parent, prompt_text, window);
 
     // Fraction bars row: a/b (blue) + "+" + c/b (orange)
     parent
