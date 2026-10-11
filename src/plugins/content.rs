@@ -32,19 +32,16 @@ fn build_content_library() -> ContentLibrary {
                     Lesson {
                         id: "fractions".into(),
                         title_key: TranslationKey::LessonFractions,
-                        available: true,
                         questions: build_fractions_questions(),
                     },
                     Lesson {
                         id: "multiplication_tables".into(),
                         title_key: TranslationKey::LessonMultiplicationTables,
-                        available: true,
                         questions: build_multiplication_tables_questions(),
                     },
                     Lesson {
                         id: "multiply_10_100_1000".into(),
                         title_key: TranslationKey::LessonMultiplyByPowerOf10,
-                        available: true,
                         questions: build_multiply_10_100_1000_questions(),
                     },
                 ],

@@ -16,7 +16,6 @@ pub(super) struct LessonTreeRowSpec {
     pub theme_id: String,
     pub lesson_id: String,
     pub title_key: TranslationKey,
-    pub available: bool,
     pub has_custom_config: bool,
 }
 
@@ -45,7 +44,6 @@ pub(super) fn build_tree_specs(
                         theme_id: t.id.clone(),
                         lesson_id: lesson.id.clone(),
                         title_key: lesson.title_key.clone(),
-                        available: lesson.available,
                         has_custom_config: lesson_has_custom_config(lesson, save_data, session),
                     })
                     .collect()
@@ -144,13 +142,6 @@ fn spawn_lesson_tree_row(
     show_config_button: bool,
     window: Entity,
 ) {
-    let is_available = lesson.available;
-    let text_color = if is_available {
-        theme::colors::TEXT_DARK
-    } else {
-        theme::colors::TEXT_MUTED
-    };
-
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -161,20 +152,10 @@ fn spawn_lesson_tree_row(
             ..default()
         })
         .with_children(|row| {
-            let label = if is_available {
-                i18n.t(&lesson.title_key).into_owned()
-            } else {
-                format!(
-                    "{} {}",
-                    i18n.t(&lesson.title_key),
-                    i18n.t(&TranslationKey::ComingSoon)
-                )
-            };
-
             row.spawn((
-                Text::new(label),
+                Text::new(i18n.t(&lesson.title_key)),
                 theme::typography::text(theme::fonts::BODY, window),
-                TextColor(text_color),
+                TextColor(theme::colors::TEXT_DARK),
                 Node {
                     flex_shrink: 1.0,
                     flex_grow: 1.0,
@@ -183,7 +164,7 @@ fn spawn_lesson_tree_row(
                 },
             ));
 
-            if show_config_button && is_available {
+            if show_config_button {
                 let gear_bg = if lesson.has_custom_config {
                     theme::colors::PRIMARY
                 } else {

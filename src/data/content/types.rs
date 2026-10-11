@@ -317,7 +317,6 @@ pub struct Lesson {
     pub id: String,
     #[serde(skip)]
     pub title_key: TranslationKey,
-    pub available: bool,
     pub questions: Vec<QuestionEntry>,
 }
 

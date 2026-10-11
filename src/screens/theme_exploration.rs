@@ -20,7 +20,7 @@ use crate::ui::components::{
 };
 use crate::ui::theme;
 
-/// Theme exploration screen showing available themes and lessons.
+/// Theme exploration screen showing themes and their lessons.
 pub struct ThemeExplorationScreenPlugin;
 
 impl Plugin for ThemeExplorationScreenPlugin {
@@ -242,14 +242,7 @@ fn setup_themes(
                     ctx.active_student.as_deref(),
                 )
             } else {
-                (
-                    0,
-                    theme_data
-                        .lessons
-                        .iter()
-                        .filter(|lesson| lesson.available)
-                        .count(),
-                )
+                (0, theme_data.lessons.len())
             };
             ThemeButtonData {
                 id: theme_data.id.clone(),
@@ -530,7 +523,7 @@ fn count_completed_for_theme(
     session: Option<&PlayerSession>,
     active_student: Option<&ActiveStudent>,
 ) -> (usize, usize) {
-    let total = theme_data.lessons.iter().filter(|l| l.available).count();
+    let total = theme_data.lessons.len();
     let Some(session) = session else {
         return (0, total);
     };
@@ -544,7 +537,7 @@ fn count_completed_for_theme(
         theme_data
             .lessons
             .iter()
-            .filter(|l| l.available && p.contains_key(&l.id))
+            .filter(|lesson| p.contains_key(&lesson.id))
             .count()
     });
     (completed, total)
@@ -596,9 +589,7 @@ fn handle_themes(
 /// Pre-computed data for a single lesson button (all strings owned for `'static`).
 struct LessonButtonData {
     id: String,
-    available: bool,
     title_text: String,
-    coming_soon_text: String,
     best_percent_text: Option<String>,
 }
 
@@ -616,9 +607,7 @@ fn build_lesson_button_data(
                 .map(LessonProgress::percentage);
             LessonButtonData {
                 id: lesson.id.clone(),
-                available: lesson.available,
                 title_text: i18n.t(&lesson.title_key).into_owned(),
-                coming_soon_text: i18n.t(&TranslationKey::ComingSoon).into_owned(),
                 best_percent_text: best_percent.map(|percentage| {
                     i18n.t(&TranslationKey::BestPercent(percentage))
                         .into_owned()
@@ -704,7 +693,6 @@ fn setup_theme_lessons(
             parent.spawn(write_notice);
 
             // Lesson actions
-            let first_available = lesson_buttons.iter().position(|lesson| lesson.available);
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Row,
@@ -720,7 +708,7 @@ fn setup_theme_lessons(
                         spawn_lesson_button(
                             grid,
                             data,
-                            Some(i) == first_available,
+                            i == 0,
                             &action_labels,
                             window,
                             card_style,
@@ -797,7 +785,6 @@ fn update_exploration_progress(
                 (ExplorationView::ThemeLessons, ExplorationProgressText::Lesson(lesson_id)) => {
                     theme_data
                         .and_then(|theme| theme.lesson(lesson_id))
-                        .filter(|lesson| lesson.available)
                         .and_then(|lesson| progress.and_then(|progress| progress.get(&lesson.id)))
                         .map(|progress| {
                             i18n.t(&TranslationKey::BestPercent(progress.percentage()))
@@ -840,8 +827,7 @@ fn spawn_lesson_button(
     card_style: Option<ExplorationCardStyle>,
     index: usize,
 ) {
-    let (bg, text_color, progress_color) =
-        card_colors(card_style, data.available, theme::colors::SUCCESS);
+    let (bg, text_color, progress_color) = card_colors(card_style, true, theme::colors::SUCCESS);
     let dims = card_dimensions(card_style);
     let mut card = parent.spawn((
         Node {
@@ -853,13 +839,7 @@ fn spawn_lesson_button(
         Hovered::default(),
     ));
     if let Some(style) = card_style {
-        insert_card_overlay(&mut card, style, data.available, index, &dims);
-    }
-    if !data.available {
-        card.insert(HoverTooltip {
-            message: data.coming_soon_text.clone(),
-            window,
-        });
+        insert_card_overlay(&mut card, style, true, index, &dims);
     }
 
     card.with_children(|contents| {
@@ -869,63 +849,52 @@ fn spawn_lesson_button(
             text_color,
             window,
         ));
-        if let Some(style) = card_style
-            && data.available
-        {
+        if let Some(style) = card_style {
             title_cmd.insert(TextShadow {
                 color: style.colors.card_text_shadow,
                 offset: Vec2::new(0.0, 1.0),
             });
         }
 
-        if data.available {
-            let has_progress = data.best_percent_text.is_some();
-            let progress = data.best_percent_text.as_deref().unwrap_or_default();
-            contents.spawn((
-                card_text(progress, theme::fonts::SMALL, progress_color, window),
-                ExplorationProgressText::Lesson(data.id.clone()),
-                Node {
-                    display: if has_progress {
-                        Display::Flex
-                    } else {
-                        Display::None
-                    },
-                    ..default()
+        let has_progress = data.best_percent_text.is_some();
+        let progress = data.best_percent_text.as_deref().unwrap_or_default();
+        contents.spawn((
+            card_text(progress, theme::fonts::SMALL, progress_color, window),
+            ExplorationProgressText::Lesson(data.id.clone()),
+            Node {
+                display: if has_progress {
+                    Display::Flex
+                } else {
+                    Display::None
                 },
-            ));
-            contents
-                .spawn(Node {
-                    width: percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    row_gap: theme::scaled(theme::spacing::SMALL),
-                    ..default()
-                })
-                .with_children(|actions| {
-                    spawn_lesson_action(
-                        actions,
-                        data,
-                        LessonLaunchAction::CompleteSeries,
-                        &action_labels.play_series,
-                        auto_focus,
-                        window,
-                    );
-                    spawn_lesson_action(
-                        actions,
-                        data,
-                        LessonLaunchAction::ChooseQuestion,
-                        &action_labels.choose_question,
-                        false,
-                        window,
-                    );
-                });
-        } else {
-            contents.spawn(card_text(
-                &data.coming_soon_text,
-                theme::fonts::SMALL,
-                theme::colors::TEXT_MUTED,
-                window,
-            ));
-        }
+                ..default()
+            },
+        ));
+        contents
+            .spawn(Node {
+                width: percent(100.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: theme::scaled(theme::spacing::SMALL),
+                ..default()
+            })
+            .with_children(|actions| {
+                spawn_lesson_action(
+                    actions,
+                    data,
+                    LessonLaunchAction::CompleteSeries,
+                    &action_labels.play_series,
+                    auto_focus,
+                    window,
+                );
+                spawn_lesson_action(
+                    actions,
+                    data,
+                    LessonLaunchAction::ChooseQuestion,
+                    &action_labels.choose_question,
+                    false,
+                    window,
+                );
+            });
     });
 }
 
@@ -987,9 +956,7 @@ fn handle_theme_lessons(
     for activation in activations.read() {
         if let Ok(lesson_btn) = lesson_query.get(activation.0) {
             if let Some(theme_data) = content.theme(&active_theme)
-                && theme_data
-                    .lesson(&lesson_btn.lesson_id)
-                    .is_some_and(|lesson| lesson.available)
+                && theme_data.lesson(&lesson_btn.lesson_id).is_some()
             {
                 commands.insert_resource(SelectedLesson(Some(lesson_btn.lesson_id.clone())));
                 match lesson_btn.action {

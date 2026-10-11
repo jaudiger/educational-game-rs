@@ -56,10 +56,6 @@ pub fn build_session_with_selection(
     let Some(lesson) = theme_data.lesson(lesson_id) else {
         return Err(vec![format!("Lesson {lesson_id} was not indexed")]);
     };
-    if !lesson.available {
-        return Err(vec![format!("Lesson {lesson_id} is unavailable")]);
-    }
-
     let mut rng = rand::rng();
     match selection {
         LessonLaunchSelection::CompleteLesson => plan_session(lesson, lesson_config, &mut rng),

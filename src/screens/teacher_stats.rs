@@ -410,16 +410,13 @@ fn precompute_stats(
         let has_data = theme_data
             .lessons
             .iter()
-            .any(|l| l.available && progress.contains_key(&l.id));
+            .any(|lesson| progress.contains_key(&lesson.id));
         if !has_data {
             continue;
         }
 
         let mut lessons = Vec::new();
         for lesson in &theme_data.lessons {
-            if !lesson.available {
-                continue;
-            }
             let Some(lp) = progress.get(&lesson.id) else {
                 continue;
             };
