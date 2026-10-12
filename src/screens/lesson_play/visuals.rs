@@ -340,8 +340,8 @@ fn spawn_conversion_row(
                     entry.fraction.0,
                     entry.fraction.1,
                     theme::fonts::BODY,
-                    theme::colors::TEXT_MUTED,
-                    theme::colors::TEXT_MUTED,
+                    color,
+                    theme::colors::TEXT_DARK,
                     window,
                 ));
                 conversion.spawn((
@@ -353,8 +353,8 @@ fn spawn_conversion_row(
                     entry.converted.0,
                     entry.converted.1,
                     theme::fonts::BODY,
-                    theme::colors::TEXT_MUTED,
-                    theme::colors::TEXT_MUTED,
+                    color,
+                    theme::colors::TEXT_DARK,
                     window,
                 ));
                 conversion.spawn(fraction_bar(
@@ -639,7 +639,7 @@ fn spawn_pv_legend_entries(
                 Language::French => NAMES_FR,
                 Language::English => NAMES_EN,
             };
-            for i in 0..num_columns {
+            for i in (0..num_columns).rev() {
                 let (abbr_fr, abbr_en, color) = PV_COLUMNS[i];
                 let abbr = match language {
                     Language::French => abbr_fr,
@@ -652,7 +652,7 @@ fn spawn_pv_legend_entries(
                     TextColor(color),
                 ));
                 // Separator dot (except after the last entry).
-                if i + 1 < num_columns {
+                if i > 0 {
                     row.spawn((
                         Text::new("\u{00B7}".to_owned()),
                         theme::typography::text(theme::fonts::SMALL, window),

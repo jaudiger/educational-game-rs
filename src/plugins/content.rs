@@ -228,8 +228,8 @@ fn build_visual_fraction_questions() -> Vec<QuestionEntry> {
                 denominator_range: vec![3, 4, 5, 6, 8, 10, 12],
                 numerator_range: vec![2, 3, 4, 5],
                 explanation_template: LocalizedText::new(
-                    "Ils mangent le même nombre de parts ({na}), mais moins il y a de parts dans le gâteau, plus chaque part est grosse. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
-                    "They eat the same number of slices ({na}), but the fewer slices the pie has, the larger each slice is. So {greater_fraction} is greater than {lesser_fraction}.",
+                    "Ils mangent le même nombre de parts, mais moins il y a de parts dans le gâteau, plus chaque part est grosse. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                    "They eat the same number of slices, but the fewer slices the pie has, the larger each slice is. So {greater_fraction} is greater than {lesser_fraction}.",
                 ),
             }),
         ),

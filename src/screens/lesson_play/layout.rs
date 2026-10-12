@@ -81,6 +81,7 @@ pub(super) fn setup_lesson_play(
             Node {
                 width: percent(100.0),
                 height: percent(100.0),
+                min_height: px(0.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::FlexStart,

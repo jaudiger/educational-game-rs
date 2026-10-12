@@ -199,7 +199,7 @@ impl TranslationKey {
                 BackToLessons           => ("Retour aux le\u{00e7}ons",                      "Back to lessons"),
                 BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
                 ChooseQuestion          => ("Choisir une question",                      "Choose a question"),
-                PlaySeries              => ("Jouer toute la s\u{00e9}rie",                    "Play full series"),
+                PlaySeries              => ("Jouer une s\u{00e9}rie",                    "Play a series"),
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
                 // Save Slots
                 Empty                     => ("Vide",                                      "Empty"),

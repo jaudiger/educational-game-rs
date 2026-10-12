@@ -255,7 +255,7 @@ impl McqTemplate {
             self.explanation_template.clone(),
             vec![
                 text_placeholder("name", name_fr.to_owned(), name_en.to_owned()),
-                number_placeholder("d", d.unsigned_abs(), ExplanationColorRole::Default),
+                number_placeholder("d", d.unsigned_abs(), ExplanationColorRole::Secondary),
                 fraction_placeholder(
                     "fraction",
                     1,
@@ -451,7 +451,6 @@ impl FractionComparisonTemplate {
         };
 
         let explanation_placeholders = comparison_explanation_placeholders(
-            self.difficulty,
             fraction_a,
             fraction_b,
             answer,
@@ -613,26 +612,30 @@ fn comparison_explanation_text(
 }
 
 fn comparison_explanation_placeholders(
-    difficulty: ComparisonDifficulty,
     fraction_a: (u32, u32),
     fraction_b: (u32, u32),
     answer: ComparisonAnswer,
     character_a: &str,
     character_b: &str,
 ) -> Vec<ExplanationPlaceholder> {
-    let right_numerator_role = if matches!(difficulty, ComparisonDifficulty::SameNumerator) {
-        ExplanationColorRole::Primary
-    } else {
-        ExplanationColorRole::Secondary
-    };
-    let (greater_fraction, lesser_fraction) = match answer {
-        ComparisonAnswer::A | ComparisonAnswer::Equal => (fraction_a, fraction_b),
-        ComparisonAnswer::B => (fraction_b, fraction_a),
+    let (greater_fraction, lesser_fraction, greater_role, lesser_role) = match answer {
+        ComparisonAnswer::A | ComparisonAnswer::Equal => (
+            fraction_a,
+            fraction_b,
+            ExplanationColorRole::Primary,
+            ExplanationColorRole::Secondary,
+        ),
+        ComparisonAnswer::B => (
+            fraction_b,
+            fraction_a,
+            ExplanationColorRole::Secondary,
+            ExplanationColorRole::Primary,
+        ),
     };
     vec![
         number_placeholder("na", fraction_a.0, ExplanationColorRole::Primary),
         number_placeholder("da", fraction_a.1, ExplanationColorRole::Default),
-        number_placeholder("nb", fraction_b.0, right_numerator_role),
+        number_placeholder("nb", fraction_b.0, ExplanationColorRole::Secondary),
         number_placeholder("db", fraction_b.1, ExplanationColorRole::Default),
         fraction_placeholder(
             "fraction_a",
@@ -645,21 +648,21 @@ fn comparison_explanation_placeholders(
             "fraction_b",
             fraction_b.0,
             fraction_b.1,
-            right_numerator_role,
+            ExplanationColorRole::Secondary,
             ExplanationColorRole::Default,
         ),
         fraction_placeholder(
             "greater_fraction",
             greater_fraction.0,
             greater_fraction.1,
-            ExplanationColorRole::Primary,
+            greater_role,
             ExplanationColorRole::Default,
         ),
         fraction_placeholder(
             "lesser_fraction",
             lesser_fraction.0,
             lesser_fraction.1,
-            ExplanationColorRole::Secondary,
+            lesser_role,
             ExplanationColorRole::Default,
         ),
         text_placeholder("char_a", character_a.to_owned(), character_a.to_owned()),
