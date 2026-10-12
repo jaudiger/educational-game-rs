@@ -13,14 +13,19 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, InLessonFlow, StateScopedResourceExt};
 use crate::ui::components::{
-    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, action_button_scene,
-    button_base, card_node, icon_button, persistence_notice, screen_root, spawn_confirmation_modal,
-    standard_button,
+    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, MenuBackgroundStyle,
+    action_button_scene, button_base, card_node, icon_button, menu_background, persistence_notice,
+    screen_root, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
 const MAX_NAME_LENGTH: usize = 30;
+const SLOT_ACCENTS: [Color; 3] = [
+    theme::colors::PASTEL_BLUE,
+    theme::colors::PASTEL_PEACH,
+    theme::colors::PASTEL_LAVENDER,
+];
 
 /// Save slot selection screen for creating, loading, and deleting profiles.
 pub struct SaveSlotsScreenPlugin;
@@ -135,6 +140,8 @@ fn spawn_save_slots_ui(
         DespawnOnExit(AppState::SaveSlots),
         SaveSlotsRoot,
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+            parent.spawn(menu_background(MenuBackgroundStyle::SaveSlots));
+
             // Title
             parent.spawn((
                 Text::new(title),
@@ -191,6 +198,10 @@ fn spawn_slot_card(
     auto_focus: bool,
     window: Entity,
 ) {
+    let accent = SLOT_ACCENTS
+        .get(index)
+        .copied()
+        .unwrap_or(theme::colors::PASTEL_BLUE);
     let mut cmd = parent.spawn((
         button_base(theme::colors::CARD_BG),
         Node {
@@ -201,8 +212,13 @@ fn spawn_slot_card(
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
             row_gap: theme::scaled(theme::spacing::SMALL),
+            border: UiRect::new(theme::scaled(5.0), px(1.0), px(1.0), px(1.0)),
             border_radius: BorderRadius::all(theme::scaled(theme::sizes::CARD_BORDER_RADIUS)),
             ..default()
+        },
+        BorderColor {
+            left: accent,
+            ..BorderColor::all(theme::colors::CARD_BORDER)
         },
         SlotCard(index),
     ));

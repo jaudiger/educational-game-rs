@@ -179,6 +179,10 @@ pub mod colors {
     pub const CARD_OVERLAY: Color = Color::srgba(1.0, 1.0, 1.0, 0.65);
     pub const CARD_BORDER: Color = Color::srgba(0.0, 0.0, 0.0, 0.18);
     pub const FOCUS_RING: Color = Color::srgb(1.0, 0.85, 0.0);
+    pub const PASTEL_BLUE: Color = Color::srgb(0.54, 0.77, 0.93);
+    pub const PASTEL_PEACH: Color = Color::srgb(1.0, 0.74, 0.55);
+    pub const PASTEL_LAVENDER: Color = Color::srgb(0.73, 0.68, 0.91);
+    pub const PASTEL_MINT: Color = Color::srgb(0.55, 0.82, 0.70);
 }
 
 pub mod fonts {

@@ -4,7 +4,9 @@ use bevy::window::PrimaryWindow;
 
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
-use crate::ui::components::{ButtonActivated, screen_root, standard_button};
+use crate::ui::components::{
+    ButtonActivated, MenuBackgroundStyle, menu_background, screen_root, standard_button,
+};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -36,6 +38,7 @@ fn setup_home(
         screen_root(),
         DespawnOnExit(AppState::Home),
         children![
+            menu_background(MenuBackgroundStyle::Home),
             // Title
             (
                 Text::new(title),

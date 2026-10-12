@@ -16,6 +16,7 @@ impl Plugin for UiAnimationPlugin {
                 tick_animate_scale,
                 tick_screen_entry,
                 tick_floating_cards,
+                tick_floating_menu_decorations,
                 animate_button_hover,
             ),
         );
@@ -55,6 +56,14 @@ impl AnimateScale {
 pub struct FloatingCard {
     pub phase: f32,
     pub amplitude: f32,
+}
+
+#[derive(Component, Reflect)]
+#[require(UiTransform)]
+pub struct FloatingMenuDecoration {
+    pub phase: f32,
+    pub amplitude: f32,
+    pub speed: f32,
 }
 
 /// Slide-up + scale-in entry animation for screen roots.
@@ -111,6 +120,17 @@ fn tick_floating_cards(time: Res<Time>, mut query: Query<(&FloatingCard, &mut Ui
                 .mul_add(theme::animation::FLOATING_SPEED, card.phase)
                 .sin();
         transform.translation = Val2::new(px(0.0), px(y));
+    }
+}
+
+fn tick_floating_menu_decorations(
+    time: Res<Time>,
+    mut query: Query<(&FloatingMenuDecoration, &mut UiTransform)>,
+) {
+    let elapsed = time.elapsed_secs();
+    for (decoration, mut transform) in &mut query {
+        let y = decoration.amplitude * elapsed.mul_add(decoration.speed, decoration.phase).sin();
+        transform.translation = Val2::new(px(0.0), theme::scaled(y));
     }
 }
 

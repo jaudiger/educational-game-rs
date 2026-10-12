@@ -1,9 +1,11 @@
 mod buttons;
 mod forms;
+mod menu_background;
 mod overlays;
 
 pub use buttons::*;
 pub use forms::*;
+pub use menu_background::*;
 pub use overlays::*;
 
 use bevy::input_focus::tab_navigation::TabGroup;

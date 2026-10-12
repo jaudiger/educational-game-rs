@@ -11,8 +11,9 @@ use crate::data::{GameSettings, GameSettingsMut, PersistenceAction, PersistenceS
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
 use crate::ui::components::{
-    checkbox_scene, persistence_notice, radio_button_muted_scene, radio_button_scene, radio_group,
-    screen_root, slider_scene, standard_button,
+    MenuBackgroundStyle, checkbox_scene, menu_background, persistence_notice,
+    radio_button_muted_scene, radio_button_scene, radio_group, screen_root, slider_scene,
+    standard_button,
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -86,6 +87,7 @@ fn spawn_settings_ui(
         DespawnOnExit(AppState::Settings),
         SettingsRoot,
         children![
+            menu_background(MenuBackgroundStyle::Settings),
             // Title
             (
                 Text::new(title),
