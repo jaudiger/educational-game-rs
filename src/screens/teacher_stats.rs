@@ -4,7 +4,7 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 
-use crate::data::content::QuestionType;
+use crate::data::content::{Lesson, QuestionType};
 use crate::data::save::score_percentage;
 use crate::data::{
     ContentLibrary, GameMode, Language, LessonProgress, PersistenceAction, PersistenceStatus,
@@ -318,15 +318,31 @@ const fn pct_color(pct: u32) -> Color {
     }
 }
 
-/// Aggregates scores by type using the cumulative exercise records.
-fn aggregate_type_scores(progress: &LessonProgress) -> HashMap<QuestionType, DerivedTypeScore> {
+/// Derives the question category from each exercise in the current lesson.
+fn aggregate_type_scores(
+    lesson: &Lesson,
+    progress: &LessonProgress,
+) -> HashMap<QuestionType, DerivedTypeScore> {
     let mut totals: HashMap<QuestionType, DerivedTypeScore> = HashMap::new();
-    for score in progress.question_scores.values() {
-        let total = totals.entry(score.question_type).or_default();
-        total.correct = total.correct.saturating_add(u128::from(score.correct));
-        total.total = total.total.saturating_add(u128::from(score.total));
+    for (exercise_id, score) in &progress.question_scores {
+        let Some(question_type) = question_type_for_exercise(lesson, exercise_id) else {
+            continue;
+        };
+        let total = totals.entry(question_type).or_default();
+        total.correct = total
+            .correct
+            .saturating_add(u128::from(score.correct_count()));
+        total.total = total.total.saturating_add(u128::from(score.total_count()));
     }
     totals
+}
+
+fn question_type_for_exercise(lesson: &Lesson, exercise_id: &str) -> Option<QuestionType> {
+    lesson
+        .questions
+        .iter()
+        .find(|question| question.id == exercise_id)
+        .map(|question| question.definition.question_type())
 }
 
 fn question_label(
@@ -354,23 +370,28 @@ fn question_label(
 
 /// Builds exercise rows grouped by question type, sorted by type and stable ID.
 fn collect_lesson_type_rows(
-    lesson_id: &str,
+    lesson: &Lesson,
     progress: &LessonProgress,
     content: &ContentLibrary,
     i18n: &I18n,
 ) -> Vec<TypeScoreRow> {
-    let totals = aggregate_type_scores(progress);
+    let totals = aggregate_type_scores(lesson, progress);
     let mut question_rows: HashMap<QuestionType, Vec<QuestionScoreRow>> = HashMap::new();
     for (exercise_id, score) in &progress.question_scores {
-        let pct = score_percentage(u128::from(score.correct), u128::from(score.total));
+        let Some(question_type) = question_type_for_exercise(lesson, exercise_id) else {
+            continue;
+        };
+        let correct = score.correct_count();
+        let total = score.total_count();
+        let pct = score_percentage(u128::from(correct), u128::from(total));
         question_rows
-            .entry(score.question_type)
+            .entry(question_type)
             .or_default()
             .push(QuestionScoreRow {
-                question_label: question_label(lesson_id, exercise_id, content, i18n.language),
-                score_text: format!("{}/{} {} %", score.correct, score.total, pct),
+                question_label: question_label(&lesson.id, exercise_id, content, i18n.language),
+                score_text: format!("{correct}/{total} {pct} %"),
                 score_color: pct_color(pct),
-                lesson_id: lesson_id.to_owned(),
+                lesson_id: lesson.id.clone(),
                 exercise_id: exercise_id.clone(),
             });
     }
@@ -388,7 +409,7 @@ fn collect_lesson_type_rows(
                 type_label: question_type_label(question_type, i18n),
                 score_text: format!("{}/{} {} %", total.correct, total.total, pct),
                 score_color: pct_color(pct),
-                lesson_id: lesson_id.to_owned(),
+                lesson_id: lesson.id.clone(),
                 question_type,
                 question_rows: exercises,
             }
@@ -436,7 +457,7 @@ fn precompute_stats(
                 total_label: total_text.clone(),
                 total_score: format!("{lesson_correct}/{lesson_total} {lesson_pct} %"),
                 total_color: pct_color(lesson_pct),
-                type_rows: collect_lesson_type_rows(&lesson.id, lp, content, i18n),
+                type_rows: collect_lesson_type_rows(lesson, lp, content, i18n),
             });
         }
 
@@ -795,6 +816,7 @@ fn handle_reset_click(
 fn handle_confirm_reset(
     event: On<ConfirmationDialogActionEvent>,
     target_query: Query<&StatsResetRequest>,
+    content: Res<ContentLibrary>,
     session: Option<Res<PlayerSession>>,
     mut persistence: SaveDataMut<'_>,
 ) {
@@ -817,22 +839,33 @@ fn handle_confirm_reset(
         let Some(student) = class_save.students.get_mut(student_index) else {
             return;
         };
-        apply_stats_reset(&mut student.progress, &target);
+        apply_stats_reset(&mut student.progress, &target, &content);
     });
 }
 
-fn apply_stats_reset(progress: &mut HashMap<String, LessonProgress>, target: &StatsResetTarget) {
+fn apply_stats_reset(
+    progress: &mut HashMap<String, LessonProgress>,
+    target: &StatsResetTarget,
+    content: &ContentLibrary,
+) {
     match target {
         StatsResetTarget::All => progress.clear(),
         StatsResetTarget::Lesson(lesson_id) => {
             progress.remove(lesson_id);
         }
         StatsResetTarget::Type(lesson_id, question_type) => {
-            if let Some(lesson) = progress.get_mut(lesson_id) {
-                lesson
-                    .question_scores
-                    .retain(|_, score| score.question_type != *question_type);
-                if lesson.question_scores.is_empty() {
+            let content_lesson = content
+                .themes
+                .iter()
+                .flat_map(|theme| &theme.lessons)
+                .find(|lesson| lesson.id == *lesson_id);
+            if let (Some(progress_lesson), Some(content_lesson)) =
+                (progress.get_mut(lesson_id), content_lesson)
+            {
+                progress_lesson.question_scores.retain(|exercise_id, _| {
+                    question_type_for_exercise(content_lesson, exercise_id) != Some(*question_type)
+                });
+                if progress_lesson.question_scores.is_empty() {
                     progress.remove(lesson_id);
                 }
             }

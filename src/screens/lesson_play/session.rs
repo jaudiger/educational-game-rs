@@ -1,4 +1,5 @@
-use crate::data::content::QuestionType;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::data::{
     ActiveStudent, AnswerResult, GameMode, LessonSession, PersistenceAction, PersistenceMut,
     PlayerSession, SaveData, SelectedLesson,
@@ -44,10 +45,16 @@ pub(super) fn record_answer(
     ) {
         return;
     }
+    let Ok(answered_at) = SystemTime::now().duration_since(UNIX_EPOCH) else {
+        bevy::log::error!(
+            "Could not record answer because the system clock predates the UTC epoch"
+        );
+        persistence.status.fail(PersistenceAction::QuestionAnswer);
+        return;
+    };
 
     let lesson_id = lesson_id.to_owned();
     let exercise_id = question.exercise_id.clone();
-    let question_type = question.instance.question_type();
     let slot_index = player_session.slot_index;
     let is_correct = matches!(last_answer, AnswerResult::Correct);
 
@@ -62,12 +69,14 @@ pub(super) fn record_answer(
             target,
             &lesson_id,
             &exercise_id,
-            question_type,
             is_correct,
+            answered_at.as_secs(),
         )
     });
     if !recorded {
-        bevy::log::error!("Could not record answer because a persisted score counter overflowed");
+        bevy::log::error!(
+            "Could not record answer because the selected player slot is unavailable"
+        );
         persistence.status.fail(PersistenceAction::QuestionAnswer);
     }
 }
@@ -108,8 +117,8 @@ fn apply_answer(
     target: AnswerTarget,
     lesson_id: &str,
     exercise_id: &str,
-    question_type: QuestionType,
     is_correct: bool,
+    timestamp_unix_seconds: u64,
 ) -> bool {
     let progress = match target.mode {
         GameMode::Individual => {
@@ -139,5 +148,6 @@ fn apply_answer(
     progress
         .entry(lesson_id.to_owned())
         .or_default()
-        .record_answer(exercise_id, question_type, is_correct)
+        .record_answer(exercise_id, is_correct, timestamp_unix_seconds);
+    true
 }

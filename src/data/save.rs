@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use bevy::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::content::{ContentLibrary, QuestionType};
+use super::content::ContentLibrary;
 use super::progress::GameMode;
 
 /// Teacher-configured settings for a single lesson in a class slot.
@@ -59,9 +59,33 @@ impl<'de> Deserialize<'de> for LessonSessionConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct QuestionScore {
-    pub question_type: QuestionType,
-    pub correct: u64,
-    pub total: u64,
+    pub answer_history: Vec<AnswerEvent>,
+}
+
+impl QuestionScore {
+    /// Counts correct answers recorded in the history.
+    pub fn correct_count(&self) -> u64 {
+        u64::try_from(
+            self.answer_history
+                .iter()
+                .filter(|answer| answer.is_correct)
+                .count(),
+        )
+        .unwrap_or(u64::MAX)
+    }
+
+    /// Counts answers recorded in the history.
+    pub fn total_count(&self) -> u64 {
+        u64::try_from(self.answer_history.len()).unwrap_or(u64::MAX)
+    }
+}
+
+/// One persisted answer with its UTC Unix timestamp and correctness result.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnswerEvent {
+    pub timestamp_unix_seconds: u64,
+    pub is_correct: bool,
 }
 
 /// Cumulative lesson progress, broken down by stable exercise ID.
@@ -76,38 +100,26 @@ impl LessonProgress {
     pub fn record_answer(
         &mut self,
         exercise_id: &str,
-        question_type: QuestionType,
         is_correct: bool,
-    ) -> bool {
+        timestamp_unix_seconds: u64,
+    ) {
         let score = self
             .question_scores
             .entry(exercise_id.to_owned())
             .or_insert(QuestionScore {
-                question_type,
-                correct: 0,
-                total: 0,
+                answer_history: Vec::new(),
             });
-        let Some(total) = score.total.checked_add(1) else {
-            return false;
-        };
-        let correct = if is_correct {
-            let Some(correct) = score.correct.checked_add(1) else {
-                return false;
-            };
-            correct
-        } else {
-            score.correct
-        };
-        score.total = total;
-        score.correct = correct;
-        true
+        score.answer_history.push(AnswerEvent {
+            timestamp_unix_seconds,
+            is_correct,
+        });
     }
 
     /// Total correct answers across all persisted exercise scores.
     pub fn total_correct(&self) -> u128 {
         self.question_scores
             .values()
-            .map(|score| u128::from(score.correct))
+            .map(|score| u128::from(score.correct_count()))
             .fold(0, u128::saturating_add)
     }
 
@@ -115,20 +127,13 @@ impl LessonProgress {
     pub fn total_questions(&self) -> u128 {
         self.question_scores
             .values()
-            .map(|score| u128::from(score.total))
+            .map(|score| u128::from(score.total_count()))
             .fold(0, u128::saturating_add)
     }
 
     /// Overall percentage derived from all persisted exercise scores.
     pub fn percentage(&self) -> u32 {
         score_percentage(self.total_correct(), self.total_questions())
-    }
-
-    fn invalid_score_count(&self) -> usize {
-        self.question_scores
-            .values()
-            .filter(|score| score.total == 0 || score.correct > score.total)
-            .count()
     }
 }
 
@@ -194,28 +199,42 @@ pub struct SaveData {
 
 impl SaveData {
     pub(crate) fn validate_persisted(&self, content: &ContentLibrary) -> Result<(), String> {
-        let known_lesson_ids = content
+        let known_exercise_ids = content
             .themes
             .iter()
             .flat_map(|theme| &theme.lessons)
-            .map(|lesson| lesson.id.as_str())
-            .collect::<HashSet<_>>();
-        let mut invalid_count = 0_usize;
+            .map(|lesson| {
+                (
+                    lesson.id.as_str(),
+                    lesson
+                        .questions
+                        .iter()
+                        .map(|exercise| exercise.id.as_str())
+                        .collect::<HashSet<_>>(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let mut invalid_progress_count = 0_usize;
         let mut unknown_lesson_ids = BTreeSet::new();
+        let mut unknown_exercise_ids = BTreeSet::new();
         for save in self.individual_slots.iter().flatten() {
-            invalid_count = invalid_count.saturating_add(invalid_progress_count(
-                &save.progress,
-                &known_lesson_ids,
-                &mut unknown_lesson_ids,
-            ));
+            invalid_progress_count =
+                invalid_progress_count.saturating_add(invalid_progress_count_for_save(
+                    &save.progress,
+                    &known_exercise_ids,
+                    &mut unknown_lesson_ids,
+                    &mut unknown_exercise_ids,
+                ));
         }
         for save in self.class_slots.iter().flatten() {
             for student in &save.students {
-                invalid_count = invalid_count.saturating_add(invalid_progress_count(
-                    &student.progress,
-                    &known_lesson_ids,
-                    &mut unknown_lesson_ids,
-                ));
+                invalid_progress_count =
+                    invalid_progress_count.saturating_add(invalid_progress_count_for_save(
+                        &student.progress,
+                        &known_exercise_ids,
+                        &mut unknown_lesson_ids,
+                        &mut unknown_exercise_ids,
+                    ));
             }
         }
 
@@ -229,8 +248,19 @@ impl SaveData {
                     .join(", ")
             ));
         }
-        if invalid_count > 0 {
-            issues.push(format!("{invalid_count} invalid score records"));
+        if !unknown_exercise_ids.is_empty() {
+            issues.push(format!(
+                "progress references unknown exercise IDs: {}",
+                unknown_exercise_ids
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        if invalid_progress_count > 0 {
+            issues.push(format!(
+                "{invalid_progress_count} empty lesson progress records"
+            ));
         }
         if issues.is_empty() {
             Ok(())
@@ -240,20 +270,23 @@ impl SaveData {
     }
 }
 
-fn invalid_progress_count(
+fn invalid_progress_count_for_save(
     progress: &HashMap<String, LessonProgress>,
-    known_lesson_ids: &HashSet<&str>,
+    known_exercise_ids: &HashMap<&str, HashSet<&str>>,
     unknown_lesson_ids: &mut BTreeSet<String>,
+    unknown_exercise_ids: &mut BTreeSet<String>,
 ) -> usize {
     progress.iter().fold(0_usize, |count, (lesson_id, lesson)| {
-        if !known_lesson_ids.contains(lesson_id.as_str()) {
+        let Some(known_ids) = known_exercise_ids.get(lesson_id.as_str()) else {
             unknown_lesson_ids.insert(lesson_id.clone());
+            return count.saturating_add(usize::from(lesson.question_scores.is_empty()));
+        };
+        for exercise_id in lesson.question_scores.keys() {
+            if !known_ids.contains(exercise_id.as_str()) {
+                unknown_exercise_ids.insert(format!("{lesson_id}/{exercise_id}"));
+            }
         }
-        let invalid_scores = lesson.invalid_score_count();
-        let empty_progress = usize::from(lesson.question_scores.is_empty());
-        count
-            .saturating_add(invalid_scores)
-            .saturating_add(empty_progress)
+        count.saturating_add(usize::from(lesson.question_scores.is_empty()))
     })
 }
 
