@@ -59,7 +59,7 @@ pub fn build_session_with_selection(
     let mut rng = rand::rng();
     match selection {
         LessonLaunchSelection::CompleteLesson => plan_session(lesson, lesson_config, &mut rng),
-        selection @ LessonLaunchSelection::SingleQuestion { .. } => {
+        selection @ LessonLaunchSelection::SingleExercise { .. } => {
             plan_session_with_selection(lesson, selection, lesson_config, &mut rng)
         }
     }
@@ -88,8 +88,8 @@ pub fn plan_session_with_selection(
 ) -> Result<LessonSession, Vec<String>> {
     match selection {
         LessonLaunchSelection::CompleteLesson => plan_complete_session(lesson, lesson_config, rng),
-        LessonLaunchSelection::SingleQuestion { exercise_id } => {
-            plan_single_question(lesson, exercise_id, rng)
+        LessonLaunchSelection::SingleExercise { exercise_id } => {
+            plan_single_exercise(lesson, exercise_id, rng)
         }
     }
 }
@@ -137,7 +137,7 @@ fn plan_complete_session(
     })
 }
 
-fn plan_single_question(
+fn plan_single_exercise(
     lesson: &Lesson,
     exercise_id: &str,
     rng: &mut impl Rng,

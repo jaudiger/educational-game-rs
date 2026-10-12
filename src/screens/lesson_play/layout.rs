@@ -161,6 +161,8 @@ fn spawn_question_container(parent: &mut ChildSpawnerCommands) {
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             flex_grow: 1.0,
+            flex_basis: px(0.0),
+            min_height: px(0.0),
             width: percent(100.0),
             row_gap: theme::scaled(theme::spacing::LARGE),
             padding: theme::scaled(theme::spacing::LARGE).all(),

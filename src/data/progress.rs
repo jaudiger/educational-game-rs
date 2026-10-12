@@ -78,12 +78,12 @@ pub struct SelectedLesson(pub Option<String>);
 pub enum LessonLaunchSelection {
     #[default]
     CompleteLesson,
-    SingleQuestion {
+    SingleExercise {
         exercise_id: String,
     },
 }
 
-/// Runtime state for an active lesson: question list, index, and scores.
+/// Runtime state for an active lesson: exercise list, index, and scores.
 #[derive(Resource, Clone, Debug, Default, Reflect)]
 pub struct LessonSession {
     #[reflect(ignore)]

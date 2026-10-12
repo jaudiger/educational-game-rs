@@ -61,7 +61,7 @@ struct ThemeButton(String);
 #[derive(Clone, Copy, Reflect)]
 enum LessonLaunchAction {
     CompleteSeries,
-    ChooseQuestion,
+    ChooseExercise,
 }
 
 #[derive(Component, Reflect)]
@@ -189,7 +189,7 @@ const fn restored_exploration_view(
         return None;
     }
     Some(match launch_selection {
-        Some(LessonLaunchSelection::SingleQuestion { .. }) => ExplorationView::QuestionSelection,
+        Some(LessonLaunchSelection::SingleExercise { .. }) => ExplorationView::ExerciseSelection,
         Some(LessonLaunchSelection::CompleteLesson) | None => ExplorationView::ThemeLessons,
     })
 }
@@ -207,7 +207,7 @@ fn setup_themes(
     primary_window: Single<Entity, With<PrimaryWindow>>,
     existing_roots: Query<Entity, With<ExplorationScreenRoot>>,
 ) {
-    // Preserve the lesson grid or question list when returning from play.
+    // Preserve the lesson grid or exercise list when returning from play.
     if let Some(view) =
         restored_exploration_view(active_theme.is_some(), launch_selection.as_deref())
     {
@@ -619,7 +619,7 @@ fn build_lesson_button_data(
 
 struct LessonActionLabels {
     play_series: String,
-    choose_question: String,
+    choose_exercise: String,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -666,7 +666,7 @@ fn setup_theme_lessons(
 
     let action_labels = LessonActionLabels {
         play_series: i18n.t(&TranslationKey::PlaySeries).into_owned(),
-        choose_question: i18n.t(&TranslationKey::ChooseQuestion).into_owned(),
+        choose_exercise: i18n.t(&TranslationKey::ChooseExercise).into_owned(),
     };
 
     let lesson_buttons = build_lesson_button_data(theme_data, progress, &i18n);
@@ -675,7 +675,7 @@ fn setup_theme_lessons(
         screen_root(),
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
-        DespawnOnEnter(ExplorationView::QuestionSelection),
+        DespawnOnEnter(ExplorationView::ExerciseSelection),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             // Title
             let mut title_cmd = parent.spawn((
@@ -889,8 +889,8 @@ fn spawn_lesson_button(
                 spawn_lesson_action(
                     actions,
                     data,
-                    LessonLaunchAction::ChooseQuestion,
-                    &action_labels.choose_question,
+                    LessonLaunchAction::ChooseExercise,
+                    &action_labels.choose_exercise,
                     false,
                     window,
                 );
@@ -908,7 +908,7 @@ fn spawn_lesson_action(
 ) {
     let color = match action {
         LessonLaunchAction::CompleteSeries => theme::colors::PRIMARY,
-        LessonLaunchAction::ChooseQuestion => theme::colors::SECONDARY,
+        LessonLaunchAction::ChooseExercise => theme::colors::SECONDARY,
     };
     let mut button = parent.spawn((
         button_base(color),
@@ -964,8 +964,9 @@ fn handle_theme_lessons(
                         commands.insert_resource(LessonLaunchSelection::CompleteLesson);
                         next_app_state.set(AppState::LessonPlay);
                     }
-                    LessonLaunchAction::ChooseQuestion => {
-                        next_exploration_view.set(ExplorationView::QuestionSelection);
+                    LessonLaunchAction::ChooseExercise => {
+                        commands.insert_resource(LessonLaunchSelection::CompleteLesson);
+                        next_exploration_view.set(ExplorationView::ExerciseSelection);
                     }
                 }
             }

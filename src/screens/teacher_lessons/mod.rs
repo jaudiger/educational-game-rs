@@ -7,14 +7,14 @@ use bevy::prelude::*;
 use crate::data::{ContentLibrary, GameMode, PersistenceAction, PersistenceStatus};
 use crate::i18n::I18n;
 use crate::plugins::teacher::{
-    TeacherQuestionDraft, TeacherScreenParam, TeacherView, tab_header,
+    TeacherExerciseDraft, TeacherScreenParam, TeacherView, tab_header,
     teacher_lesson_config_view_active, teacher_lessons_tree_view_active, teacher_window_exists,
 };
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES, cleanup_root};
 use crate::ui::components::persistence_notice;
 use crate::ui::theme;
 
-/// Teacher lessons tab for configuring per-lesson question selection.
+/// Teacher lessons tab for configuring per-lesson exercise selection.
 pub struct TeacherLessonsScreenPlugin;
 
 impl Plugin for TeacherLessonsScreenPlugin {
@@ -44,7 +44,7 @@ impl Plugin for TeacherLessonsScreenPlugin {
                 config::handle_save_config,
                 config::handle_return_to_tree,
                 config::update_scroll_indicator,
-                config::update_question_labels,
+                config::update_exercise_labels,
                 config::update_config_hover_text,
             )
                 .run_if(in_state(AppState::ThemeExploration))
@@ -85,7 +85,7 @@ struct CountText;
 struct VisualToggleButton(String);
 
 #[derive(Component, Reflect)]
-struct QuestionRow(String);
+struct ExerciseRow(String);
 
 #[derive(Component, Reflect)]
 struct ScrollFrame;
@@ -97,7 +97,7 @@ struct ScrollContent;
 struct ScrollIndicator;
 
 #[derive(Component, Reflect)]
-struct QuestionLabel(String);
+struct ExerciseLabel(String);
 
 #[derive(Component, Reflect)]
 struct ConfigHoverText;
@@ -134,10 +134,10 @@ fn rebuild_lessons_ui(
     match &state.view {
         TeacherView::LessonConfig {
             lesson_title,
-            questions,
+            exercises,
             ..
         } => {
-            let questions = questions.clone();
+            let exercises = exercises.clone();
             let title = lesson_title.clone();
             let i18n_owned = I18n::new(ts.i18n.language);
             let write_notice = lesson_config_notice(*status, &ts.i18n, window);
@@ -159,7 +159,7 @@ fn rebuild_lessons_ui(
                         parent,
                         &i18n_owned,
                         &title,
-                        &questions,
+                        &exercises,
                         active_tab,
                         window,
                     );
@@ -214,6 +214,6 @@ fn lesson_config_notice(
     persistence_notice(PersistenceAction::TeacherLessonConfig, status, i18n, window)
 }
 
-pub(super) fn has_any_selected(questions: &[TeacherQuestionDraft]) -> bool {
-    questions.iter().any(|question| question.count > 0)
+pub(super) fn has_any_selected(exercises: &[TeacherExerciseDraft]) -> bool {
+    exercises.iter().any(|exercise| exercise.count > 0)
 }

@@ -17,6 +17,7 @@ pub enum TranslationKey {
     Cancel,
     ComingSoon,
     Create,
+    ExerciseCount(usize),
     Delete,
     NameLabel,
     Play,
@@ -40,7 +41,7 @@ pub enum TranslationKey {
     IncorrectAnswer,
     NextQuestion,
     QuestionProgress(usize, usize),
-    ReturnToQuestionList,
+    ReturnToExerciseList,
 
     // Lesson Summary
     SummaryEncouragement,
@@ -59,7 +60,7 @@ pub enum TranslationKey {
     BackToLessons,
     BackToThemes,
     BestPercent(u32),
-    ChooseQuestion,
+    ChooseExercise,
     PlaySeries,
     LessonsCompleted(usize, usize),
     Themes,
@@ -93,17 +94,17 @@ pub enum TranslationKey {
     // Teacher
     NoLessonsCompleted,
     NoStudentsYet,
-    QuestionTypeComparison,
-    QuestionTypeIdentification,
-    QuestionTypeMcq,
+    ExerciseTypeComparison,
+    ExerciseTypeIdentification,
+    ExerciseTypeMcq,
 
-    QuestionTypeNumericInput,
-    QuestionTypeVisualization,
+    ExerciseTypeNumericInput,
+    ExerciseTypeVisualization,
     RemoveStudentConfirm(String),
     ResetAllStatsConfirm,
     ResetConfig,
     ResetLessonStatsConfirm(String),
-    ResetQuestionStatsConfirm(String, String),
+    ResetExerciseStatsConfirm(String, String),
     ResetTypeStatsConfirm(String, String),
     SaveConfig,
     StudentStats(String),
@@ -156,7 +157,7 @@ impl TranslationKey {
                 LanguageEnglish            => "English",
                 LanguageFrench             => "Fran\u{00e7}ais",
                 Mode                       => "Mode",
-                QuestionTypeIdentification => "Identification",
+                ExerciseTypeIdentification => "Identification",
                 SfxVolumeLabel             => "Interface",
                 Total                      => "Total",
             ];
@@ -185,7 +186,7 @@ impl TranslationKey {
                 FinishLesson              => ("Terminer la le\u{00e7}on",                  "Finish lesson"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
                 NextQuestion              => ("Question suivante",                          "Next question"),
-                ReturnToQuestionList      => ("Retour a la liste des questions",            "Return to question list"),
+                ReturnToExerciseList      => ("Retour a la liste des exercices",           "Return to exercises"),
                 // Lesson Summary
                 SummaryEncouragement      => ("Continue, tu vas y arriver !",              "Keep going, you'll get there!"),
                 SummaryGood               => ("Bon travail !",                             "Good job!"),
@@ -198,8 +199,8 @@ impl TranslationKey {
                 // Theme Exploration
                 BackToLessons           => ("Retour aux le\u{00e7}ons",                      "Back to lessons"),
                 BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
-                ChooseQuestion          => ("Choisir une question",                      "Choose a question"),
-                PlaySeries              => ("Jouer une s\u{00e9}rie",                    "Play a series"),
+                ChooseExercise          => ("Choisir un exercice",                      "Choose an exercise"),
+                                PlaySeries              => ("Jouer une s\u{00e9}rie",                    "Play a series"),
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
                 // Save Slots
                 Empty                     => ("Vide",                                      "Empty"),
@@ -221,10 +222,10 @@ impl TranslationKey {
                 // Teacher
                 NoLessonsCompleted        => ("(aucune le\u{00e7}on termin\u{00e9}e)",     "(no lessons completed)"),
                 NoStudentsYet             => ("Aucun \u{00e9}l\u{00e8}ve pour l'instant",  "No students yet"),
-                QuestionTypeComparison    => ("Comparaison",                               "Comparison"),
-                QuestionTypeMcq           => ("QCM",                                       "MCQ"),
-                QuestionTypeNumericInput  => ("Saisie num\u{00e9}rique",                   "Numeric Input"),
-                QuestionTypeVisualization => ("Visualisation",                             "Visualization"),
+                ExerciseTypeComparison    => ("Comparaison",                               "Comparison"),
+                ExerciseTypeMcq           => ("QCM",                                       "MCQ"),
+                ExerciseTypeNumericInput  => ("Saisie num\u{00e9}rique",                   "Numeric Input"),
+                ExerciseTypeVisualization => ("Visualisation",                             "Visualization"),
                 ResetAllStatsConfirm      => ("R\u{00e9}initialiser toutes les stats ?",   "Reset all stats?"),
                 ResetConfig               => ("R\u{00e9}initialiser",                      "Reset"),
                 SaveConfig                => ("Sauvegarder",                               "Save"),
@@ -241,6 +242,12 @@ impl TranslationKey {
             Self::CharacterAte(name, n, d) => match language {
                 Language::French  => format!("{name} mange {n}/{d}").into(),
                 Language::English => format!("{name} eats {n}/{d}").into(),
+            },
+            Self::ExerciseCount(count) => match language {
+                Language::French if *count == 1 => format!("{count} exercice").into(),
+                Language::French => format!("{count} exercices").into(),
+                Language::English if *count == 1 => format!("{count} exercise").into(),
+                Language::English => format!("{count} exercises").into(),
             },
             Self::QuestionProgress(current, total) => match language {
                 Language::French  => format!("Question {current}/{total}").into(),
@@ -286,9 +293,9 @@ impl TranslationKey {
                 Language::French  => format!("R\u{00e9}initialiser les stats {qtype} pour {lesson} ?").into(),
                 Language::English => format!("Reset {qtype} stats for {lesson}?").into(),
             },
-            Self::ResetQuestionStatsConfirm(lesson, question) => match language {
-                Language::French  => format!("R\u{00e9}initialiser les stats {question} pour {lesson} ?").into(),
-                Language::English => format!("Reset {question} stats for {lesson}?").into(),
+            Self::ResetExerciseStatsConfirm(lesson, exercise) => match language {
+                Language::French  => format!("R\u{00e9}initialiser les stats {exercise} pour {lesson} ?").into(),
+                Language::English => format!("Reset {exercise} stats for {lesson}?").into(),
             },
             Self::StudentStats(name) => match language {
                 Language::French  => format!("{name} - Statistiques").into(),

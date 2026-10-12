@@ -47,7 +47,7 @@ pub(super) fn setup_feedback_ui(
     let default_selection = LessonLaunchSelection::CompleteLesson;
     let selection = launch_selection.as_deref().unwrap_or(&default_selection);
     let next_button_label = match selection {
-        LessonLaunchSelection::SingleQuestion { .. } => TranslationKey::ReturnToQuestionList,
+        LessonLaunchSelection::SingleExercise { .. } => TranslationKey::ReturnToExerciseList,
         LessonLaunchSelection::CompleteLesson if is_last => TranslationKey::FinishLesson,
         LessonLaunchSelection::CompleteLesson => TranslationKey::NextQuestion,
     };

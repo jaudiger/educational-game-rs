@@ -18,8 +18,8 @@ use questions::{
     NumericInputPlugin,
 };
 use screens::{
-    HomeScreenPlugin, LessonPlayScreenPlugin, LessonSummaryScreenPlugin,
-    QuestionSelectionScreenPlugin, SaveSlotsScreenPlugin, SettingsScreenPlugin,
+    ExerciseSelectionScreenPlugin, HomeScreenPlugin, LessonPlayScreenPlugin,
+    LessonSummaryScreenPlugin, SaveSlotsScreenPlugin, SettingsScreenPlugin,
     TeacherLessonsScreenPlugin, TeacherRosterScreenPlugin, TeacherStatsScreenPlugin,
     ThemeExplorationScreenPlugin,
 };
@@ -78,7 +78,7 @@ fn main() {
             HomeScreenPlugin,
             SaveSlotsScreenPlugin,
             ThemeExplorationScreenPlugin,
-            QuestionSelectionScreenPlugin,
+            ExerciseSelectionScreenPlugin,
             LessonPlayScreenPlugin,
             LessonSummaryScreenPlugin,
             SettingsScreenPlugin,

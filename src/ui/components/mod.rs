@@ -96,6 +96,32 @@ pub fn card_node(mut node: Node) -> (Node, BackgroundColor, BorderColor) {
     )
 }
 
+pub fn disclosure_chevron_transform(expanded: bool) -> UiTransform {
+    UiTransform::from_rotation(if expanded {
+        Rot2::degrees(90.0)
+    } else {
+        Rot2::IDENTITY
+    })
+}
+
+pub fn disclosure_chevron(expanded: bool, color: Color, window: Entity) -> impl Bundle + use<> {
+    (
+        Text::new(">"),
+        theme::typography::text(theme::fonts::BODY, window),
+        TextColor(color),
+        TextLayout::justify(Justify::Center),
+        Node {
+            width: theme::scaled(20.0),
+            height: theme::scaled(24.0),
+            flex_shrink: 0.0,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        disclosure_chevron_transform(expanded),
+    )
+}
+
 /// Keeps an operator with its following visual when the parent row wraps.
 pub fn operator_visual_group<B: Bundle>(
     operator: &'static str,

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
@@ -15,11 +15,12 @@ use crate::plugins::teacher::{
     TeacherScreenParam, TeacherView, TeacherViewOverlay, TeacherWindow, TeacherWindowParam,
     TeacherWindowState, tab_header, teacher_stats_view_active, teacher_window_exists,
 };
-use crate::screens::teacher_shared::question_type_label;
+use crate::screens::teacher_shared::exercise_type_label;
 use crate::states::{AppState, cleanup_root};
 use crate::ui::components::{
-    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, icon_button,
-    persistence_message, save_write_failure_notice, spawn_confirmation_modal, standard_button,
+    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base,
+    disclosure_chevron, disclosure_chevron_transform, icon_button, persistence_message,
+    save_write_failure_notice, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::theme;
 
@@ -28,22 +29,27 @@ pub struct TeacherStatsScreenPlugin;
 
 impl Plugin for TeacherStatsScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            rebuild_stats_ui
-                .run_if(in_state(AppState::ThemeExploration))
-                .run_if(teacher_window_exists),
-        )
-        .add_systems(
-            Update,
-            (handle_return_to_list, handle_reset_click)
-                .run_if(in_state(AppState::ThemeExploration))
-                .run_if(teacher_stats_view_active),
-        )
-        .add_systems(
-            OnExit(AppState::ThemeExploration),
-            cleanup_root::<TeacherStatsRoot>,
-        );
+        app.init_resource::<StatsDisclosureState>()
+            .add_systems(
+                Update,
+                rebuild_stats_ui
+                    .run_if(in_state(AppState::ThemeExploration))
+                    .run_if(teacher_window_exists),
+            )
+            .add_systems(
+                Update,
+                (
+                    handle_return_to_list,
+                    handle_reset_click,
+                    handle_stats_disclosure,
+                )
+                    .run_if(in_state(AppState::ThemeExploration))
+                    .run_if(teacher_stats_view_active),
+            )
+            .add_systems(
+                OnExit(AppState::ThemeExploration),
+                cleanup_root::<TeacherStatsRoot>,
+            );
     }
 }
 
@@ -52,6 +58,54 @@ pub struct TeacherStatsRoot;
 
 #[derive(Component, Reflect)]
 struct ReturnToListButton;
+
+#[derive(Component, Reflect)]
+struct TeacherStatsFrame;
+
+#[derive(Component, Clone, Reflect)]
+struct StatsDisclosureButton(StatsDisclosureTarget);
+
+#[derive(Component, Clone, Reflect)]
+struct StatsDisclosurePanel(StatsDisclosureTarget);
+
+#[derive(Component, Clone, Reflect)]
+struct StatsDisclosureChevron(StatsDisclosureTarget);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Reflect)]
+enum StatsDisclosureTarget {
+    Lesson(String),
+    Type(String, QuestionType),
+}
+
+#[derive(Resource, Default)]
+struct StatsDisclosureState {
+    expanded: HashSet<StatsDisclosureTarget>,
+}
+
+struct StatsDisclosureRowData {
+    target: StatsDisclosureTarget,
+    label: String,
+    score_text: String,
+    score_color: Color,
+    label_font_size: f32,
+    expanded: bool,
+    left_padding: Val,
+}
+
+impl StatsDisclosureState {
+    fn is_expanded(&self, target: &StatsDisclosureTarget) -> bool {
+        self.expanded.contains(target)
+    }
+
+    fn toggle(&mut self, target: StatsDisclosureTarget) -> bool {
+        if self.expanded.remove(&target) {
+            false
+        } else {
+            self.expanded.insert(target);
+            true
+        }
+    }
+}
 
 /// Marker for any stats reset button.
 #[derive(Component, Clone, Debug, Reflect)]
@@ -72,12 +126,14 @@ struct StatsResetRequest {
 enum StatsResetTarget {
     /// Reset all stats for the student.
     All,
+    /// Reset stats for a specific theme.
+    Theme(String),
     /// Reset stats for a specific lesson.
     Lesson(String),
-    /// Reset stats for a specific question type within a lesson.
+    /// Reset stats for a specific exercise type within a lesson.
     Type(String, QuestionType),
     /// Reset stats for one exercise within a lesson.
-    Question(String, String),
+    Exercise(String, String),
 }
 
 /// Builds the stats UI when its view or backing save data changes.
@@ -86,6 +142,8 @@ fn rebuild_stats_ui(
     ts: TeacherScreenParam<'_, '_>,
     content: Res<ContentLibrary>,
     existing_root: Query<Entity, With<TeacherStatsRoot>>,
+    existing_frame: Query<&ScrollPosition, With<TeacherStatsFrame>>,
+    mut disclosures: ResMut<StatsDisclosureState>,
     mut write_status: ResMut<PersistenceStatus>,
 ) {
     let Ok(state) = ts.teacher.state.single() else {
@@ -93,11 +151,15 @@ fn rebuild_stats_ui(
     };
     if state.is_changed() {
         write_status.clear_save_data();
+        disclosures.expanded.clear();
     }
     if !state.is_changed() && !ts.ctx.save_data.is_changed() && !write_status.is_changed() {
         return;
     }
 
+    let scroll_position = existing_frame
+        .single()
+        .map_or_else(|_| ScrollPosition::default(), Clone::clone);
     for entity in &existing_root {
         commands.entity(entity).despawn();
     }
@@ -124,7 +186,6 @@ fn rebuild_stats_ui(
         return;
     };
 
-    let has_any_progress = !student.progress.is_empty();
     let active_tab = state.view.tab();
 
     let tab = tab_header(&ts.i18n, active_tab, window);
@@ -134,7 +195,7 @@ fn rebuild_stats_ui(
         .into_owned();
     let no_lessons_text = ts.i18n.t(&TranslationKey::NoLessonsCompleted).into_owned();
     let return_text = ts.i18n.t(&TranslationKey::Back).into_owned();
-    let (stats_data, global_total) = precompute_stats(&student.progress, &content, &ts.i18n);
+    let stats_data = precompute_stats(&student.progress, &content, &ts.i18n, &disclosures);
 
     spawn_stats_root(
         &mut commands,
@@ -145,9 +206,8 @@ fn rebuild_stats_ui(
             title_text,
             no_lessons_text,
             return_text,
-            has_any_progress,
             stats_data,
-            global_total,
+            scroll_position,
             save_failure_notice: persistence_message(
                 PersistenceAction::TeacherStatsReset,
                 *write_status,
@@ -161,9 +221,8 @@ struct StatsViewData {
     title_text: String,
     no_lessons_text: String,
     return_text: String,
-    has_any_progress: bool,
     stats_data: Vec<ThemeStatsData>,
-    global_total: GlobalTotal,
+    scroll_position: ScrollPosition,
     save_failure_notice: Option<String>,
 }
 
@@ -199,19 +258,20 @@ fn spawn_stats_root(
                 Node {
                     flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
+                    flex_basis: px(0.0),
+                    min_height: px(0.0),
                     row_gap: theme::scaled(theme::spacing::MEDIUM),
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |content: &mut ChildSpawner| {
-                    if data.has_any_progress {
-                        spawn_stats_frame(content, data.stats_data, window);
-                        spawn_global_total(content, &data.global_total, window);
-                    } else {
+                    if data.stats_data.is_empty() {
                         content.spawn((
                             Text::new(data.no_lessons_text),
                             theme::typography::text(theme::fonts::BODY, window),
                             TextColor(theme::colors::TEXT_MUTED),
                         ));
+                    } else {
+                        spawn_stats_frame(content, data.stats_data, data.scroll_position, window);
                     }
                 })),
             ));
@@ -253,59 +313,94 @@ fn spawn_stats_title_row(parent: &mut ChildSpawner, title_text: &str, window: En
 
 /// Pre-computed data for a single exercise score row.
 #[derive(Clone)]
-struct QuestionScoreRow {
-    question_label: String,
+struct ExerciseScoreRow {
+    exercise_label: String,
     score_text: String,
     score_color: Color,
     lesson_id: String,
     exercise_id: String,
 }
 
-/// Temporary totals derived from persisted exercise scores.
-#[derive(Clone, Copy, Default)]
-struct DerivedTypeScore {
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+struct ScoreTotals {
     correct: u128,
     total: u128,
 }
 
-impl DerivedTypeScore {
-    fn percentage(self) -> u32 {
-        score_percentage(self.correct, self.total)
+impl ScoreTotals {
+    const fn add(&mut self, other: Self) {
+        self.correct = self.correct.saturating_add(other.correct);
+        self.total = self.total.saturating_add(other.total);
+    }
+
+    fn from_progress(progress: Option<&LessonProgress>) -> Self {
+        progress.map_or_else(Self::default, |progress| {
+            progress
+                .question_scores
+                .values()
+                .fold(Self::default(), |mut totals, score| {
+                    totals.correct = totals
+                        .correct
+                        .saturating_add(u128::from(score.correct_count()));
+                    totals.total = totals.total.saturating_add(u128::from(score.total_count()));
+                    totals
+                })
+        })
+    }
+
+    fn display(self) -> (String, Color) {
+        if self.total == 0 {
+            return (
+                format!("{}/{}", self.correct, self.total),
+                theme::colors::TEXT_MUTED,
+            );
+        }
+        let percentage = score_percentage(self.correct, self.total);
+        (
+            format!("{}/{} {} %", self.correct, self.total, percentage),
+            pct_color(percentage),
+        )
     }
 }
 
-/// Pre-computed data for a single question type score row.
+#[derive(Clone, Copy, Default)]
+struct DerivedTypeScore {
+    totals: ScoreTotals,
+}
+
+/// Pre-computed data for a single exercise type score row.
 #[derive(Clone)]
 struct TypeScoreRow {
     type_label: String,
     score_text: String,
     score_color: Color,
     lesson_id: String,
-    question_type: QuestionType,
-    question_rows: Vec<QuestionScoreRow>,
+    exercise_type: QuestionType,
+    details_expanded: bool,
+    exercise_rows: Vec<ExerciseScoreRow>,
 }
 
 /// Pre-computed data for a lesson section.
+#[derive(Clone)]
 struct LessonStatsData {
     lesson_name: String,
     lesson_id: String,
     total_label: String,
     total_score: String,
     total_color: Color,
+    details_expanded: bool,
     type_rows: Vec<TypeScoreRow>,
+    unclassified_rows: Vec<ExerciseScoreRow>,
 }
 
 /// Pre-computed data for a theme section.
 struct ThemeStatsData {
     theme_title: String,
+    theme_id: String,
+    total_label: String,
+    total_score: String,
+    total_color: Color,
     lessons: Vec<LessonStatsData>,
-}
-
-/// Pre-computed global total across all lessons.
-struct GlobalTotal {
-    label: String,
-    score: String,
-    score_color: Color,
 }
 
 const fn pct_color(pct: u32) -> Color {
@@ -318,34 +413,58 @@ const fn pct_color(pct: u32) -> Color {
     }
 }
 
-/// Derives the question category from each exercise in the current lesson.
+fn score_row(
+    lesson_id: &str,
+    exercise_id: &str,
+    score: Option<&crate::data::save::QuestionScore>,
+    content: &ContentLibrary,
+    language: Language,
+) -> ExerciseScoreRow {
+    let totals = score.map_or_else(ScoreTotals::default, |score| ScoreTotals {
+        correct: u128::from(score.correct_count()),
+        total: u128::from(score.total_count()),
+    });
+    let (score_text, score_color) = totals.display();
+    ExerciseScoreRow {
+        exercise_label: exercise_label(lesson_id, exercise_id, content, language),
+        score_text,
+        score_color,
+        lesson_id: lesson_id.to_owned(),
+        exercise_id: exercise_id.to_owned(),
+    }
+}
+
+/// Derives the exercise category from each catalog entry in the lesson.
 fn aggregate_type_scores(
     lesson: &Lesson,
-    progress: &LessonProgress,
+    progress: Option<&LessonProgress>,
 ) -> HashMap<QuestionType, DerivedTypeScore> {
     let mut totals: HashMap<QuestionType, DerivedTypeScore> = HashMap::new();
-    for (exercise_id, score) in &progress.question_scores {
-        let Some(question_type) = question_type_for_exercise(lesson, exercise_id) else {
-            continue;
-        };
-        let total = totals.entry(question_type).or_default();
-        total.correct = total
-            .correct
-            .saturating_add(u128::from(score.correct_count()));
-        total.total = total.total.saturating_add(u128::from(score.total_count()));
+    for exercise in &lesson.questions {
+        let exercise_type = exercise.definition.question_type();
+        let score = progress.and_then(|progress| progress.question_scores.get(&exercise.id));
+        let row_totals = score.map_or_else(ScoreTotals::default, |score| ScoreTotals {
+            correct: u128::from(score.correct_count()),
+            total: u128::from(score.total_count()),
+        });
+        totals
+            .entry(exercise_type)
+            .or_default()
+            .totals
+            .add(row_totals);
     }
     totals
 }
 
-fn question_type_for_exercise(lesson: &Lesson, exercise_id: &str) -> Option<QuestionType> {
+fn exercise_type_for_id(lesson: &Lesson, exercise_id: &str) -> Option<QuestionType> {
     lesson
         .questions
         .iter()
-        .find(|question| question.id == exercise_id)
-        .map(|question| question.definition.question_type())
+        .find(|exercise| exercise.id == exercise_id)
+        .map(|exercise| exercise.definition.question_type())
 }
 
-fn question_label(
+fn exercise_label(
     lesson_id: &str,
     exercise_id: &str,
     content: &ContentLibrary,
@@ -360,124 +479,141 @@ fn question_label(
             lesson
                 .questions
                 .iter()
-                .find(|question| question.id == exercise_id)
+                .find(|exercise| exercise.id == exercise_id)
         })
         .map_or_else(
             || exercise_id.to_owned(),
-            |question| question.definition.prompt_label(language),
+            |exercise| exercise.definition.prompt_label(language),
         )
 }
 
-/// Builds exercise rows grouped by question type, sorted by type and stable ID.
+fn lesson_label(lesson_id: &str, content: &ContentLibrary, i18n: &I18n) -> String {
+    content
+        .themes
+        .iter()
+        .flat_map(|theme| &theme.lessons)
+        .find(|lesson| lesson.id == lesson_id)
+        .map_or_else(
+            || lesson_id.to_owned(),
+            |lesson| i18n.t(&lesson.title_key).into_owned(),
+        )
+}
+
+/// Builds exercise rows grouped by type, including unanswered catalog entries.
 fn collect_lesson_type_rows(
     lesson: &Lesson,
-    progress: &LessonProgress,
+    progress: Option<&LessonProgress>,
     content: &ContentLibrary,
     i18n: &I18n,
-) -> Vec<TypeScoreRow> {
+) -> (Vec<TypeScoreRow>, Vec<ExerciseScoreRow>) {
     let totals = aggregate_type_scores(lesson, progress);
-    let mut question_rows: HashMap<QuestionType, Vec<QuestionScoreRow>> = HashMap::new();
-    for (exercise_id, score) in &progress.question_scores {
-        let Some(question_type) = question_type_for_exercise(lesson, exercise_id) else {
-            continue;
-        };
-        let correct = score.correct_count();
-        let total = score.total_count();
-        let pct = score_percentage(u128::from(correct), u128::from(total));
-        question_rows
-            .entry(question_type)
+    let mut exercise_rows: HashMap<QuestionType, Vec<ExerciseScoreRow>> = HashMap::new();
+    for exercise in &lesson.questions {
+        let exercise_type = exercise.definition.question_type();
+        let score = progress.and_then(|progress| progress.question_scores.get(&exercise.id));
+        exercise_rows
+            .entry(exercise_type)
             .or_default()
-            .push(QuestionScoreRow {
-                question_label: question_label(&lesson.id, exercise_id, content, i18n.language),
-                score_text: format!("{correct}/{total} {pct} %"),
-                score_color: pct_color(pct),
-                lesson_id: lesson.id.clone(),
-                exercise_id: exercise_id.clone(),
-            });
+            .push(score_row(
+                &lesson.id,
+                &exercise.id,
+                score,
+                content,
+                i18n.language,
+            ));
     }
 
+    let mut unclassified_rows = Vec::new();
+    if let Some(progress) = progress {
+        for (exercise_id, score) in &progress.question_scores {
+            if exercise_type_for_id(lesson, exercise_id).is_none() {
+                unclassified_rows.push(score_row(
+                    &lesson.id,
+                    exercise_id,
+                    Some(score),
+                    content,
+                    i18n.language,
+                ));
+            }
+        }
+    }
+    unclassified_rows.sort_by(|left, right| left.exercise_id.cmp(&right.exercise_id));
+
     let mut types: Vec<_> = totals.into_iter().collect();
-    types.sort_by_key(|(question_type, _)| format!("{question_type:?}"));
-    types
+    types.sort_by_key(|(exercise_type, _)| format!("{exercise_type:?}"));
+    let rows = types
         .into_iter()
-        .filter(|(_, total)| total.total > 0)
-        .map(|(question_type, total)| {
-            let pct = total.percentage();
-            let mut exercises = question_rows.remove(&question_type).unwrap_or_default();
+        .map(|(exercise_type, total)| {
+            let (score_text, score_color) = total.totals.display();
+            let mut exercises = exercise_rows.remove(&exercise_type).unwrap_or_default();
             exercises.sort_by(|left, right| left.exercise_id.cmp(&right.exercise_id));
             TypeScoreRow {
-                type_label: question_type_label(question_type, i18n),
-                score_text: format!("{}/{} {} %", total.correct, total.total, pct),
-                score_color: pct_color(pct),
+                type_label: exercise_type_label(exercise_type, i18n),
+                score_text,
+                score_color,
                 lesson_id: lesson.id.clone(),
-                question_type,
-                question_rows: exercises,
+                exercise_type,
+                details_expanded: false,
+                exercise_rows: exercises,
             }
         })
-        .collect()
+        .collect();
+    (rows, unclassified_rows)
 }
 
 fn precompute_stats(
     progress: &HashMap<String, LessonProgress>,
     content: &ContentLibrary,
     i18n: &I18n,
-) -> (Vec<ThemeStatsData>, GlobalTotal) {
+    disclosures: &StatsDisclosureState,
+) -> Vec<ThemeStatsData> {
     let total_text = i18n.t(&TranslationKey::Total).into_owned();
-    let mut result = Vec::new();
-    let mut grand_correct: u128 = 0;
-    let mut grand_total: u128 = 0;
-
-    for theme_data in &content.themes {
-        if !theme_data.available {
-            continue;
-        }
-        let has_data = theme_data
-            .lessons
-            .iter()
-            .any(|lesson| progress.contains_key(&lesson.id));
-        if !has_data {
-            continue;
-        }
-
-        let mut lessons = Vec::new();
-        for lesson in &theme_data.lessons {
-            let Some(lp) = progress.get(&lesson.id) else {
-                continue;
-            };
-
-            let lesson_correct = lp.total_correct();
-            let lesson_total = lp.total_questions();
-            let lesson_pct = lp.percentage();
-            grand_correct = grand_correct.saturating_add(lesson_correct);
-            grand_total = grand_total.saturating_add(lesson_total);
-
-            lessons.push(LessonStatsData {
-                lesson_name: i18n.t(&lesson.title_key).into_owned(),
-                lesson_id: lesson.id.clone(),
-                total_label: total_text.clone(),
-                total_score: format!("{lesson_correct}/{lesson_total} {lesson_pct} %"),
-                total_color: pct_color(lesson_pct),
-                type_rows: collect_lesson_type_rows(lesson, lp, content, i18n),
-            });
-        }
-
-        result.push(ThemeStatsData {
-            theme_title: i18n.t(&theme_data.title_key).into_owned(),
-            lessons,
-        });
-    }
-
-    let grand_pct = score_percentage(grand_correct, grand_total);
-    let global_total = GlobalTotal {
-        label: match i18n.language {
-            Language::French => format!("{total_text} score : "),
-            Language::English => format!("{total_text} score: "),
-        },
-        score: format!("{grand_correct}/{grand_total}"),
-        score_color: pct_color(grand_pct),
-    };
-
-    (result, global_total)
+    let total_label = format!("{total_text}: ");
+    content
+        .themes
+        .iter()
+        .filter(|theme| theme.available)
+        .map(|theme_data| {
+            let mut theme_totals = ScoreTotals::default();
+            let lessons = theme_data
+                .lessons
+                .iter()
+                .map(|lesson| {
+                    let lesson_progress = progress.get(&lesson.id);
+                    let lesson_totals = ScoreTotals::from_progress(lesson_progress);
+                    theme_totals.add(lesson_totals);
+                    let (total_score, total_color) = lesson_totals.display();
+                    let (mut type_rows, unclassified_rows) =
+                        collect_lesson_type_rows(lesson, lesson_progress, content, i18n);
+                    for type_row in &mut type_rows {
+                        type_row.details_expanded = disclosures.is_expanded(
+                            &StatsDisclosureTarget::Type(lesson.id.clone(), type_row.exercise_type),
+                        );
+                    }
+                    LessonStatsData {
+                        lesson_name: i18n.t(&lesson.title_key).into_owned(),
+                        lesson_id: lesson.id.clone(),
+                        total_label: total_label.clone(),
+                        total_score,
+                        total_color,
+                        details_expanded: disclosures
+                            .is_expanded(&StatsDisclosureTarget::Lesson(lesson.id.clone())),
+                        type_rows,
+                        unclassified_rows,
+                    }
+                })
+                .collect();
+            let (total_score, total_color) = theme_totals.display();
+            ThemeStatsData {
+                theme_title: i18n.t(&theme_data.title_key).into_owned(),
+                theme_id: theme_data.id.clone(),
+                total_label: total_label.clone(),
+                total_score,
+                total_color,
+                lessons,
+            }
+        })
+        .collect()
 }
 
 /// Small "X" button used for reset actions, same style as the student remove button.
@@ -493,14 +629,24 @@ fn reset_icon_button(window: Entity) -> impl Bundle {
     )
 }
 
-fn spawn_stats_frame(parent: &mut ChildSpawner, data: Vec<ThemeStatsData>, window: Entity) {
+fn spawn_stats_frame(
+    parent: &mut ChildSpawner,
+    data: Vec<ThemeStatsData>,
+    scroll_position: ScrollPosition,
+    window: Entity,
+) {
     // Scrollable rounded frame (same style as lesson config view)
     parent.spawn((
         ScrollArea,
+        TeacherStatsFrame,
+        scroll_position,
         Node {
             flex_direction: FlexDirection::Column,
             row_gap: theme::scaled(theme::spacing::MEDIUM),
+            width: percent(100.0),
             flex_grow: 1.0,
+            flex_basis: px(0.0),
+            min_height: px(0.0),
             padding: theme::scaled(theme::spacing::MEDIUM).all(),
             border: UiRect::all(px(1.0)),
             border_radius: BorderRadius::all(theme::scaled(8.0)),
@@ -510,23 +656,64 @@ fn spawn_stats_frame(parent: &mut ChildSpawner, data: Vec<ThemeStatsData>, windo
         BackgroundColor(theme::colors::CARD_BG),
         BorderColor::all(theme::colors::TEXT_MUTED),
         Children::spawn(SpawnWith(move |list: &mut ChildSpawner| {
-            for theme_section in &data {
-                // Theme header (bold)
-                list.spawn((
-                    Text::new(theme_section.theme_title.clone()),
-                    theme::typography::text(theme::fonts::BODY, window),
-                    TextColor(theme::colors::TEXT_DARK),
-                ));
-
-                for lesson in &theme_section.lessons {
-                    spawn_lesson_section(list, lesson, window);
-                }
-            }
+            list.spawn((
+                Node {
+                    width: percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    flex_shrink: 0.0,
+                    row_gap: theme::scaled(theme::spacing::MEDIUM),
+                    ..default()
+                },
+                Children::spawn(SpawnWith(move |content: &mut ChildSpawner| {
+                    for theme_section in &data {
+                        spawn_theme_header(content, theme_section, window);
+                        for lesson in &theme_section.lessons {
+                            spawn_lesson_section(content, lesson, window);
+                        }
+                    }
+                })),
+            ));
         })),
     ));
 }
 
+fn spawn_theme_header(parent: &mut ChildSpawner, theme_data: &ThemeStatsData, window: Entity) {
+    parent.spawn((
+        Node {
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::SpaceBetween,
+            align_items: AlignItems::Center,
+            column_gap: theme::scaled(theme::spacing::SMALL),
+            ..default()
+        },
+        children![
+            (
+                Text::new(theme_data.theme_title.clone()),
+                theme::typography::text(theme::fonts::BODY, window),
+                TextColor(theme::colors::TEXT_DARK),
+                Node {
+                    flex_grow: 1.0,
+                    ..default()
+                },
+            ),
+            (
+                Text::new(format!(
+                    "{}{}",
+                    theme_data.total_label, theme_data.total_score
+                )),
+                theme::typography::text(theme::fonts::SMALL, window),
+                TextColor(theme_data.total_color),
+            ),
+            (
+                reset_icon_button(window),
+                StatsResetButton(StatsResetTarget::Theme(theme_data.theme_id.clone())),
+            ),
+        ],
+    ));
+}
+
 fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, window: Entity) {
+    let lesson = lesson.clone();
     parent.spawn((
         Node {
             flex_direction: FlexDirection::Column,
@@ -534,105 +721,77 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
             padding: theme::scaled(theme::spacing::SMALL).left(),
             ..default()
         },
-        Children::spawn(SpawnWith({
-            let lesson_name = lesson.lesson_name.clone();
-            let lesson_id = lesson.lesson_id.clone();
-            let total_label = lesson.total_label.clone();
-            let total_score = lesson.total_score.clone();
-            let total_color = lesson.total_color;
-            let type_rows_data = lesson.type_rows.clone();
-            move |section: &mut ChildSpawner| {
-                spawn_lesson_header(section, &lesson_name, &lesson_id, window);
-
-                for type_row in &type_rows_data {
-                    spawn_type_row(section, type_row, window);
-                }
-                spawn_lesson_total(section, &total_label, &total_score, total_color, window);
-            }
+        Children::spawn(SpawnWith(move |section: &mut ChildSpawner| {
+            spawn_lesson_header(section, &lesson, window);
+            let details_target = StatsDisclosureTarget::Lesson(lesson.lesson_id.clone());
+            let details_expanded = lesson.details_expanded;
+            let type_rows = lesson.type_rows.clone();
+            let unclassified_rows = lesson.unclassified_rows.clone();
+            section.spawn((
+                StatsDisclosurePanel(details_target),
+                Node {
+                    display: disclosure_display(details_expanded),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: theme::scaled(theme::spacing::SMALL),
+                    ..default()
+                },
+                Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
+                    for type_row in &type_rows {
+                        spawn_type_row(details, type_row, window);
+                    }
+                    for exercise_row in &unclassified_rows {
+                        spawn_exercise_row(details, exercise_row, window);
+                    }
+                })),
+            ));
         })),
     ));
 }
 
-fn spawn_lesson_header(
-    parent: &mut ChildSpawner,
-    lesson_name: &str,
-    lesson_id: &str,
-    window: Entity,
-) {
-    let lesson_name = lesson_name.to_owned();
-    let lesson_id = lesson_id.to_owned();
+fn spawn_lesson_header(parent: &mut ChildSpawner, lesson: &LessonStatsData, window: Entity) {
+    let lesson_id = lesson.lesson_id.clone();
+    let row_data = StatsDisclosureRowData {
+        target: StatsDisclosureTarget::Lesson(lesson_id.clone()),
+        label: lesson.lesson_name.clone(),
+        score_text: format!("{}{}", lesson.total_label, lesson.total_score),
+        score_color: lesson.total_color,
+        label_font_size: theme::fonts::BODY,
+        expanded: lesson.details_expanded,
+        left_padding: theme::scaled(theme::spacing::SMALL),
+    };
     parent.spawn((
         Node {
             flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::SpaceBetween,
             align_items: AlignItems::Center,
+            column_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
         },
-        children![
-            (
-                Text::new(lesson_name),
-                theme::typography::text(theme::fonts::BODY, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ),
-            (
+        Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
+            row.spawn(stats_disclosure_button(row_data, window));
+            row.spawn((
                 reset_icon_button(window),
                 StatsResetButton(StatsResetTarget::Lesson(lesson_id)),
-            ),
-        ],
+            ));
+        })),
     ));
-}
-
-fn spawn_lesson_total(
-    parent: &mut ChildSpawner,
-    label: &str,
-    score: &str,
-    color: Color,
-    window: Entity,
-) {
-    parent.spawn((
-        Node {
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::Center,
-            padding: theme::scaled(theme::spacing::MEDIUM).left(),
-            ..default()
-        },
-        children![
-            (
-                Text::new(label.to_owned()),
-                theme::typography::text(theme::fonts::SMALL, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ),
-            (
-                Text::new(score.to_owned()),
-                theme::typography::text(theme::fonts::SMALL, window),
-                TextColor(color),
-            ),
-        ],
-    ));
-}
-
-fn spawn_global_total(parent: &mut ChildSpawner, total: &GlobalTotal, window: Entity) {
-    parent
-        .spawn((
-            Text::new(total.label.clone()),
-            theme::typography::text(theme::fonts::BODY, window),
-            TextColor(theme::colors::TEXT_DARK),
-        ))
-        .with_child((
-            TextSpan::new(total.score.clone()),
-            theme::typography::text(theme::fonts::BODY, window),
-            TextColor(total.score_color),
-        ));
 }
 
 fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: Entity) {
-    let type_label = type_row.type_label.clone();
-    let score_text = type_row.score_text.clone();
-    let score_color = type_row.score_color;
     let lesson_id = type_row.lesson_id.clone();
-    let question_type = type_row.question_type;
-    let question_rows = type_row.question_rows.clone();
+    let exercise_type = type_row.exercise_type;
+    let target = StatsDisclosureTarget::Type(lesson_id.clone(), exercise_type);
+    let panel_target = target.clone();
+    let row_data = StatsDisclosureRowData {
+        target,
+        label: type_row.type_label.clone(),
+        score_text: type_row.score_text.clone(),
+        score_color: type_row.score_color,
+        label_font_size: theme::fonts::SMALL,
+        expanded: type_row.details_expanded,
+        left_padding: theme::scaled(theme::spacing::MEDIUM),
+    };
+    let details_expanded = type_row.details_expanded;
+    let exercise_rows = type_row.exercise_rows.clone();
 
     parent.spawn((
         Node {
@@ -644,58 +803,123 @@ fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: En
             group.spawn((
                 Node {
                     flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::SpaceBetween,
                     align_items: AlignItems::Center,
-                    padding: theme::scaled(theme::spacing::MEDIUM).left(),
+                    column_gap: theme::scaled(theme::spacing::SMALL),
                     ..default()
                 },
-                children![
-                    (
-                        Text::new(type_label),
-                        theme::typography::text(theme::fonts::SMALL, window),
-                        TextColor(theme::colors::TEXT_DARK),
-                        Node {
-                            flex_grow: 1.0,
-                            ..default()
-                        },
-                    ),
-                    (
-                        Text::new(score_text),
-                        theme::typography::text(theme::fonts::SMALL, window),
-                        TextColor(score_color),
-                        Node {
-                            margin: UiRect::right(theme::scaled(theme::spacing::MEDIUM)),
-                            ..default()
-                        },
-                    ),
-                    (
+                Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
+                    row.spawn(stats_disclosure_button(row_data, window));
+                    row.spawn((
                         reset_icon_button(window),
-                        StatsResetButton(StatsResetTarget::Type(lesson_id, question_type)),
-                    ),
-                ],
+                        StatsResetButton(StatsResetTarget::Type(lesson_id, exercise_type)),
+                    ));
+                })),
             ));
-            for question_row in &question_rows {
-                spawn_question_row(group, question_row, window);
-            }
+            group.spawn((
+                StatsDisclosurePanel(panel_target),
+                Node {
+                    display: disclosure_display(details_expanded),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: theme::scaled(theme::spacing::SMALL),
+                    ..default()
+                },
+                Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
+                    for exercise_row in &exercise_rows {
+                        spawn_exercise_row(details, exercise_row, window);
+                    }
+                })),
+            ));
         })),
     ));
 }
 
-fn spawn_question_row(parent: &mut ChildSpawner, question_row: &QuestionScoreRow, window: Entity) {
+fn stats_disclosure_button(data: StatsDisclosureRowData, window: Entity) -> impl Bundle + use<> {
+    let chevron_target = data.target.clone();
+    (
+        button_base(Color::NONE),
+        StatsDisclosureButton(data.target),
+        Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: theme::scaled(theme::spacing::SMALL),
+            flex_grow: 1.0,
+            min_width: px(0.0),
+            padding: UiRect::left(data.left_padding),
+            ..default()
+        },
+        Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
+            row.spawn((
+                disclosure_chevron(data.expanded, theme::colors::TEXT_DARK, window),
+                StatsDisclosureChevron(chevron_target),
+            ));
+            row.spawn((
+                Text::new(data.label),
+                theme::typography::text(data.label_font_size, window),
+                TextColor(theme::colors::TEXT_DARK),
+                Node {
+                    flex_grow: 1.0,
+                    min_width: px(0.0),
+                    ..default()
+                },
+            ));
+            row.spawn((
+                Text::new(data.score_text),
+                theme::typography::text(theme::fonts::SMALL, window),
+                TextColor(data.score_color),
+            ));
+        })),
+    )
+}
+
+const fn disclosure_display(expanded: bool) -> Display {
+    if expanded {
+        Display::Flex
+    } else {
+        Display::None
+    }
+}
+
+fn handle_stats_disclosure(
+    mut activations: MessageReader<ButtonActivated>,
+    buttons: Query<&StatsDisclosureButton>,
+    mut panels: Query<(&StatsDisclosurePanel, &mut Node)>,
+    mut chevrons: Query<(&StatsDisclosureChevron, &mut UiTransform)>,
+    mut disclosures: ResMut<StatsDisclosureState>,
+) {
+    for event in activations.read() {
+        let Ok(button) = buttons.get(event.0) else {
+            continue;
+        };
+        let target = button.0.clone();
+        let expanded = disclosures.toggle(target.clone());
+        for (panel, mut node) in &mut panels {
+            if panel.0 == target {
+                node.display = disclosure_display(expanded);
+            }
+        }
+        for (chevron, mut transform) in &mut chevrons {
+            if chevron.0 == target {
+                *transform = disclosure_chevron_transform(expanded);
+            }
+        }
+    }
+}
+
+fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow, window: Entity) {
     parent.spawn((
         Node {
             flex_direction: FlexDirection::Row,
             justify_content: JustifyContent::SpaceBetween,
             align_items: AlignItems::Center,
-            padding: theme::scaled(theme::spacing::MEDIUM).left(),
+            padding: theme::scaled(theme::spacing::LARGE).left(),
             ..default()
         },
         Children::spawn(SpawnWith({
-            let label = question_row.question_label.clone();
-            let score = question_row.score_text.clone();
-            let color = question_row.score_color;
-            let lesson_id = question_row.lesson_id.clone();
-            let exercise_id = question_row.exercise_id.clone();
+            let label = exercise_row.exercise_label.clone();
+            let score = exercise_row.score_text.clone();
+            let color = exercise_row.score_color;
+            let lesson_id = exercise_row.lesson_id.clone();
+            let exercise_id = exercise_row.exercise_id.clone();
             move |row: &mut ChildSpawner| {
                 row.spawn((
                     Text::new(label),
@@ -717,7 +941,7 @@ fn spawn_question_row(parent: &mut ChildSpawner, question_row: &QuestionScoreRow
                 ));
                 row.spawn((
                     reset_icon_button(window),
-                    StatsResetButton(StatsResetTarget::Question(lesson_id, exercise_id)),
+                    StatsResetButton(StatsResetTarget::Exercise(lesson_id, exercise_id)),
                 ));
             }
         })),
@@ -772,19 +996,33 @@ fn handle_reset_click(
 
         let confirm_message = match &reset_btn.0 {
             StatsResetTarget::All => i18n.t(&TranslationKey::ResetAllStatsConfirm).into_owned(),
-            StatsResetTarget::Lesson(lid) => i18n
-                .t(&TranslationKey::ResetLessonStatsConfirm(lid.clone()))
+            StatsResetTarget::Theme(theme_id) => {
+                let title = content
+                    .themes
+                    .iter()
+                    .find(|theme| theme.id == *theme_id)
+                    .map_or_else(
+                        || theme_id.clone(),
+                        |theme| i18n.t(&theme.title_key).into_owned(),
+                    );
+                i18n.t(&TranslationKey::ResetLessonStatsConfirm(title))
+                    .into_owned()
+            }
+            StatsResetTarget::Lesson(lesson_id) => i18n
+                .t(&TranslationKey::ResetLessonStatsConfirm(lesson_label(
+                    lesson_id, &content, &i18n,
+                )))
                 .into_owned(),
-            StatsResetTarget::Type(lid, qt) => i18n
+            StatsResetTarget::Type(lesson_id, exercise_type) => i18n
                 .t(&TranslationKey::ResetTypeStatsConfirm(
-                    lid.clone(),
-                    question_type_label(*qt, &i18n),
+                    lesson_label(lesson_id, &content, &i18n),
+                    exercise_type_label(*exercise_type, &i18n),
                 ))
                 .into_owned(),
-            StatsResetTarget::Question(lid, exercise_id) => i18n
-                .t(&TranslationKey::ResetQuestionStatsConfirm(
-                    lid.clone(),
-                    question_label(lid, exercise_id, &content, i18n.language),
+            StatsResetTarget::Exercise(lesson_id, exercise_id) => i18n
+                .t(&TranslationKey::ResetExerciseStatsConfirm(
+                    lesson_label(lesson_id, &content, &i18n),
+                    exercise_label(lesson_id, exercise_id, &content, i18n.language),
                 ))
                 .into_owned(),
         };
@@ -850,10 +1088,17 @@ fn apply_stats_reset(
 ) {
     match target {
         StatsResetTarget::All => progress.clear(),
+        StatsResetTarget::Theme(theme_id) => {
+            if let Some(theme) = content.themes.iter().find(|theme| theme.id == *theme_id) {
+                for lesson in &theme.lessons {
+                    progress.remove(&lesson.id);
+                }
+            }
+        }
         StatsResetTarget::Lesson(lesson_id) => {
             progress.remove(lesson_id);
         }
-        StatsResetTarget::Type(lesson_id, question_type) => {
+        StatsResetTarget::Type(lesson_id, exercise_type) => {
             let content_lesson = content
                 .themes
                 .iter()
@@ -863,14 +1108,14 @@ fn apply_stats_reset(
                 (progress.get_mut(lesson_id), content_lesson)
             {
                 progress_lesson.question_scores.retain(|exercise_id, _| {
-                    question_type_for_exercise(content_lesson, exercise_id) != Some(*question_type)
+                    exercise_type_for_id(content_lesson, exercise_id) != Some(*exercise_type)
                 });
                 if progress_lesson.question_scores.is_empty() {
                     progress.remove(lesson_id);
                 }
             }
         }
-        StatsResetTarget::Question(lesson_id, exercise_id) => {
+        StatsResetTarget::Exercise(lesson_id, exercise_id) => {
             if let Some(lesson) = progress.get_mut(lesson_id) {
                 lesson.question_scores.remove(exercise_id);
                 if lesson.question_scores.is_empty() {

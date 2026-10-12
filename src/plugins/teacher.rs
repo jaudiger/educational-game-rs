@@ -60,7 +60,7 @@ pub enum TeacherView {
     LessonConfig {
         lesson_id: String,
         lesson_title: String,
-        questions: Vec<TeacherQuestionDraft>,
+        exercises: Vec<TeacherExerciseDraft>,
     },
 }
 
@@ -85,9 +85,9 @@ impl TeacherView {
 }
 
 #[derive(Clone, Debug)]
-pub struct TeacherQuestionDraft {
+pub struct TeacherExerciseDraft {
     pub id: String,
-    pub question_type: QuestionType,
+    pub exercise_type: QuestionType,
     pub full_prompt: String,
     pub count: usize,
     pub has_visual: bool,

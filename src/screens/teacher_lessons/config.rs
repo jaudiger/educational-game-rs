@@ -10,15 +10,15 @@ use crate::data::{
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::teacher::{
-    TeacherQuestionDraft, TeacherTab, TeacherView, TeacherWindow, TeacherWindowState, tab_header,
+    TeacherExerciseDraft, TeacherTab, TeacherView, TeacherWindow, TeacherWindowState, tab_header,
 };
-use crate::screens::teacher_shared::question_type_label;
+use crate::screens::teacher_shared::exercise_type_label;
 use crate::ui::components::ButtonActivated;
 use crate::ui::components::{button_base, icon_button, standard_button};
 use crate::ui::theme;
 
 use super::{
-    ConfigHoverText, ConfigLessonButton, CountButton, CountText, QuestionLabel, QuestionRow,
+    ConfigHoverText, ConfigLessonButton, CountButton, CountText, ExerciseLabel, ExerciseRow,
     ResetConfigButton, ReturnToTreeButton, SaveConfigButton, ScrollContent, ScrollFrame,
     ScrollIndicator, VisualToggleButton, has_any_selected,
 };
@@ -27,7 +27,7 @@ pub(super) fn spawn_config_view(
     parent: &mut ChildSpawner,
     i18n: &I18n,
     lesson_title: &str,
-    draft: &[TeacherQuestionDraft],
+    draft: &[TeacherExerciseDraft],
     active_tab: TeacherTab,
     window: Entity,
 ) {
@@ -38,9 +38,9 @@ pub(super) fn spawn_config_view(
         &i18n.t(&TranslationKey::ResetConfig),
         window,
     );
-    spawn_question_counter_section(parent, i18n, draft, window);
+    spawn_exercise_counter_section(parent, i18n, draft, window);
 
-    // Hover detail text: shows the full prompt of the hovered question row.
+    // Hover detail text: shows the full prompt of the hovered exercise row.
     // Lives outside the scroll frame to avoid layout-shift flicker.
     parent.spawn((
         Text::default(),
@@ -107,14 +107,14 @@ fn spawn_config_header(
     ));
 }
 
-fn spawn_question_counter_section(
+fn spawn_exercise_counter_section(
     parent: &mut ChildSpawner,
     i18n: &I18n,
-    draft: &[TeacherQuestionDraft],
+    draft: &[TeacherExerciseDraft],
     window: Entity,
 ) {
     let i18n_owned = I18n::new(i18n.language);
-    let questions = draft.to_vec();
+    let exercises = draft.to_vec();
 
     parent.spawn((
         ScrollArea,
@@ -142,16 +142,16 @@ fn spawn_question_counter_section(
                     ScrollContent,
                 ))
                 .with_children(|col| {
-                    let mut questions_by_type =
-                        HashMap::<QuestionType, Vec<&TeacherQuestionDraft>>::new();
-                    for question in &questions {
-                        questions_by_type
-                            .entry(question.question_type)
+                    let mut exercises_by_type =
+                        HashMap::<QuestionType, Vec<&TeacherExerciseDraft>>::new();
+                    for exercise in &exercises {
+                        exercises_by_type
+                            .entry(exercise.exercise_type)
                             .or_default()
-                            .push(question);
+                            .push(exercise);
                     }
-                    let mut question_groups = questions_by_type.into_iter().collect::<Vec<_>>();
-                    question_groups.sort_by_key(|(question_type, _)| match question_type {
+                    let mut exercise_groups = exercises_by_type.into_iter().collect::<Vec<_>>();
+                    exercise_groups.sort_by_key(|(exercise_type, _)| match exercise_type {
                         QuestionType::Mcq => 0,
                         QuestionType::Visualization => 1,
                         QuestionType::Comparison => 2,
@@ -159,9 +159,9 @@ fn spawn_question_counter_section(
                         QuestionType::NumericInput => 4,
                     });
 
-                    for (qt, questions_of_type) in question_groups {
+                    for (exercise_type, exercises_of_type) in exercise_groups {
                         col.spawn((
-                            Text::new(question_type_label(qt, &i18n_owned)),
+                            Text::new(exercise_type_label(exercise_type, &i18n_owned)),
                             theme::typography::text(theme::fonts::BODY, window),
                             TextColor(theme::colors::TEXT_DARK),
                             Node {
@@ -170,8 +170,8 @@ fn spawn_question_counter_section(
                             },
                         ));
 
-                        for q in questions_of_type {
-                            spawn_question_counter_row(col, q, window);
+                        for exercise in exercises_of_type {
+                            spawn_exercise_counter_row(col, exercise, window);
                         }
                     }
                 });
@@ -194,12 +194,16 @@ fn spawn_question_counter_section(
     ));
 }
 
-fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &TeacherQuestionDraft, window: Entity) {
-    let full_prompt = q.full_prompt.clone();
-    let count_str = q.count.to_string();
-    let id = q.id.clone();
-    let has_visual = q.has_visual;
-    let show_visual = q.show_visual;
+fn spawn_exercise_counter_row(
+    parent: &mut ChildSpawner,
+    exercise: &TeacherExerciseDraft,
+    window: Entity,
+) {
+    let full_prompt = exercise.full_prompt.clone();
+    let count_str = exercise.count.to_string();
+    let id = exercise.id.clone();
+    let has_visual = exercise.has_visual;
+    let show_visual = exercise.show_visual;
     parent
         .spawn((
             Node {
@@ -212,10 +216,10 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &TeacherQuestionDraf
                 ..default()
             },
             Hovered::default(),
-            QuestionRow(full_prompt.clone()),
+            ExerciseRow(full_prompt.clone()),
         ))
         .with_children(|row| {
-            // Label: dynamically truncated by update_question_labels
+            // Label: dynamically truncated by update_exercise_labels
             row.spawn((
                 Text::new(format!("\u{2022} {full_prompt}")),
                 theme::typography::text(theme::fonts::BODY, window),
@@ -226,7 +230,7 @@ fn spawn_question_counter_row(parent: &mut ChildSpawner, q: &TeacherQuestionDraf
                     overflow: Overflow::clip(),
                     ..default()
                 },
-                QuestionLabel(full_prompt),
+                ExerciseLabel(full_prompt),
             ));
 
             // Controls: [visual toggle]  [-] count [+]
@@ -251,7 +255,7 @@ fn spawn_counter_controls(
         ..default()
     })
     .with_children(|controls| {
-        // Visual toggle button (only shown if the question has an optional visual)
+        // Visual toggle button (only shown if the exercise has an optional visual)
         // Wrapper node adds right margin to separate from the counter group.
         if has_visual {
             let toggle_bg = if show_visual {
@@ -317,7 +321,7 @@ fn spawn_counter_controls(
 fn spawn_button_row(
     parent: &mut ChildSpawner,
     i18n: &I18n,
-    draft: &[TeacherQuestionDraft],
+    draft: &[TeacherExerciseDraft],
     window: Entity,
 ) {
     let can_save = has_any_selected(draft);
@@ -373,28 +377,30 @@ fn counter_button(label: &str, bg: Color, window: Entity) -> impl Bundle {
     )
 }
 
-pub(super) fn build_draft_questions(
+pub(super) fn build_draft_exercises(
     lesson: &Lesson,
     language: Language,
     existing_config: Option<&LessonSessionConfig>,
-) -> Vec<TeacherQuestionDraft> {
+) -> Vec<TeacherExerciseDraft> {
     lesson
         .questions
         .iter()
         .map(|entry| {
-            let q = &entry.definition;
-            let full_prompt = q.prompt_label(language);
+            let definition = &entry.definition;
+            let full_prompt = definition.prompt_label(language);
             let count = existing_config
                 .and_then(|config| config.counts.get(&entry.id).copied())
                 .unwrap_or(1);
-            let default_show_visual = q.effective_show_visual(None).unwrap_or(false);
+            let default_show_visual = definition.effective_show_visual(None).unwrap_or(false);
             let configured_visual =
                 existing_config.and_then(|config| config.show_visuals.get(&entry.id).copied());
-            let show_visual = q.effective_show_visual(configured_visual).unwrap_or(false);
-            let has_visual = q.has_optional_visual();
-            TeacherQuestionDraft {
+            let show_visual = definition
+                .effective_show_visual(configured_visual)
+                .unwrap_or(false);
+            let has_visual = definition.has_optional_visual();
+            TeacherExerciseDraft {
                 id: entry.id.clone(),
-                question_type: q.question_type(),
+                exercise_type: definition.question_type(),
                 full_prompt,
                 count,
                 has_visual,
@@ -433,7 +439,7 @@ pub(super) fn handle_config_button_click(
                 .and_then(|class_save| class_save.lesson_configs.get(&config_btn.lesson_id))
         });
 
-        let questions = build_draft_questions(lesson, i18n.language, existing_config);
+        let exercises = build_draft_exercises(lesson, i18n.language, existing_config);
         let lesson_title = i18n.t(&lesson.title_key).into_owned();
 
         let Ok(mut state) = teacher_states.single_mut() else {
@@ -445,13 +451,13 @@ pub(super) fn handle_config_button_click(
         state.view = TeacherView::LessonConfig {
             lesson_id: config_btn.lesson_id.clone(),
             lesson_title,
-            questions,
+            exercises,
         };
         return;
     }
 }
 
-/// Increments or decrements the repetition count for a specific question.
+/// Increments or decrements the repetition count for a specific exercise.
 /// The direction and magnitude come from the `delta` field on the button component.
 pub(super) fn handle_count_change(
     mut activations: MessageReader<ButtonActivated>,
@@ -465,7 +471,7 @@ pub(super) fn handle_count_change(
         return;
     };
     let state = state.bypass_change_detection();
-    let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
+    let TeacherView::LessonConfig { exercises, .. } = &mut state.view else {
         return;
     };
     for entity in activated_entities {
@@ -473,23 +479,23 @@ pub(super) fn handle_count_change(
             continue;
         };
         let id = &btn.id;
-        let Some(q) = questions.iter_mut().find(|q| q.id == *id) else {
+        let Some(exercise) = exercises.iter_mut().find(|exercise| exercise.id == *id) else {
             continue;
         };
-        if let Some(new_count) = q.count.checked_add_signed(btn.delta) {
+        if let Some(new_count) = exercise.count.checked_add_signed(btn.delta) {
             if new_count > MAX_QUESTION_REPETITIONS {
                 continue;
             }
-            q.count = new_count;
+            exercise.count = new_count;
             if let Ok(mut text) = text_query.get_mut(btn.count_text) {
-                **text = q.count.to_string();
+                **text = exercise.count.to_string();
             }
-            update_save_button_state(&mut save_btn_query, questions);
+            update_save_button_state(&mut save_btn_query, exercises);
         }
     }
 }
 
-/// Toggles the optional visual for a specific question on/off.
+/// Toggles the optional visual for a specific exercise on/off.
 pub(super) fn handle_visual_toggle(
     mut activations: MessageReader<ButtonActivated>,
     query: Query<&VisualToggleButton>,
@@ -501,7 +507,7 @@ pub(super) fn handle_visual_toggle(
         return;
     };
     let state = state.bypass_change_detection();
-    let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
+    let TeacherView::LessonConfig { exercises, .. } = &mut state.view else {
         return;
     };
     for entity in activated_entities {
@@ -509,11 +515,11 @@ pub(super) fn handle_visual_toggle(
             continue;
         };
         let id = &btn.0;
-        let Some(q) = questions.iter_mut().find(|q| q.id == *id) else {
+        let Some(exercise) = exercises.iter_mut().find(|exercise| exercise.id == *id) else {
             continue;
         };
-        q.show_visual = !q.show_visual;
-        let new_bg = if q.show_visual {
+        exercise.show_visual = !exercise.show_visual;
+        let new_bg = if exercise.show_visual {
             theme::colors::PRIMARY
         } else {
             theme::colors::TOGGLE_INACTIVE
@@ -533,17 +539,20 @@ fn reset_count_texts(text_query: &mut Query<&mut Text, With<CountText>>) {
     }
 }
 
-/// Restore each visual-toggle button color to its default for the matching question.
+/// Restore each visual-toggle button color to its default for the matching exercise.
 fn reset_visual_toggles(
     toggle_bg_query: &mut Query<
         (&mut BackgroundColor, &VisualToggleButton),
         Without<SaveConfigButton>,
     >,
-    questions: &[TeacherQuestionDraft],
+    exercises: &[TeacherExerciseDraft],
 ) {
     for (mut bg, toggle) in toggle_bg_query {
-        if let Some(q) = questions.iter().find(|q| q.id == toggle.0 && q.has_visual) {
-            *bg = BackgroundColor(if q.default_show_visual {
+        if let Some(exercise) = exercises
+            .iter()
+            .find(|exercise| exercise.id == toggle.0 && exercise.has_visual)
+        {
+            *bg = BackgroundColor(if exercise.default_show_visual {
                 theme::colors::PRIMARY
             } else {
                 theme::colors::TOGGLE_INACTIVE
@@ -552,7 +561,7 @@ fn reset_visual_toggles(
     }
 }
 
-/// Resets all question counts to the default value (1) and visual toggles to their defaults.
+/// Restores all exercise counts and visual toggles to their defaults.
 pub(super) fn handle_reset_config(
     mut activations: MessageReader<ButtonActivated>,
     query: Query<(), With<ResetConfigButton>>,
@@ -569,22 +578,22 @@ pub(super) fn handle_reset_config(
         return;
     };
     let state = state.bypass_change_detection();
-    let TeacherView::LessonConfig { questions, .. } = &mut state.view else {
+    let TeacherView::LessonConfig { exercises, .. } = &mut state.view else {
         return;
     };
     for entity in activated_entities {
         if !query.contains(entity) {
             continue;
         }
-        for q in questions.iter_mut() {
-            q.count = 1;
-            if q.has_visual {
-                q.show_visual = q.default_show_visual;
+        for exercise in exercises.iter_mut() {
+            exercise.count = 1;
+            if exercise.has_visual {
+                exercise.show_visual = exercise.default_show_visual;
             }
         }
         reset_count_texts(&mut text_query);
-        reset_visual_toggles(&mut toggle_bg_query, questions);
-        update_save_button_state(&mut save_btn_query, questions);
+        reset_visual_toggles(&mut toggle_bg_query, exercises);
+        update_save_button_state(&mut save_btn_query, exercises);
     }
 }
 
@@ -610,7 +619,7 @@ pub(super) fn update_scroll_indicator(
     }
 }
 
-/// Dynamically truncates question labels to fit the available width,
+/// Dynamically truncates exercise labels to fit the available width,
 /// appending "..." when the full prompt is too long.  Reacts to layout
 /// changes (e.g. window resize) so the text always uses the space
 /// available.  `Overflow::clip()` on the node acts as a safety net.
@@ -619,7 +628,7 @@ pub(super) fn update_scroll_indicator(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
-pub(super) fn update_question_labels(mut query: Query<(&mut Text, &ComputedNode, &QuestionLabel)>) {
+pub(super) fn update_exercise_labels(mut query: Query<(&mut Text, &ComputedNode, &ExerciseLabel)>) {
     /// Approximate average character width relative to font size.
     /// `FiraMono` is a monospace font with wider characters than proportional
     /// fonts; 0.6 closely matches its actual advance width.
@@ -660,10 +669,10 @@ pub(super) fn update_question_labels(mut query: Query<(&mut Text, &ComputedNode,
     }
 }
 
-/// Updates the hover detail text when a question row is hovered.
+/// Updates the hover detail text when an exercise row is hovered.
 /// Checks every frame because child buttons are part of the row hover state.
 pub(super) fn update_config_hover_text(
-    rows: Query<(&Hovered, &QuestionRow)>,
+    rows: Query<(&Hovered, &ExerciseRow)>,
     mut hover_text: Query<&mut Text, With<ConfigHoverText>>,
 ) {
     let hovered_prompt = rows
@@ -688,7 +697,7 @@ pub(super) fn update_config_hover_text(
 
 fn update_save_button_state(
     query: &mut Query<&mut BackgroundColor, With<SaveConfigButton>>,
-    draft: &[TeacherQuestionDraft],
+    draft: &[TeacherExerciseDraft],
 ) {
     let can_save = has_any_selected(draft);
     let bg = if can_save {
@@ -723,26 +732,26 @@ pub(super) fn handle_save_config(
         let (lesson_id, config) = {
             let TeacherView::LessonConfig {
                 lesson_id,
-                questions,
+                exercises,
                 ..
             } = &state.view
             else {
                 continue;
             };
-            if !has_any_selected(questions) {
+            if !has_any_selected(exercises) {
                 continue;
             }
             (
                 lesson_id.clone(),
                 LessonSessionConfig {
-                    counts: questions
+                    counts: exercises
                         .iter()
-                        .map(|question| (question.id.clone(), question.count))
+                        .map(|exercise| (exercise.id.clone(), exercise.count))
                         .collect(),
-                    show_visuals: questions
+                    show_visuals: exercises
                         .iter()
-                        .filter(|question| question.has_visual)
-                        .map(|question| (question.id.clone(), question.show_visual))
+                        .filter(|exercise| exercise.has_visual)
+                        .map(|exercise| (exercise.id.clone(), exercise.show_visual))
                         .collect(),
                 },
             )
