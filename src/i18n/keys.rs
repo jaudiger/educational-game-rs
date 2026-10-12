@@ -102,11 +102,11 @@ pub enum TranslationKey {
     ExerciseTypeVisualization,
     RemoveStudentConfirm(String),
     ResetAllStatsConfirm,
-    ResetConfig,
+    ResetLessonConfigConfirm(String),
     ResetLessonStatsConfirm(String),
+    ResetThemeConfigConfirm(String),
     ResetExerciseStatsConfirm(String, String),
     ResetTypeStatsConfirm(String, String),
-    SaveConfig,
     StudentStats(String),
     StudentsOf(String),
     TabLessons,
@@ -227,8 +227,6 @@ impl TranslationKey {
                 ExerciseTypeNumericInput  => ("Saisie num\u{00e9}rique",                   "Numeric Input"),
                 ExerciseTypeVisualization => ("Visualisation",                             "Visualization"),
                 ResetAllStatsConfirm      => ("R\u{00e9}initialiser toutes les stats ?",   "Reset all stats?"),
-                ResetConfig               => ("R\u{00e9}initialiser",                      "Reset"),
-                SaveConfig                => ("Sauvegarder",                               "Save"),
                 TabLessons                => ("Le\u{00e7}ons",                             "Lessons"),
                 TabStudents               => ("\u{00c9}l\u{00e8}ves",                      "Students"),
                 TeacherDashboard          => ("Tableau enseignant",                        "Teacher Dashboard"),
@@ -284,6 +282,14 @@ impl TranslationKey {
             Self::RemoveStudentConfirm(name) => match language {
                 Language::French  => format!("Supprimer {name} ?").into(),
                 Language::English => format!("Remove {name}?").into(),
+            },
+            Self::ResetLessonConfigConfirm(lesson) => match language {
+                Language::French  => format!("R\u{00e9}initialiser la configuration de {lesson} ?").into(),
+                Language::English => format!("Reset the configuration for {lesson}?").into(),
+            },
+            Self::ResetThemeConfigConfirm(theme) => match language {
+                Language::French  => format!("R\u{00e9}initialiser la configuration du th\u{00e8}me {theme} ?").into(),
+                Language::English => format!("Reset the configuration for the {theme} theme?").into(),
             },
             Self::ResetLessonStatsConfirm(lesson) => match language {
                 Language::French  => format!("R\u{00e9}initialiser les stats pour {lesson} ?").into(),

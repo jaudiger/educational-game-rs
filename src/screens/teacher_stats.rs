@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
-use bevy::ui_widgets::ScrollArea;
 
 use crate::data::content::{Lesson, QuestionType};
 use crate::data::save::score_percentage;
@@ -18,9 +17,12 @@ use crate::plugins::teacher::{
 use crate::screens::teacher_shared::exercise_type_label;
 use crate::states::{AppState, cleanup_root};
 use crate::ui::components::{
-    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base,
-    disclosure_chevron, disclosure_chevron_transform, icon_button, persistence_message,
-    save_write_failure_notice, spawn_confirmation_modal, standard_button,
+    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, TeacherListLevel,
+    button_base, disclosure_chevron, disclosure_chevron_transform, icon_button,
+    persistence_message, save_write_failure_notice, spawn_confirmation_modal, standard_button,
+    teacher_list_content_node, teacher_list_exercise_row, teacher_list_frame,
+    teacher_list_header_border, teacher_list_header_button_node, teacher_list_header_node,
+    teacher_list_indent, teacher_list_label, teacher_list_separator_gap,
 };
 use crate::ui::theme;
 
@@ -73,6 +75,7 @@ struct StatsDisclosureChevron(StatsDisclosureTarget);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Reflect)]
 enum StatsDisclosureTarget {
+    Theme(String),
     Lesson(String),
     Type(String, QuestionType),
 }
@@ -80,6 +83,7 @@ enum StatsDisclosureTarget {
 #[derive(Resource, Default)]
 struct StatsDisclosureState {
     expanded: HashSet<StatsDisclosureTarget>,
+    collapsed_themes: HashSet<String>,
 }
 
 struct StatsDisclosureRowData {
@@ -87,17 +91,28 @@ struct StatsDisclosureRowData {
     label: String,
     score_text: String,
     score_color: Color,
-    label_font_size: f32,
+    label_level: TeacherListLevel,
     expanded: bool,
-    left_padding: Val,
 }
 
 impl StatsDisclosureState {
     fn is_expanded(&self, target: &StatsDisclosureTarget) -> bool {
-        self.expanded.contains(target)
+        match target {
+            StatsDisclosureTarget::Theme(theme_id) => !self.collapsed_themes.contains(theme_id),
+            StatsDisclosureTarget::Lesson(_) | StatsDisclosureTarget::Type(_, _) => {
+                self.expanded.contains(target)
+            }
+        }
     }
 
     fn toggle(&mut self, target: StatsDisclosureTarget) -> bool {
+        if let StatsDisclosureTarget::Theme(theme_id) = target {
+            if self.collapsed_themes.remove(&theme_id) {
+                return true;
+            }
+            self.collapsed_themes.insert(theme_id);
+            return false;
+        }
         if self.expanded.remove(&target) {
             false
         } else {
@@ -152,6 +167,7 @@ fn rebuild_stats_ui(
     if state.is_changed() {
         write_status.clear_save_data();
         disclosures.expanded.clear();
+        disclosures.collapsed_themes.clear();
     }
     if !state.is_changed() && !ts.ctx.save_data.is_changed() && !write_status.is_changed() {
         return;
@@ -397,10 +413,20 @@ struct LessonStatsData {
 struct ThemeStatsData {
     theme_title: String,
     theme_id: String,
-    total_label: String,
-    total_score: String,
-    total_color: Color,
-    lessons: Vec<LessonStatsData>,
+    expanded: bool,
+    content: ThemeStatsContent,
+}
+
+enum ThemeStatsContent {
+    Available {
+        total_label: String,
+        total_score: String,
+        total_color: Color,
+        lessons: Vec<LessonStatsData>,
+    },
+    Unavailable {
+        status_label: String,
+    },
 }
 
 const fn pct_color(pct: u32) -> Color {
@@ -572,45 +598,57 @@ fn precompute_stats(
     content
         .themes
         .iter()
-        .filter(|theme| theme.available)
         .map(|theme_data| {
-            let mut theme_totals = ScoreTotals::default();
-            let lessons = theme_data
-                .lessons
-                .iter()
-                .map(|lesson| {
-                    let lesson_progress = progress.get(&lesson.id);
-                    let lesson_totals = ScoreTotals::from_progress(lesson_progress);
-                    theme_totals.add(lesson_totals);
-                    let (total_score, total_color) = lesson_totals.display();
-                    let (mut type_rows, unclassified_rows) =
-                        collect_lesson_type_rows(lesson, lesson_progress, content, i18n);
-                    for type_row in &mut type_rows {
-                        type_row.details_expanded = disclosures.is_expanded(
-                            &StatsDisclosureTarget::Type(lesson.id.clone(), type_row.exercise_type),
-                        );
-                    }
-                    LessonStatsData {
-                        lesson_name: i18n.t(&lesson.title_key).into_owned(),
-                        lesson_id: lesson.id.clone(),
-                        total_label: total_label.clone(),
-                        total_score,
-                        total_color,
-                        details_expanded: disclosures
-                            .is_expanded(&StatsDisclosureTarget::Lesson(lesson.id.clone())),
-                        type_rows,
-                        unclassified_rows,
-                    }
-                })
-                .collect();
-            let (total_score, total_color) = theme_totals.display();
+            let theme_content = if theme_data.available {
+                let mut theme_totals = ScoreTotals::default();
+                let lessons = theme_data
+                    .lessons
+                    .iter()
+                    .map(|lesson| {
+                        let lesson_progress = progress.get(&lesson.id);
+                        let lesson_totals = ScoreTotals::from_progress(lesson_progress);
+                        theme_totals.add(lesson_totals);
+                        let (total_score, total_color) = lesson_totals.display();
+                        let (mut type_rows, unclassified_rows) =
+                            collect_lesson_type_rows(lesson, lesson_progress, content, i18n);
+                        for type_row in &mut type_rows {
+                            type_row.details_expanded =
+                                disclosures.is_expanded(&StatsDisclosureTarget::Type(
+                                    lesson.id.clone(),
+                                    type_row.exercise_type,
+                                ));
+                        }
+                        LessonStatsData {
+                            lesson_name: i18n.t(&lesson.title_key).into_owned(),
+                            lesson_id: lesson.id.clone(),
+                            total_label: total_label.clone(),
+                            total_score,
+                            total_color,
+                            details_expanded: disclosures
+                                .is_expanded(&StatsDisclosureTarget::Lesson(lesson.id.clone())),
+                            type_rows,
+                            unclassified_rows,
+                        }
+                    })
+                    .collect();
+                let (total_score, total_color) = theme_totals.display();
+                ThemeStatsContent::Available {
+                    total_label: total_label.clone(),
+                    total_score,
+                    total_color,
+                    lessons,
+                }
+            } else {
+                ThemeStatsContent::Unavailable {
+                    status_label: i18n.t(&TranslationKey::ComingSoon).into_owned(),
+                }
+            };
             ThemeStatsData {
                 theme_title: i18n.t(&theme_data.title_key).into_owned(),
                 theme_id: theme_data.id.clone(),
-                total_label: total_label.clone(),
-                total_score,
-                total_color,
-                lessons,
+                expanded: disclosures
+                    .is_expanded(&StatsDisclosureTarget::Theme(theme_data.id.clone())),
+                content: theme_content,
             }
         })
         .collect()
@@ -635,41 +673,16 @@ fn spawn_stats_frame(
     scroll_position: ScrollPosition,
     window: Entity,
 ) {
-    // Scrollable rounded frame (same style as lesson config view)
     parent.spawn((
-        ScrollArea,
+        teacher_list_frame(),
         TeacherStatsFrame,
         scroll_position,
-        Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: theme::scaled(theme::spacing::MEDIUM),
-            width: percent(100.0),
-            flex_grow: 1.0,
-            flex_basis: px(0.0),
-            min_height: px(0.0),
-            padding: theme::scaled(theme::spacing::MEDIUM).all(),
-            border: UiRect::all(px(1.0)),
-            border_radius: BorderRadius::all(theme::scaled(8.0)),
-            overflow: Overflow::scroll_y(),
-            ..default()
-        },
-        BackgroundColor(theme::colors::CARD_BG),
-        BorderColor::all(theme::colors::TEXT_MUTED),
         Children::spawn(SpawnWith(move |list: &mut ChildSpawner| {
             list.spawn((
-                Node {
-                    width: percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    flex_shrink: 0.0,
-                    row_gap: theme::scaled(theme::spacing::MEDIUM),
-                    ..default()
-                },
+                teacher_list_content_node(),
                 Children::spawn(SpawnWith(move |content: &mut ChildSpawner| {
-                    for theme_section in &data {
-                        spawn_theme_header(content, theme_section, window);
-                        for lesson in &theme_section.lessons {
-                            spawn_lesson_section(content, lesson, window);
-                        }
+                    for theme_section in data {
+                        spawn_theme_section(content, theme_section, window);
                     }
                 })),
             ));
@@ -677,36 +690,100 @@ fn spawn_stats_frame(
     ));
 }
 
-fn spawn_theme_header(parent: &mut ChildSpawner, theme_data: &ThemeStatsData, window: Entity) {
+fn spawn_theme_section(parent: &mut ChildSpawner, data: ThemeStatsData, window: Entity) {
+    let ThemeStatsData {
+        theme_title,
+        theme_id,
+        expanded,
+        content,
+    } = data;
+    let (total_label, total_score, total_color, lessons) = match content {
+        ThemeStatsContent::Available {
+            total_label,
+            total_score,
+            total_color,
+            lessons,
+        } => (total_label, total_score, total_color, lessons),
+        ThemeStatsContent::Unavailable { status_label } => {
+            spawn_unavailable_theme_header(parent, theme_title, status_label, window);
+            return;
+        }
+    };
+
+    let target = StatsDisclosureTarget::Theme(theme_id.clone());
+    let panel_target = target.clone();
+    let reset_target = StatsResetTarget::Theme(theme_id);
+    let row_data = StatsDisclosureRowData {
+        target,
+        label: theme_title,
+        score_text: format!("{total_label}{total_score}"),
+        score_color: total_color,
+        label_level: TeacherListLevel::Theme,
+        expanded,
+    };
     parent.spawn((
         Node {
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
+            width: percent(100.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
         },
+        Children::spawn(SpawnWith(move |section: &mut ChildSpawner| {
+            section.spawn((
+                teacher_list_header_node(),
+                teacher_list_header_border(),
+                Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
+                    row.spawn(stats_disclosure_button(row_data, window));
+                    row.spawn((reset_icon_button(window), StatsResetButton(reset_target)));
+                })),
+            ));
+            section.spawn((
+                StatsDisclosurePanel(panel_target),
+                Node {
+                    display: disclosure_display(expanded),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: theme::scaled(theme::spacing::SMALL),
+                    ..default()
+                },
+                Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
+                    for lesson in &lessons {
+                        spawn_lesson_section(details, lesson, window);
+                    }
+                })),
+            ));
+        })),
+    ));
+}
+
+fn spawn_unavailable_theme_header(
+    parent: &mut ChildSpawner,
+    title: String,
+    status_label: String,
+    window: Entity,
+) {
+    parent.spawn((
+        Node {
+            justify_content: JustifyContent::SpaceBetween,
+            ..teacher_list_header_node()
+        },
+        teacher_list_header_border(),
         children![
             (
-                Text::new(theme_data.theme_title.clone()),
-                theme::typography::text(theme::fonts::BODY, window),
-                TextColor(theme::colors::TEXT_DARK),
+                teacher_list_label(
+                    title,
+                    TeacherListLevel::Theme,
+                    theme::colors::TEXT_MUTED,
+                    window,
+                ),
                 Node {
                     flex_grow: 1.0,
                     ..default()
                 },
             ),
             (
-                Text::new(format!(
-                    "{}{}",
-                    theme_data.total_label, theme_data.total_score
-                )),
+                Text::new(status_label),
                 theme::typography::text(theme::fonts::SMALL, window),
-                TextColor(theme_data.total_color),
-            ),
-            (
-                reset_icon_button(window),
-                StatsResetButton(StatsResetTarget::Theme(theme_data.theme_id.clone())),
+                TextColor(theme::colors::TEXT_MUTED),
             ),
         ],
     ));
@@ -718,7 +795,7 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
         Node {
             flex_direction: FlexDirection::Column,
             row_gap: theme::scaled(theme::spacing::SMALL),
-            padding: theme::scaled(theme::spacing::SMALL).left(),
+            padding: teacher_list_indent(TeacherListLevel::Theme, TeacherListLevel::Lesson).left(),
             ..default()
         },
         Children::spawn(SpawnWith(move |section: &mut ChildSpawner| {
@@ -733,6 +810,15 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
                     display: disclosure_display(details_expanded),
                     flex_direction: FlexDirection::Column,
                     row_gap: theme::scaled(theme::spacing::SMALL),
+                    padding: UiRect {
+                        left: teacher_list_indent(
+                            TeacherListLevel::Lesson,
+                            TeacherListLevel::ExerciseType,
+                        ),
+                        top: teacher_list_separator_gap(),
+                        bottom: teacher_list_separator_gap(),
+                        ..default()
+                    },
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
@@ -755,17 +841,12 @@ fn spawn_lesson_header(parent: &mut ChildSpawner, lesson: &LessonStatsData, wind
         label: lesson.lesson_name.clone(),
         score_text: format!("{}{}", lesson.total_label, lesson.total_score),
         score_color: lesson.total_color,
-        label_font_size: theme::fonts::BODY,
+        label_level: TeacherListLevel::Lesson,
         expanded: lesson.details_expanded,
-        left_padding: theme::scaled(theme::spacing::SMALL),
     };
     parent.spawn((
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        },
+        teacher_list_header_node(),
+        teacher_list_header_border(),
         Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
             row.spawn(stats_disclosure_button(row_data, window));
             row.spawn((
@@ -786,9 +867,8 @@ fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: En
         label: type_row.type_label.clone(),
         score_text: type_row.score_text.clone(),
         score_color: type_row.score_color,
-        label_font_size: theme::fonts::SMALL,
+        label_level: TeacherListLevel::ExerciseType,
         expanded: type_row.details_expanded,
-        left_padding: theme::scaled(theme::spacing::MEDIUM),
     };
     let details_expanded = type_row.details_expanded;
     let exercise_rows = type_row.exercise_rows.clone();
@@ -796,17 +876,12 @@ fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: En
     parent.spawn((
         Node {
             flex_direction: FlexDirection::Column,
-            row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
         },
         Children::spawn(SpawnWith(move |group: &mut ChildSpawner| {
             group.spawn((
-                Node {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: theme::scaled(theme::spacing::SMALL),
-                    ..default()
-                },
+                teacher_list_header_node(),
+                teacher_list_header_border(),
                 Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
                     row.spawn(stats_disclosure_button(row_data, window));
                     row.spawn((
@@ -821,6 +896,7 @@ fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: En
                     display: disclosure_display(details_expanded),
                     flex_direction: FlexDirection::Column,
                     row_gap: theme::scaled(theme::spacing::SMALL),
+                    padding: UiRect::top(teacher_list_separator_gap()),
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
@@ -838,24 +914,19 @@ fn stats_disclosure_button(data: StatsDisclosureRowData, window: Entity) -> impl
     (
         button_base(Color::NONE),
         StatsDisclosureButton(data.target),
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            flex_grow: 1.0,
-            min_width: px(0.0),
-            padding: UiRect::left(data.left_padding),
-            ..default()
-        },
+        teacher_list_header_button_node(),
         Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
             row.spawn((
                 disclosure_chevron(data.expanded, theme::colors::TEXT_DARK, window),
                 StatsDisclosureChevron(chevron_target),
             ));
             row.spawn((
-                Text::new(data.label),
-                theme::typography::text(data.label_font_size, window),
-                TextColor(theme::colors::TEXT_DARK),
+                teacher_list_label(
+                    data.label,
+                    data.label_level,
+                    theme::colors::TEXT_DARK,
+                    window,
+                ),
                 Node {
                     flex_grow: 1.0,
                     min_width: px(0.0),
@@ -907,13 +978,7 @@ fn handle_stats_disclosure(
 
 fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow, window: Entity) {
     parent.spawn((
-        Node {
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::Center,
-            padding: theme::scaled(theme::spacing::LARGE).left(),
-            ..default()
-        },
+        teacher_list_exercise_row(),
         Children::spawn(SpawnWith({
             let label = exercise_row.exercise_label.clone();
             let score = exercise_row.score_text.clone();
@@ -922,9 +987,12 @@ fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow
             let exercise_id = exercise_row.exercise_id.clone();
             move |row: &mut ChildSpawner| {
                 row.spawn((
-                    Text::new(label),
-                    theme::typography::text(theme::fonts::SMALL, window),
-                    TextColor(theme::colors::TEXT_DARK),
+                    teacher_list_label(
+                        format!("\u{2022} {label}"),
+                        TeacherListLevel::Exercise,
+                        theme::colors::TEXT_DARK,
+                        window,
+                    ),
                     Node {
                         flex_grow: 1.0,
                         ..default()

@@ -14,8 +14,8 @@ use crate::screens::teacher_shared::exercise_type_label;
 use crate::states::{AppState, ExplorationView};
 use crate::ui::animation::FloatingCard;
 use crate::ui::components::{
-    ButtonActivated, button_base, disclosure_chevron, disclosure_chevron_transform, screen_root,
-    standard_button,
+    ButtonActivated, button_base, disclosure_chevron, disclosure_chevron_transform,
+    list_separator_border, screen_root, standard_button,
 };
 use crate::ui::theme;
 
@@ -419,7 +419,7 @@ fn spawn_exercise_group(
                     border: px(1.0).bottom(),
                     ..default()
                 },
-                BorderColor::all(Color::srgba(0.35, 0.48, 0.67, 0.3)),
+                list_separator_border(),
                 Children::spawn(SpawnWith(move |header: &mut ChildSpawner| {
                     header.spawn((
                         disclosure_chevron(expanded, theme::colors::PRIMARY, window),

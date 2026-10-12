@@ -2,7 +2,7 @@ use bevy::picking::events::PointerRelease;
 use bevy::prelude::*;
 use bevy::ui::{Checked, Pressed};
 use bevy::ui_widgets::{
-    SliderValue, ValueChange, checkbox_self_update, observe, slider_self_update,
+    ScrollArea, SliderValue, ValueChange, checkbox_self_update, observe, slider_self_update,
 };
 use bevy::window::PrimaryWindow;
 
@@ -82,56 +82,87 @@ fn spawn_settings_ui(
     let title = i18n.t(&TranslationKey::Settings);
     let back = i18n.t(&TranslationKey::Back);
 
+    let card = (
+        Node {
+            width: percent(92.0),
+            height: percent(94.0),
+            min_height: px(0.0),
+            border: px(1.0).all(),
+            border_radius: BorderRadius::all(theme::scaled(28.0)),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::FlexStart,
+            padding: theme::scaled(theme::sizes::CARD_PADDING).all(),
+            row_gap: theme::scaled(theme::spacing::LARGE),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.88)),
+        BorderColor::all(theme::colors::CARD_BORDER),
+    );
+
     commands.spawn((
         screen_root(),
         DespawnOnExit(AppState::Settings),
         SettingsRoot,
         children![
             menu_background(MenuBackgroundStyle::Settings),
-            // Title
             (
-                Text::new(title),
-                theme::typography::text(theme::fonts::TITLE, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ),
-            // Settings sections group
-            (
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: theme::scaled(theme::spacing::LARGE),
-                    ..default()
-                },
+                card,
                 children![
-                    mode_section(settings.mode, i18n, window),
-                    language_section(settings.language, i18n, window),
-                    exploration_theme_section(settings.exploration_theme, i18n, window),
-                    bool_setting_section(
-                        BoolSettingField::ShowExplanations,
-                        settings.show_explanations,
-                        i18n,
-                        window,
+                    (
+                        Text::new(title),
+                        theme::typography::text(theme::fonts::TITLE, window),
+                        TextColor(theme::colors::TEXT_DARK),
                     ),
-                    bool_setting_section(
-                        BoolSettingField::GamepadNavigation,
-                        settings.gamepad_navigation,
-                        i18n,
-                        window,
+                    (
+                        ScrollArea,
+                        Node {
+                            width: percent(100.0),
+                            flex_grow: 1.0,
+                            flex_basis: px(0.0),
+                            min_height: px(0.0),
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            row_gap: theme::scaled(theme::spacing::LARGE),
+                            overflow: Overflow::scroll_y(),
+                            ..default()
+                        },
+                        children![
+                            mode_section(settings.mode, i18n, window),
+                            language_section(settings.language, i18n, window),
+                            exploration_theme_section(settings.exploration_theme, i18n, window),
+                            bool_setting_section(
+                                BoolSettingField::ShowExplanations,
+                                settings.show_explanations,
+                                i18n,
+                                window,
+                            ),
+                            bool_setting_section(
+                                BoolSettingField::GamepadNavigation,
+                                settings.gamepad_navigation,
+                                i18n,
+                                window,
+                            ),
+                            volume_section(
+                                VolumeChannel::Music,
+                                settings.music_volume,
+                                i18n,
+                                window
+                            ),
+                            volume_section(VolumeChannel::Sfx, settings.sfx_volume, i18n, window),
+                        ],
                     ),
-                    volume_section(VolumeChannel::Music, settings.music_volume, i18n, window),
-                    volume_section(VolumeChannel::Sfx, settings.sfx_volume, i18n, window),
+                    notice,
+                    (
+                        standard_button(
+                            &back,
+                            theme::colors::PRIMARY,
+                            theme::scaled(theme::sizes::BUTTON_WIDTH),
+                            window,
+                        ),
+                        NavigateTo(AppState::Home),
+                    ),
                 ],
-            ),
-            notice,
-            // Back button
-            (
-                standard_button(
-                    &back,
-                    theme::colors::PRIMARY,
-                    theme::scaled(theme::sizes::BUTTON_WIDTH),
-                    window,
-                ),
-                NavigateTo(AppState::Home),
             ),
         ],
     ));

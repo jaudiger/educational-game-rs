@@ -16,7 +16,6 @@ use bevy::window::{
     WindowResolution,
 };
 
-use crate::data::content::QuestionType;
 use crate::data::{GameMode, GameSettings, PlayerContext};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES};
@@ -57,23 +56,18 @@ pub enum TeacherView {
         student_index: usize,
     },
     Lessons,
-    LessonConfig {
-        lesson_id: String,
-        lesson_title: String,
-        exercises: Vec<TeacherExerciseDraft>,
-    },
 }
 
 impl TeacherView {
     pub const fn tab(&self) -> TeacherTab {
         match self {
             Self::Students | Self::StudentStats { .. } => TeacherTab::Students,
-            Self::Lessons | Self::LessonConfig { .. } => TeacherTab::Lessons,
+            Self::Lessons => TeacherTab::Lessons,
         }
     }
 
     pub const fn is_detail(&self) -> bool {
-        matches!(self, Self::StudentStats { .. } | Self::LessonConfig { .. })
+        matches!(self, Self::StudentStats { .. })
     }
 
     pub const fn base(tab: TeacherTab) -> Self {
@@ -82,17 +76,6 @@ impl TeacherView {
             TeacherTab::Lessons => Self::Lessons,
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct TeacherExerciseDraft {
-    pub id: String,
-    pub exercise_type: QuestionType,
-    pub full_prompt: String,
-    pub count: usize,
-    pub has_visual: bool,
-    pub show_visual: bool,
-    pub default_show_visual: bool,
 }
 
 #[derive(Component, Reflect)]
@@ -169,14 +152,6 @@ pub fn teacher_lessons_tree_view_active(
     query
         .single()
         .is_ok_and(|state| matches!(state.view, TeacherView::Lessons))
-}
-
-pub fn teacher_lesson_config_view_active(
-    query: Query<&TeacherWindowState, With<TeacherWindow>>,
-) -> bool {
-    query
-        .single()
-        .is_ok_and(|state| matches!(state.view, TeacherView::LessonConfig { .. }))
 }
 
 pub fn teacher_stats_view_active(query: Query<&TeacherWindowState, With<TeacherWindow>>) -> bool {
