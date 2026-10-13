@@ -1,0 +1,490 @@
+{
+  "id": "maths",
+  "title": {
+    "fr": "Mathématiques",
+    "en": "Mathematics"
+  },
+  "available": true,
+  "lessons": [
+    {
+      "id": "fractions",
+      "title": {
+        "fr": "Les fractions",
+        "en": "Fractions"
+      },
+      "categories": [
+        {
+          "type": "Mcq",
+          "exercises": [
+            {
+              "id": "fraction_name",
+              "definition": {
+                "type": "McqTemplate",
+                "prompt_template": {
+                  "fr": "Quelle fraction représente {name} ?",
+                  "en": "Which fraction represents {name}?"
+                },
+                "parameters": [
+                  {
+                    "name": "d",
+                    "values": [2, 3, 4, 5, 6, 8]
+                  }
+                ],
+                "resolver": "FractionName",
+                "explanation_template": {
+                  "fr": "Si on coupe un gâteau en {d} parts égales, {name} c'est la fraction {fraction}.",
+                  "en": "If you cut a cake into {d} equal pieces, {name} is the fraction {fraction}."
+                }
+              }
+            },
+            {
+              "id": "fraction_addition",
+              "definition": {
+                "type": "McqTemplate",
+                "prompt_template": {
+                  "fr": "Combien font {a}/{b} + {c}/{b} ?",
+                  "en": "What is {a}/{b} + {c}/{b}?"
+                },
+                "parameters": [
+                  {
+                    "name": "a",
+                    "values": [1, 2, 3]
+                  },
+                  {
+                    "name": "b",
+                    "values": [4, 6, 8]
+                  },
+                  {
+                    "name": "c",
+                    "values": [1, 2, 3]
+                  }
+                ],
+                "resolver": "FractionAddition",
+                "explanation_template": {
+                  "fr": "Les deux fractions ont le même dénominateur ({b}), on additionne les numérateurs : {a} + {c} = {sum}. Donc {fraction_a} + {fraction_c} = {result}.",
+                  "en": "Both fractions have the same denominator ({b}), so we add the numerators: {a} + {c} = {sum}. So {fraction_a} + {fraction_c} = {result}."
+                }
+              }
+            },
+            {
+              "id": "fraction_value",
+              "definition": {
+                "type": "McqTemplate",
+                "prompt_template": {
+                  "fr": "Quel nombre est représenté par {a}/{b} ?",
+                  "en": "What number is represented by {a}/{b}?"
+                },
+                "parameters": [
+                  {
+                    "name": "a",
+                    "values": [2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 20]
+                  },
+                  {
+                    "name": "b",
+                    "values": [2, 3, 4, 5]
+                  }
+                ],
+                "resolver": "FractionValue",
+                "explanation_template": {
+                  "fr": "Si on partage {a} parts en groupes de {b}, on obtient {result} groupes. Donc {fraction} = {result}.",
+                  "en": "If we share {a} parts into groups of {b}, we get {result} groups. So {fraction} = {result}."
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "Visualization",
+          "exercises": [
+            {
+              "id": "fraction_visualization",
+              "definition": {
+                "type": "FractionVisualizationTemplate",
+                "prompt_template": {
+                  "fr": "Colorie {n}/{d} du gâteau",
+                  "en": "Colour {n}/{d} of the pie"
+                },
+                "numerator_range": [1, 2, 3, 4, 5, 6, 7],
+                "denominator_range": [3, 4, 5, 6, 8, 10, 12],
+                "explanation_template": {
+                  "fr": "Il y a {d} parts au total et {n} sont coloriées : c'est la fraction {fraction}.",
+                  "en": "There are {d} parts in total and {n} are colored: that's the fraction {fraction}."
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "Comparison",
+          "exercises": [
+            {
+              "id": "fraction_comparison_same_denominator",
+              "definition": {
+                "type": "FractionComparisonTemplate",
+                "prompt": {
+                  "fr": "Qui a mangé le plus de gâteau ?",
+                  "en": "Who ate the most pie?"
+                },
+                "character_a": "Léa",
+                "character_b": "Tom",
+                "difficulty": "SameDenominator",
+                "denominator_range": [4, 5, 6, 8, 10, 12],
+                "numerator_range": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                "explanation_template": {
+                  "fr": "Les deux gâteaux sont divisés en {da} parts chacun. On compare les numérateurs : {na} et {nb}. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                  "en": "Each pie is divided into {da} slices. Compare the numerators, {na} and {nb}. So {greater_fraction} is greater than {lesser_fraction}."
+                }
+              }
+            },
+            {
+              "id": "fraction_comparison_same_numerator",
+              "definition": {
+                "type": "FractionComparisonTemplate",
+                "prompt": {
+                  "fr": "Qui a mangé le plus de gâteau ?",
+                  "en": "Who ate the most pie?"
+                },
+                "character_a": "Emma",
+                "character_b": "Hugo",
+                "difficulty": "SameNumerator",
+                "denominator_range": [3, 4, 5, 6, 8, 10, 12],
+                "numerator_range": [2, 3, 4, 5],
+                "explanation_template": {
+                  "fr": "Ils mangent le même nombre de parts, mais moins il y a de parts dans le gâteau, plus chaque part est grosse. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                  "en": "They eat the same number of slices, but the fewer slices the pie has, the larger each slice is. So {greater_fraction} is greater than {lesser_fraction}."
+                }
+              }
+            },
+            {
+              "id": "fraction_comparison_multiple_denominators",
+              "definition": {
+                "type": "FractionComparisonTemplate",
+                "prompt": {
+                  "fr": "Qui a mangé le plus de gâteau ?",
+                  "en": "Who ate the most pie?"
+                },
+                "character_a": "Jade",
+                "character_b": "Noah",
+                "difficulty": "MultipleDenominator",
+                "denominator_range": [3, 4, 6, 8, 12],
+                "numerator_range": [1, 2, 3, 4, 5, 6, 7],
+                "explanation_template": {
+                  "fr": "Pour comparer {fraction_a} et {fraction_b}, on partage les gâteaux en parts de même taille. Donc {greater_fraction} est supérieur à {lesser_fraction}.",
+                  "en": "To compare {fraction_a} and {fraction_b}, divide the pies into slices of the same size. So {greater_fraction} is greater than {lesser_fraction}."
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "Identification",
+          "exercises": [
+            {
+              "id": "fraction_identification",
+              "definition": {
+                "type": "FractionIdentificationTemplate",
+                "numerator_range": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                "denominator_range": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multiplication_tables",
+      "title": {
+        "fr": "Tables de multiplication",
+        "en": "Multiplication Tables"
+      },
+      "categories": [
+        {
+          "type": "Mcq",
+          "exercises": [
+            {
+              "id": "multiplication_tables_even_mcq",
+              "definition": {
+                "type": "McqTemplate",
+                "resolver": "Multiplication",
+                "prompt_template": {
+                  "fr": "Combien font {a} × {b} ?",
+                  "en": "What is {a} × {b}?"
+                },
+                "parameters": [
+                  {
+                    "name": "a",
+                    "values": [2, 4, 6, 8]
+                  },
+                  {
+                    "name": "b",
+                    "values": [1, 2, 3, 4, 5, 6, 7, 8, 9]
+                  }
+                ],
+                "explanation_template": {
+                  "fr": "Dans la grille, on compte {a} lignes de {b}. {a} × {b} = {result}.",
+                  "en": "In the grid, count {a} rows of {b}. {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Tables paires (2, 4, 6, 8)",
+                  "en": "Even tables (2, 4, 6, 8)"
+                },
+                "with_grid": true
+              }
+            },
+            {
+              "id": "multiplication_tables_odd_mcq",
+              "definition": {
+                "type": "McqTemplate",
+                "resolver": "Multiplication",
+                "prompt_template": {
+                  "fr": "Combien font {a} × {b} ?",
+                  "en": "What is {a} × {b}?"
+                },
+                "parameters": [
+                  {
+                    "name": "a",
+                    "values": [3, 5, 7, 9]
+                  },
+                  {
+                    "name": "b",
+                    "values": [1, 2, 3, 4, 5, 6, 7, 8, 9]
+                  }
+                ],
+                "explanation_template": {
+                  "fr": "Dans la grille, on compte {a} lignes de {b}. {a} × {b} = {result}.",
+                  "en": "In the grid, count {a} rows of {b}. {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Tables impaires (3, 5, 7, 9)",
+                  "en": "Odd tables (3, 5, 7, 9)"
+                },
+                "with_grid": true
+              }
+            }
+          ]
+        },
+        {
+          "type": "NumericInput",
+          "exercises": [
+            {
+              "id": "multiplication_tables_even_numeric",
+              "definition": {
+                "type": "NumericInputTemplate",
+                "prompt_template": {
+                  "fr": "{a} × {b} = ?",
+                  "en": "{a} × {b} = ?"
+                },
+                "factor_a_range": [2, 4, 6, 8],
+                "factor_b_range": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                "difficulty": "Beginner",
+                "explanation_template": {
+                  "fr": "Dans la grille, on compte {a} lignes de {b}. {a} × {b} = {result}.",
+                  "en": "In the grid, count {a} rows of {b}. {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Tables paires (2, 4, 6, 8)",
+                  "en": "Even tables (2, 4, 6, 8)"
+                },
+                "with_grid": true
+              }
+            },
+            {
+              "id": "multiplication_tables_odd_numeric",
+              "definition": {
+                "type": "NumericInputTemplate",
+                "prompt_template": {
+                  "fr": "{a} × {b} = ?",
+                  "en": "{a} × {b} = ?"
+                },
+                "factor_a_range": [3, 5, 7, 9],
+                "factor_b_range": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                "difficulty": "Intermediate",
+                "explanation_template": {
+                  "fr": "Dans la grille, on compte {a} lignes de {b}. {a} × {b} = {result}.",
+                  "en": "In the grid, count {a} rows of {b}. {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Tables impaires (3, 5, 7, 9)",
+                  "en": "Odd tables (3, 5, 7, 9)"
+                },
+                "with_grid": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multiply_10_100_1000",
+      "title": {
+        "fr": "Multiplier par 10, 100, 1000",
+        "en": "Multiply by 10, 100, 1000"
+      },
+      "categories": [
+        {
+          "type": "NumericInput",
+          "exercises": [
+            {
+              "id": "multiply_powers_beginner_numeric",
+              "definition": {
+                "type": "NumericInputTemplate",
+                "prompt_template": {
+                  "fr": "{a} × {b} = ?",
+                  "en": "{a} × {b} = ?"
+                },
+                "factor_a_range": [10, 20, 30, 40, 50, 60, 70, 80, 90],
+                "factor_b_range": [10, 100, 1000],
+                "difficulty": "Beginner",
+                "explanation_template": {
+                  "fr": "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
+                  "en": "Multiplying by {b} means adding zeros: {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Dizaines entières × 10/100/1000",
+                  "en": "Round tens × 10/100/1000"
+                },
+                "place_value_explanation": true
+              }
+            },
+            {
+              "id": "multiply_powers_intermediate_numeric",
+              "definition": {
+                "type": "NumericInputTemplate",
+                "prompt_template": {
+                  "fr": "{a} × {b} = ?",
+                  "en": "{a} × {b} = ?"
+                },
+                "factor_a_range": [5, 15, 25, 35, 45, 55, 65, 75, 85, 95],
+                "factor_b_range": [10, 100, 1000],
+                "difficulty": "Intermediate",
+                "explanation_template": {
+                  "fr": "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
+                  "en": "Multiplying by {b} means adding zeros: {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Nombres en 5 × 10/100/1000",
+                  "en": "Fives × 10/100/1000"
+                },
+                "place_value_explanation": true
+              }
+            },
+            {
+              "id": "multiply_powers_advanced_numeric",
+              "definition": {
+                "type": "NumericInputTemplate",
+                "prompt_template": {
+                  "fr": "{a} × {b} = ?",
+                  "en": "{a} × {b} = ?"
+                },
+                "factor_a_range": [1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33, 34, 36, 37, 38, 39, 41, 42, 43, 44, 46, 47, 48, 49, 51, 52, 53, 54, 56, 57, 58, 59, 61, 62, 63, 64, 66, 67, 68, 69, 71, 72, 73, 74, 76, 77, 78, 79, 81, 82, 83, 84, 86, 87, 88, 89, 91, 92, 93, 94, 96, 97, 98, 99],
+                "factor_b_range": [10, 100, 1000],
+                "difficulty": "Advanced",
+                "explanation_template": {
+                  "fr": "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
+                  "en": "Multiplying by {b} means adding zeros: {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Nombres quelconques × 10/100/1000",
+                  "en": "Any number × 10/100/1000"
+                },
+                "place_value_explanation": true
+              }
+            }
+          ]
+        },
+        {
+          "type": "Mcq",
+          "exercises": [
+            {
+              "id": "multiply_powers_beginner_mcq",
+              "definition": {
+                "type": "McqTemplate",
+                "prompt_template": {
+                  "fr": "Combien font {a} × {b} ?",
+                  "en": "What is {a} × {b}?"
+                },
+                "parameters": [
+                  {
+                    "name": "a",
+                    "values": [10, 20, 30, 40, 50, 60, 70, 80, 90]
+                  },
+                  {
+                    "name": "b",
+                    "values": [10, 100, 1000]
+                  }
+                ],
+                "resolver": "MultiplyByPowerOf10",
+                "explanation_template": {
+                  "fr": "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
+                  "en": "Multiplying by {b} means adding zeros: {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Dizaines entières × 10/100/1000",
+                  "en": "Round tens × 10/100/1000"
+                }
+              }
+            },
+            {
+              "id": "multiply_powers_intermediate_mcq",
+              "definition": {
+                "type": "McqTemplate",
+                "prompt_template": {
+                  "fr": "Combien font {a} × {b} ?",
+                  "en": "What is {a} × {b}?"
+                },
+                "parameters": [
+                  {
+                    "name": "a",
+                    "values": [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+                  },
+                  {
+                    "name": "b",
+                    "values": [10, 100, 1000]
+                  }
+                ],
+                "resolver": "MultiplyByPowerOf10",
+                "explanation_template": {
+                  "fr": "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
+                  "en": "Multiplying by {b} means adding zeros: {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Nombres en 5 × 10/100/1000",
+                  "en": "Fives × 10/100/1000"
+                }
+              }
+            },
+            {
+              "id": "multiply_powers_advanced_mcq",
+              "definition": {
+                "type": "McqTemplate",
+                "prompt_template": {
+                  "fr": "Combien font {a} × {b} ?",
+                  "en": "What is {a} × {b}?"
+                },
+                "parameters": [
+                  {
+                    "name": "a",
+                    "values": [1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33, 34, 36, 37, 38, 39, 41, 42, 43, 44, 46, 47, 48, 49, 51, 52, 53, 54, 56, 57, 58, 59, 61, 62, 63, 64, 66, 67, 68, 69, 71, 72, 73, 74, 76, 77, 78, 79, 81, 82, 83, 84, 86, 87, 88, 89, 91, 92, 93, 94, 96, 97, 98, 99]
+                  },
+                  {
+                    "name": "b",
+                    "values": [10, 100, 1000]
+                  }
+                ],
+                "resolver": "MultiplyByPowerOf10",
+                "explanation_template": {
+                  "fr": "Multiplier par {b}, c'est ajouter des zéros : {a} × {b} = {result}.",
+                  "en": "Multiplying by {b} means adding zeros: {a} × {b} = {result}."
+                },
+                "teacher_label": {
+                  "fr": "Nombres quelconques × 10/100/1000",
+                  "en": "Any number × 10/100/1000"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

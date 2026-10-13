@@ -521,7 +521,7 @@ fn lesson_label(lesson_id: &str, content: &ContentLibrary, i18n: &I18n) -> Strin
         .find(|lesson| lesson.id == lesson_id)
         .map_or_else(
             || lesson_id.to_owned(),
-            |lesson| i18n.t(&lesson.title_key).into_owned(),
+            |lesson| lesson.title.get(i18n.language).to_owned(),
         )
 }
 
@@ -619,7 +619,7 @@ fn precompute_stats(
                                 ));
                         }
                         LessonStatsData {
-                            lesson_name: i18n.t(&lesson.title_key).into_owned(),
+                            lesson_name: lesson.title.get(i18n.language).to_owned(),
                             lesson_id: lesson.id.clone(),
                             total_label: total_label.clone(),
                             total_score,
@@ -644,7 +644,7 @@ fn precompute_stats(
                 }
             };
             ThemeStatsData {
-                theme_title: i18n.t(&theme_data.title_key).into_owned(),
+                theme_title: theme_data.title.get(i18n.language).to_owned(),
                 theme_id: theme_data.id.clone(),
                 expanded: disclosures
                     .is_expanded(&StatsDisclosureTarget::Theme(theme_data.id.clone())),
@@ -1070,7 +1070,7 @@ fn handle_reset_click(
                     .find(|theme| theme.id == *theme_id)
                     .map_or_else(
                         || theme_id.clone(),
-                        |theme| i18n.t(&theme.title_key).into_owned(),
+                        |theme| theme.title.get(i18n.language).to_owned(),
                     );
                 i18n.t(&TranslationKey::ResetLessonStatsConfirm(title))
                     .into_owned()

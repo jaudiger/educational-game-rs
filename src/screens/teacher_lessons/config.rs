@@ -680,7 +680,7 @@ pub(super) fn handle_reset_click(
                     .find(|theme| theme.id == *theme_id)
                     .map_or_else(
                         || theme_id.clone(),
-                        |theme| teacher.i18n.t(&theme.title_key).into_owned(),
+                        |theme| theme.title.get(teacher.i18n.language).to_owned(),
                     );
                 teacher
                     .i18n
@@ -725,7 +725,7 @@ fn lesson_label(lesson_id: &str, content: &ContentLibrary, i18n: &I18n) -> Strin
         .find(|lesson| lesson.id == lesson_id)
         .map_or_else(
             || lesson_id.to_owned(),
-            |lesson| i18n.t(&lesson.title_key).into_owned(),
+            |lesson| lesson.title.get(i18n.language).to_owned(),
         )
 }
 

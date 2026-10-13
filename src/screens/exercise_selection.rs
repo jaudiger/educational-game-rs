@@ -129,7 +129,7 @@ fn setup_exercise_selection(
         })
         .map(str::to_owned);
     let data = ExerciseSelectionScreenData {
-        lesson_context: i18n.t(&lesson.title_key).into_owned(),
+        lesson_context: lesson.title.get(i18n.language).to_owned(),
         back_label: i18n.t(&TranslationKey::BackToLessons).into_owned(),
         groups,
         selected_exercise_id,

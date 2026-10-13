@@ -51,11 +51,6 @@ pub enum TranslationKey {
     SummaryScore(u32, u32),
     SummaryTitle,
 
-    // Lessons
-    LessonFractions,
-    LessonMultiplicationTables,
-    LessonMultiplyByPowerOf10,
-
     // Theme Exploration
     BackToLessons,
     BackToThemes,
@@ -113,12 +108,6 @@ pub enum TranslationKey {
     TabStudents,
     TeacherDashboard,
     Total,
-
-    // Themes (pedagogical)
-    ThemeEnglish,
-    ThemeFrench,
-    ThemeMaths,
-    ThemeScience,
 }
 
 /// Generate a `match $self { ... }` expression from three sections of the translation table.
@@ -192,10 +181,6 @@ impl TranslationKey {
                 SummaryGood               => ("Bon travail !",                             "Good job!"),
                 SummaryPerfect            => ("Parfait ! Bravo !",                         "Perfect! Well done!"),
                 SummaryTitle              => ("R\u{00e9}sum\u{00e9}",                      "Summary"),
-                // Lessons
-                LessonFractions           => ("Les fractions",                             "Fractions"),
-                LessonMultiplicationTables => ("Tables de multiplication",                 "Multiplication Tables"),
-                LessonMultiplyByPowerOf10 => ("Multiplier par 10, 100, 1000",             "Multiply by 10, 100, 1000"),
                 // Theme Exploration
                 BackToLessons           => ("Retour aux le\u{00e7}ons",                      "Back to lessons"),
                 BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
@@ -230,11 +215,6 @@ impl TranslationKey {
                 TabLessons                => ("Le\u{00e7}ons",                             "Lessons"),
                 TabStudents               => ("\u{00c9}l\u{00e8}ves",                      "Students"),
                 TeacherDashboard          => ("Tableau enseignant",                        "Teacher Dashboard"),
-                // Themes (pedagogical)
-                ThemeEnglish              => ("Anglais",                                   "English"),
-                ThemeFrench               => ("Fran\u{00e7}ais",                           "French"),
-                ThemeMaths                => ("Math\u{00e9}matiques",                      "Mathematics"),
-                ThemeScience              => ("Sciences",                                  "Science"),
             ];
             // Parameterized variants need per-field destructuring and format! calls.
             Self::CharacterAte(name, n, d) => match language {

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use bevy::prelude::*;
 
-use crate::data::content::{Lesson, Theme};
+use crate::data::content::{Lesson, LocalizedText, Theme};
 use crate::data::save::LessonSessionConfig;
 use crate::data::{Language, PlayerSession, SaveData};
 use crate::i18n::{I18n, TranslationKey};
@@ -87,7 +87,7 @@ pub(super) struct LessonDisclosureChevron(String);
 
 struct LessonTreeRowSpec {
     lesson_id: String,
-    title_key: TranslationKey,
+    title: LocalizedText,
     has_custom_config: bool,
     expanded: bool,
     groups: Vec<config::ExerciseGroupData>,
@@ -95,7 +95,7 @@ struct LessonTreeRowSpec {
 
 pub(super) struct ThemeTreeSpec {
     theme_id: String,
-    title_key: TranslationKey,
+    title: LocalizedText,
     available: bool,
     expanded: bool,
     lessons: Vec<LessonTreeRowSpec>,
@@ -129,7 +129,7 @@ pub(super) fn build_tree_specs(
                             config::build_exercise_configs(lesson, language, existing_config);
                         LessonTreeRowSpec {
                             lesson_id: lesson.id.clone(),
-                            title_key: lesson.title_key.clone(),
+                            title: lesson.title.clone(),
                             has_custom_config: lesson_has_custom_config(lesson, existing_config),
                             expanded: lesson_disclosures.is_expanded(&lesson.id),
                             groups: config::build_exercise_groups(
@@ -146,7 +146,7 @@ pub(super) fn build_tree_specs(
             };
             ThemeTreeSpec {
                 theme_id: theme_data.id.clone(),
-                title_key: theme_data.title_key.clone(),
+                title: theme_data.title.clone(),
                 available: theme_data.available,
                 expanded: theme_disclosures.is_expanded(&theme_data.id),
                 lessons,
@@ -212,7 +212,7 @@ fn spawn_theme_section(
     }
 
     let theme_id = theme_data.theme_id;
-    let title = i18n.t(&theme_data.title_key).into_owned();
+    let title = theme_data.title.get(i18n.language).to_owned();
     let expanded = theme_data.expanded;
     let lessons = theme_data.lessons;
     let i18n = I18n::new(i18n.language);
@@ -257,7 +257,7 @@ fn spawn_unavailable_theme(
         teacher_list_header_border(),
         children![
             teacher_list_label(
-                i18n.t(&theme_data.title_key).into_owned(),
+                theme_data.title.get(i18n.language).to_owned(),
                 TeacherListLevel::Theme,
                 theme::colors::TEXT_MUTED,
                 window,
@@ -356,7 +356,7 @@ fn spawn_lesson_tree_row(
     show_config_controls: bool,
     window: Entity,
 ) {
-    let title = i18n.t(&lesson.title_key).into_owned();
+    let title = lesson.title.get(i18n.language).to_owned();
     let lesson_id = lesson.lesson_id;
     let expanded = lesson.expanded;
     let has_custom_config = lesson.has_custom_config;

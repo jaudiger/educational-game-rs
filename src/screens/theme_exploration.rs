@@ -227,7 +227,7 @@ fn setup_themes(
             ThemeButtonData {
                 id: theme_data.id.clone(),
                 available: theme_data.available,
-                title_text: i18n.t(&theme_data.title_key).into_owned(),
+                title_text: theme_data.title.get(i18n.language).to_owned(),
                 coming_soon_text: i18n.t(&TranslationKey::ComingSoon).into_owned(),
                 completed,
                 completed_text: i18n
@@ -573,7 +573,7 @@ fn build_lesson_button_data(
                 .map(LessonProgress::percentage);
             LessonButtonData {
                 id: lesson.id.clone(),
-                title_text: i18n.t(&lesson.title_key).into_owned(),
+                title_text: lesson.title.get(i18n.language).to_owned(),
                 best_percent_text: best_percent.map(|percentage| {
                     i18n.t(&TranslationKey::BestPercent(percentage))
                         .into_owned()
@@ -611,7 +611,7 @@ fn setup_theme_lessons(
     let write_notice = persistence_notice(PersistenceAction::SaveSlot, *status, &i18n, window);
 
     // Pre-compute all strings before the SpawnWith closure.
-    let theme_title = i18n.t(&theme_data.title_key).into_owned();
+    let theme_title = theme_data.title.get(i18n.language).to_owned();
     let back_label = i18n.t(&TranslationKey::BackToThemes).into_owned();
 
     let progress = if exploration_progress_visible(ctx.settings.mode) {

@@ -5,7 +5,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::i18n::{Language, TranslationKey};
+use crate::i18n::Language;
 
 /// Maximum number of times a single question can appear in a teacher-configured session.
 pub const MAX_QUESTION_REPETITIONS: usize = 5;
@@ -51,6 +51,7 @@ pub(super) fn fraction_value_pair_is_safe(a: i32, b: i32) -> bool {
 /// A plain text string available in both French and English.
 /// Used for prompts and as localized prose within structured explanations.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct LocalizedText {
     pub fr: Cow<'static, str>,
     pub en: Cow<'static, str>,
@@ -76,6 +77,7 @@ impl LocalizedText {
 
 /// Semantic color used by values embedded in localized explanations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum ExplanationColorRole {
     Default,
     Primary,
@@ -86,6 +88,7 @@ pub enum ExplanationColorRole {
 
 /// A named value inserted at an authored explanation placeholder.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExplanationPlaceholder {
     pub name: Cow<'static, str>,
     pub value: ExplanationValue,
@@ -102,6 +105,7 @@ impl ExplanationPlaceholder {
 
 /// Content bound to a named explanation placeholder.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum ExplanationValue {
     Text(LocalizedText),
     Number {
@@ -118,6 +122,7 @@ pub enum ExplanationValue {
 
 /// Localized explanation prose with explicit named semantic values.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct LocalizedExplanation {
     pub text: LocalizedText,
     pub placeholders: Vec<ExplanationPlaceholder>,
@@ -137,6 +142,11 @@ impl LocalizedExplanation {
         let mut binding_names = Vec::new();
         for placeholder in &self.placeholders {
             let name = placeholder.name.as_ref();
+            if let ExplanationValue::Fraction { denominator: 0, .. } = &placeholder.value {
+                issues.push(format!(
+                    "Explanation fraction binding {name} must have a non-zero denominator"
+                ));
+            }
             if !is_valid_placeholder_name(name) {
                 issues.push(format!("Invalid explanation binding name: {name}"));
             }
@@ -229,6 +239,7 @@ impl From<LocalizedText> for LocalizedExplanation {
 
 /// Top-level resource holding all themes and their lessons.
 #[derive(Resource, Debug, Default, Reflect, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ContentLibrary {
     #[reflect(ignore)]
     pub themes: Vec<Theme>,
@@ -259,15 +270,18 @@ impl ContentLibrary {
     pub fn validation_issues(&self) -> Vec<String> {
         let mut issues = Vec::new();
         let mut theme_ids = HashSet::new();
+        let mut lesson_ids = HashSet::new();
         for theme in &self.themes {
             if theme.id.is_empty() || !theme_ids.insert(theme.id.as_str()) {
                 issues.push(format!("Invalid or duplicate theme ID: {}", theme.id));
             }
-            let mut lesson_ids = HashSet::new();
+            if theme.available && theme.lessons.is_empty() {
+                issues.push(format!("Available theme {} has no lessons", theme.id));
+            }
             for lesson in &theme.lessons {
                 if lesson.id.is_empty() || !lesson_ids.insert(lesson.id.as_str()) {
                     issues.push(format!(
-                        "Invalid or duplicate lesson ID in theme {}: {}",
+                        "Invalid or duplicate global lesson ID in theme {}: {}",
                         theme.id, lesson.id
                     ));
                 }
@@ -284,12 +298,14 @@ impl ContentLibrary {
 }
 
 /// A pedagogical theme grouping related lessons.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Theme {
     pub id: String,
-    #[serde(skip)]
-    pub title_key: TranslationKey,
+    pub title: LocalizedText,
+    #[serde(default)]
     pub available: bool,
+    #[serde(default)]
     pub lessons: Vec<Lesson>,
     #[serde(skip)]
     pub(crate) lesson_index: HashMap<String, usize>,
@@ -313,14 +329,15 @@ impl Theme {
 
 /// A single lesson within a theme, containing question pools.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Lesson {
     pub id: String,
-    #[serde(skip)]
-    pub title_key: TranslationKey,
+    pub title: LocalizedText,
     pub questions: Vec<QuestionEntry>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct QuestionEntry {
     pub id: String,
     pub definition: QuestionDefinition,
@@ -338,6 +355,9 @@ impl QuestionEntry {
 impl Lesson {
     pub fn validation_issues(&self) -> Vec<String> {
         let mut issues = Vec::new();
+        if self.questions.is_empty() {
+            issues.push("Lesson must contain at least one exercise".to_owned());
+        }
         if self.questions.len() > MAX_LESSON_EXERCISES {
             issues.push(format!(
                 "Lesson exceeds the {MAX_LESSON_EXERCISES} exercise limit"
@@ -363,6 +383,7 @@ impl Lesson {
 /// Classifies a question by its pedagogical type, regardless of whether it
 /// originates from a static definition or a template.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Reflect, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum QuestionType {
     Mcq,
     Visualization,
@@ -373,7 +394,7 @@ pub enum QuestionType {
 
 /// Tagged union of all question variants, both static definitions and templates.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum QuestionDefinition {
     Mcq(McqDefinition),
     McqTemplate(McqTemplate),
@@ -448,6 +469,7 @@ impl QuestionInstance {
 }
 
 impl QuestionDefinition {
+    #[allow(clippy::too_many_lines)]
     pub fn validation_issues(&self) -> Vec<String> {
         let mut issues = Vec::new();
         match self {
@@ -455,8 +477,36 @@ impl QuestionDefinition {
                 validate_choices(&definition.choices, definition.correct_index, &mut issues);
                 validate_question_visual(definition.question_visual.as_ref(), &mut issues);
                 validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+                issues.extend(definition.explanation.validation_issues());
             }
-            Self::McqTemplate(template) => validate_mcq_template(template, &mut issues),
+            Self::McqTemplate(template) => {
+                validate_mcq_template(template, &mut issues);
+                let (prompt_names, explanation_names) = match template.resolver {
+                    McqResolver::FractionValue => {
+                        (&["a", "b"][..], &["a", "b", "result", "fraction"][..])
+                    }
+                    McqResolver::FractionAddition => (
+                        &["a", "b", "c"][..],
+                        &["a", "b", "c", "sum", "fraction_a", "fraction_c", "result"][..],
+                    ),
+                    McqResolver::FractionName => (&["name"][..], &["name", "d", "fraction"][..]),
+                    McqResolver::Multiplication | McqResolver::MultiplyByPowerOf10 => {
+                        (&["a", "b"][..], &["a", "b", "result"][..])
+                    }
+                };
+                validate_text_placeholders(
+                    &template.prompt_template,
+                    prompt_names,
+                    "prompt",
+                    &mut issues,
+                );
+                validate_text_placeholders(
+                    &template.explanation_template,
+                    explanation_names,
+                    "explanation",
+                    &mut issues,
+                );
+            }
             Self::FractionVisualization(definition) => {
                 validate_fraction(
                     definition.numerator,
@@ -464,8 +514,21 @@ impl QuestionDefinition {
                     true,
                     &mut issues,
                 );
+                issues.extend(definition.explanation.validation_issues());
             }
             Self::FractionVisualizationTemplate(template) => {
+                validate_text_placeholders(
+                    &template.prompt_template,
+                    &["n", "d"],
+                    "prompt",
+                    &mut issues,
+                );
+                validate_text_placeholders(
+                    &template.explanation_template,
+                    &["d", "n", "fraction"],
+                    "explanation",
+                    &mut issues,
+                );
                 validate_fraction_ranges(
                     &template.numerator_range,
                     &template.denominator_range,
@@ -486,10 +549,35 @@ impl QuestionDefinition {
                     true,
                     &mut issues,
                 );
+                validate_comparison_answer(
+                    definition.fraction_a,
+                    definition.fraction_b,
+                    definition.answer,
+                    &mut issues,
+                );
                 validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+                issues.extend(definition.explanation.validation_issues());
             }
             Self::FractionComparisonTemplate(template) => {
                 validate_comparison_template(template, &mut issues);
+                validate_text_placeholders(&template.prompt, &[], "prompt", &mut issues);
+                validate_text_placeholders(
+                    &template.explanation_template,
+                    &[
+                        "na",
+                        "da",
+                        "nb",
+                        "db",
+                        "fraction_a",
+                        "fraction_b",
+                        "greater_fraction",
+                        "lesser_fraction",
+                        "char_a",
+                        "char_b",
+                    ],
+                    "explanation",
+                    &mut issues,
+                );
             }
             Self::FractionIdentification(definition) => {
                 validate_fraction(
@@ -500,6 +588,7 @@ impl QuestionDefinition {
                 );
                 validate_choices(&definition.choices, definition.correct_index, &mut issues);
                 validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+                issues.extend(definition.explanation.validation_issues());
             }
             Self::FractionIdentificationTemplate(template) => {
                 validate_fraction_ranges(
@@ -517,9 +606,22 @@ impl QuestionDefinition {
                 }
                 validate_question_visual(definition.question_visual.as_ref(), &mut issues);
                 validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
+                issues.extend(definition.explanation.validation_issues());
             }
             Self::NumericInputTemplate(template) => {
                 validate_numeric_template(template, &mut issues);
+                validate_text_placeholders(
+                    &template.prompt_template,
+                    &["a", "b"],
+                    "prompt",
+                    &mut issues,
+                );
+                validate_text_placeholders(
+                    &template.explanation_template,
+                    &["a", "b", "result"],
+                    "explanation",
+                    &mut issues,
+                );
             }
         }
         issues
@@ -637,6 +739,25 @@ impl QuestionDefinition {
     }
 }
 
+fn validate_text_placeholders(
+    text: &LocalizedText,
+    allowed_names: &[&str],
+    description: &str,
+    issues: &mut Vec<String>,
+) {
+    for (language, value) in [("French", &text.fr), ("English", &text.en)] {
+        for (name, issue) in scan_placeholder_names(value) {
+            if let Some(issue) = issue {
+                issues.push(format!("{language} {description} {issue}"));
+            } else if !allowed_names.contains(&name.as_str()) {
+                issues.push(format!(
+                    "{language} {description} has unknown placeholder: {name}"
+                ));
+            }
+        }
+    }
+}
+
 fn validate_choices(choices: &[String], correct_index: usize, issues: &mut Vec<String>) {
     if choices.len() < 2 {
         issues.push("Multiple-choice definitions need at least two choices".to_owned());
@@ -668,6 +789,28 @@ fn validate_fraction(
     }
     if numerator == 0 || numerator > denominator || (!allow_equal && numerator == denominator) {
         issues.push("Fraction numerator is outside its valid range".to_owned());
+    }
+}
+
+fn validate_comparison_answer(
+    fraction_a: (u32, u32),
+    fraction_b: (u32, u32),
+    answer: ComparisonAnswer,
+    issues: &mut Vec<String>,
+) {
+    if fraction_a.1 == 0 || fraction_b.1 == 0 {
+        return;
+    }
+
+    let scaled_a = u64::from(fraction_a.0) * u64::from(fraction_b.1);
+    let scaled_b = u64::from(fraction_b.0) * u64::from(fraction_a.1);
+    let expected_answer = match scaled_a.cmp(&scaled_b) {
+        std::cmp::Ordering::Greater => ComparisonAnswer::A,
+        std::cmp::Ordering::Less => ComparisonAnswer::B,
+        std::cmp::Ordering::Equal => ComparisonAnswer::Equal,
+    };
+    if answer != expected_answer {
+        issues.push("Comparison answer does not match the fraction values".to_owned());
     }
 }
 
@@ -799,6 +942,15 @@ fn validate_parameter_ranges(template: &McqTemplate, required: &[&str], issues: 
         if parameter.name.is_empty() || !names.insert(parameter.name.as_ref()) {
             issues.push(format!(
                 "Invalid or duplicate parameter name: {}",
+                parameter.name
+            ));
+        }
+        if !required
+            .iter()
+            .any(|required_name| *required_name == parameter.name.as_ref())
+        {
+            issues.push(format!(
+                "Parameter {} is not supported by this resolver",
                 parameter.name
             ));
         }
@@ -1065,6 +1217,14 @@ fn validate_numeric_template(template: &NumericInputTemplate, issues: &mut Vec<S
         issues.push("Multiplication grid parameters exceed the cell limit".to_owned());
     }
     if template.place_value_explanation
+        && template
+            .factor_b_range
+            .iter()
+            .any(|&b| !is_power_of_ten(b.cast_signed()))
+    {
+        issues.push("Place-value multiplier must be a power of ten".to_owned());
+    }
+    if template.place_value_explanation
         && template.factor_a_range.iter().any(|&a| {
             template
                 .factor_b_range
@@ -1094,6 +1254,7 @@ const fn is_power_of_ten(value: i32) -> bool {
 
 /// One character's side in a fraction comparison visual.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ComparisonSide {
     pub character: Cow<'static, str>,
     pub fraction: (u32, u32),
@@ -1102,6 +1263,7 @@ pub struct ComparisonSide {
 /// One character's side in a fraction comparison visual that also carries
 /// the fraction converted to a common denominator.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ComparisonSideWithConversion {
     pub character: Cow<'static, str>,
     pub fraction: (u32, u32),
@@ -1110,6 +1272,7 @@ pub struct ComparisonSideWithConversion {
 
 /// Optional visual element displayed alongside the text explanation in feedback.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum ExplanationVisual {
     /// A fraction bar with `numerator` coloured slices out of `denominator`.
     FractionBar { numerator: u32, denominator: u32 },
@@ -1146,6 +1309,7 @@ pub enum ExplanationVisual {
 /// Unlike `ExplanationVisual` (shown in feedback), this is shown *during*
 /// the question itself and can be toggled off by the teacher.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum QuestionVisual {
     /// A grid of `rows` by `cols` coloured cells illustrating a multiplication.
     MultiplicationGrid { rows: u32, cols: u32 },
@@ -1156,6 +1320,7 @@ pub enum QuestionVisual {
 
 /// A fully resolved multiple-choice question with prompt, choices, and explanation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct McqDefinition {
     pub prompt: LocalizedText,
     pub choices: Vec<String>,
@@ -1169,6 +1334,7 @@ pub struct McqDefinition {
 
 /// A resolved fraction-bar colouring question.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FractionVisualizationDefinition {
     pub prompt: LocalizedText,
     pub numerator: u32,
@@ -1178,6 +1344,7 @@ pub struct FractionVisualizationDefinition {
 
 /// A resolved fraction comparison question pairing two characters.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FractionComparisonDefinition {
     pub prompt: LocalizedText,
     pub character_a: Cow<'static, str>,
@@ -1192,6 +1359,7 @@ pub struct FractionComparisonDefinition {
 
 /// Which side won the comparison: A, B, or Equal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum ComparisonAnswer {
     A,
     B,
@@ -1200,6 +1368,7 @@ pub enum ComparisonAnswer {
 
 /// Difficulty tier for fraction comparisons based on denominator relationship.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum ComparisonDifficulty {
     SameDenominator,
     SameNumerator,
@@ -1208,6 +1377,7 @@ pub enum ComparisonDifficulty {
 
 /// Explicit difficulty level for question types that have graded variants.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Reflect, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub enum Difficulty {
     Beginner,
     Intermediate,
@@ -1228,6 +1398,7 @@ const fn difficulty_label(difficulty: Difficulty, language: Language) -> &'stati
 
 /// A concrete numeric-input question: textual prompt + expected numeric answer.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NumericInputDefinition {
     pub prompt: LocalizedText,
     pub correct_answer: u32,
@@ -1239,6 +1410,7 @@ pub struct NumericInputDefinition {
 
 /// A resolved fraction identification MCQ: given a bar, pick the fraction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FractionIdentificationDefinition {
     pub numerator: u32,
     pub denominator: u32,
@@ -1250,6 +1422,7 @@ pub struct FractionIdentificationDefinition {
 
 /// Parameterized MCQ template resolved at runtime via an `McqResolver`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct McqTemplate {
     pub prompt_template: LocalizedText,
     pub parameters: Vec<ParameterRange>,
@@ -1258,6 +1431,7 @@ pub struct McqTemplate {
     /// Optional label shown in the teacher config UI instead of the raw
     /// `prompt_template`. Useful to disambiguate templates that share the
     /// same prompt text.
+    #[serde(default)]
     pub teacher_label: Option<LocalizedText>,
     /// When `true`, the resolved `McqDefinition` will carry a
     /// `QuestionVisual::MultiplicationGrid` derived from the selected factors.
@@ -1267,6 +1441,7 @@ pub struct McqTemplate {
 
 /// Named parameter with its allowed values, used inside templates.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ParameterRange {
     pub name: Cow<'static, str>,
     pub values: Vec<i32>,
@@ -1274,6 +1449,7 @@ pub struct ParameterRange {
 
 /// Resolver strategy that turns template parameters into a concrete MCQ.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 #[allow(clippy::enum_variant_names)]
 pub enum McqResolver {
     FractionValue,
@@ -1285,6 +1461,7 @@ pub enum McqResolver {
 
 /// Template that generates fraction-bar colouring questions from ranges.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FractionVisualizationTemplate {
     pub prompt_template: LocalizedText,
     pub numerator_range: Vec<u32>,
@@ -1294,6 +1471,7 @@ pub struct FractionVisualizationTemplate {
 
 /// Template that generates fraction-identification questions from ranges.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FractionIdentificationTemplate {
     pub numerator_range: Vec<u32>,
     pub denominator_range: Vec<u32>,
@@ -1301,6 +1479,7 @@ pub struct FractionIdentificationTemplate {
 
 /// Template that generates comparison questions for a given difficulty tier.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FractionComparisonTemplate {
     pub prompt: LocalizedText,
     pub character_a: Cow<'static, str>,
@@ -1313,6 +1492,7 @@ pub struct FractionComparisonTemplate {
 
 /// Template that generates numeric-input multiplication questions.
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NumericInputTemplate {
     pub prompt_template: LocalizedText,
     pub factor_a_range: Vec<u32>,
@@ -1321,6 +1501,7 @@ pub struct NumericInputTemplate {
     pub explanation_template: LocalizedText,
     /// Optional label shown in the teacher config UI instead of the raw
     /// prompt + difficulty.
+    #[serde(default)]
     pub teacher_label: Option<LocalizedText>,
     /// When `true`, the resolved `NumericInputDefinition` will carry a
     /// `QuestionVisual::MultiplicationGrid` derived from the selected factors.
