@@ -62,7 +62,7 @@ pub(super) fn setup_feedback_ui(
             &i18n,
             is_correct,
             &next_button_label,
-            save_notice,
+            save_notice.as_deref(),
             &explanation,
             window,
         );
@@ -111,7 +111,7 @@ fn spawn_feedback_content(
     i18n: &I18n,
     is_correct: bool,
     next_button_label: &TranslationKey,
-    save_notice: Option<String>,
+    save_notice: Option<&str>,
     explanation: &FeedbackExplanation,
     window: Entity,
 ) {
@@ -129,8 +129,8 @@ fn spawn_feedback_content(
         ))
         .with_children(|feedback| {
             spawn_result_text(feedback, i18n, is_correct, window);
-            if let Some(notice) = &save_notice {
-                feedback.spawn(save_write_failure_notice(notice.clone(), window));
+            if let Some(notice) = save_notice {
+                feedback.spawn(save_write_failure_notice(notice.to_owned(), window));
             }
             spawn_explanation_section(feedback, i18n, explanation, window);
             spawn_next_button(feedback, i18n, next_button_label, window);
