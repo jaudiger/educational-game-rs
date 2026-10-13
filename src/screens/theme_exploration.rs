@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use bevy::color::Luminance;
 use bevy::input_focus::AutoFocus;
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
-use bevy::ui::Pressed;
 use bevy::window::PrimaryWindow;
 
 use crate::data::{
@@ -44,10 +42,7 @@ impl Plugin for ThemeExplorationScreenPlugin {
             )
             .add_systems(
                 Update,
-                (
-                    handle_theme_lessons.run_if(in_state(ExplorationView::ThemeLessons)),
-                    update_exploration_card_hover.run_if(in_state(AppState::ThemeExploration)),
-                ),
+                handle_theme_lessons.run_if(in_state(ExplorationView::ThemeLessons)),
             );
     }
 }
@@ -82,30 +77,19 @@ struct BackToSaveSlotsButton;
 #[derive(Component, Reflect)]
 struct BackToThemesButton;
 
-/// Colors used by exploration cards that cannot use transform-based hover animation.
-#[derive(Component, Reflect)]
-struct ExplorationCardHover {
-    base: Color,
-    hovered: Color,
-    pressed: Color,
-}
-
 /// Color parameters for a card-styled exploration button.
 #[derive(Clone, Copy)]
 struct CardColors {
     bg_available: Color,
     bg_unavailable: Color,
     text_available: Color,
-    progress_color: Color,
     border_available: Color,
     border_unavailable: Color,
     title_shadow: Color,
-    card_text_shadow: Color,
     shadow_base: Color,
-    back_button_bg: Color,
 }
 
-/// Shadow and floating-animation parameters for a card-styled exploration button.
+/// Shadow and floating-animation parameters for exploration buttons.
 #[derive(Clone, Copy)]
 struct CardShadowAnim {
     shadow_alpha_available: f32,
@@ -141,16 +125,13 @@ impl ExplorationCardStyle {
         match exploration_theme {
             ExplorationTheme::Sky => Some(Self {
                 colors: CardColors {
-                    bg_available: Color::srgba(0.88, 0.93, 1.0, 0.82),
-                    bg_unavailable: Color::srgba(0.78, 0.82, 0.90, 0.45),
+                    bg_available: Color::srgba(0.70, 0.82, 0.95, 0.96),
+                    bg_unavailable: Color::srgba(0.58, 0.68, 0.81, 0.88),
                     text_available: theme::colors::TEXT_DARK,
-                    progress_color: theme::colors::PRIMARY,
-                    border_available: Color::srgba(0.72, 0.86, 1.0, 0.55),
-                    border_unavailable: Color::srgba(0.58, 0.65, 0.75, 0.35),
-                    title_shadow: Color::srgba(0.72, 0.86, 1.0, 0.7),
-                    card_text_shadow: Color::srgba(0.78, 0.90, 1.0, 0.5),
-                    shadow_base: Color::srgba(0.08, 0.12, 0.28, 1.0),
-                    back_button_bg: Color::srgb(0.30, 0.55, 0.88),
+                    border_available: Color::srgba(0.30, 0.55, 0.84, 0.96),
+                    border_unavailable: Color::srgba(0.40, 0.51, 0.68, 0.78),
+                    title_shadow: Color::srgba(0.54, 0.72, 0.94, 0.66),
+                    shadow_base: Color::srgba(0.07, 0.14, 0.29, 1.0),
                 },
                 dims: CardDimensions {
                     width: theme::sizes::SKY_CARD_WIDTH,
@@ -227,7 +208,6 @@ fn setup_themes(
     let back_label = i18n.t(&TranslationKey::Back).into_owned();
 
     let card_style = ExplorationCardStyle::for_exploration_theme(ctx.settings.exploration_theme);
-    let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
 
     let theme_buttons: Vec<ThemeButtonData> = content
         .themes
@@ -299,7 +279,7 @@ fn setup_themes(
             parent.spawn((
                 standard_button(
                     &back_label,
-                    back_btn_color,
+                    theme::button_styles::BACK,
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
@@ -314,42 +294,53 @@ fn setup_themes(
     }
 }
 
-/// Resolves (background, text, progress) colors from an optional card style.
-fn card_colors(
-    card_style: Option<ExplorationCardStyle>,
-    available: bool,
-    default_progress: Color,
-) -> (Color, Color, Color) {
+/// Resolves the card background and foreground colors for its availability state.
+fn card_colors(card_style: Option<ExplorationCardStyle>, available: bool) -> (Color, Color) {
     card_style.map_or(
         if available {
-            (
-                theme::colors::PRIMARY,
-                theme::colors::TEXT_LIGHT,
-                default_progress,
-            )
+            (theme::colors::ACTION_PLAY, theme::colors::TEXT_DARK)
         } else {
-            (
-                theme::colors::TOGGLE_INACTIVE,
-                theme::colors::TEXT_MUTED,
-                theme::colors::TEXT_MUTED,
-            )
+            (theme::colors::TOGGLE_INACTIVE, theme::colors::TEXT_DARK)
         },
         |style| {
             if available {
-                (
-                    style.colors.bg_available,
-                    style.colors.text_available,
-                    style.colors.progress_color,
-                )
+                (style.colors.bg_available, style.colors.text_available)
             } else {
-                (
-                    style.colors.bg_unavailable,
-                    theme::colors::TEXT_MUTED,
-                    theme::colors::TEXT_MUTED,
-                )
+                (style.colors.bg_unavailable, theme::colors::TEXT_DARK)
             }
         },
     )
+}
+
+fn exploration_button_palette(
+    background: Color,
+    foreground: Color,
+    card_style: Option<ExplorationCardStyle>,
+    available: bool,
+) -> theme::ButtonPalette {
+    let background_states = if available {
+        theme::ButtonColorStates::new(background, background.darker(0.08), background.darker(0.14))
+    } else {
+        theme::ButtonColorStates::flat(background)
+    };
+    let Some(style) = card_style else {
+        return if available {
+            theme::ButtonPalette::new(background_states, foreground)
+        } else {
+            theme::button_styles::UNAVAILABLE
+        };
+    };
+    let border = if available {
+        style.colors.border_available
+    } else {
+        style.colors.border_unavailable
+    };
+    let border_states = if available {
+        theme::ButtonColorStates::new(border, border.darker(0.08), border.darker(0.14))
+    } else {
+        theme::ButtonColorStates::flat(border)
+    };
+    theme::ButtonPalette::with_border(background_states, foreground, border_states)
 }
 
 /// Resolves card dimensions from an optional card style.
@@ -382,7 +373,7 @@ fn card_node_layout(dims: &CardDimensions) -> Node {
     }
 }
 
-/// Inserts card overlay components (border, shadow, float) onto an existing button.
+/// Inserts a framed card, its shadow, and its floating animation.
 #[allow(clippy::cast_precision_loss)]
 fn insert_card_overlay(
     button: &mut EntityWorldMut,
@@ -404,12 +395,11 @@ fn insert_card_overlay(
             style.shadow_anim.float_amplitude_unavailable,
         )
     };
-
     let shadow_color = style.colors.shadow_base.with_alpha(shadow_alpha);
-
     button.insert((
         Node {
-            border: px(2.0).all(),
+            border: px(1.0).all(),
+            overflow: Overflow::visible(),
             ..card_node_layout(dims)
         },
         BorderColor::all(border_color),
@@ -445,28 +435,27 @@ fn spawn_theme_button(
     card_style: Option<ExplorationCardStyle>,
     index: usize,
 ) {
-    let (bg, text_color, progress_color) = card_colors(
-        card_style,
-        data.available,
-        theme::colors::TEXT_MUTED, // default progress color for theme buttons
-    );
+    let (bg, text_color) = card_colors(card_style, data.available);
+    let palette = exploration_button_palette(bg, text_color, card_style, data.available);
     let dims = card_dimensions(card_style);
 
     let mut button = parent.spawn((
-        button_base(bg),
+        button_base(palette),
         card_node_layout(&dims),
         ThemeButton(data.id.clone()),
     ));
     button.remove::<AnimatedButton>();
 
-    button.insert(ExplorationCardHover {
-        base: bg,
-        hovered: bg.lighter(0.08),
-        pressed: bg.darker(0.08),
-    });
-
     if let Some(style) = card_style {
         insert_card_overlay(&mut button, style, data.available, index, &dims);
+        button.insert(Node {
+            border: px(1.0).all(),
+            flex_direction: FlexDirection::Column,
+            row_gap: theme::scaled(2.0),
+            padding: UiRect::axes(theme::scaled(12.0), theme::scaled(3.0)),
+            justify_content: JustifyContent::Center,
+            ..card_node_layout(&dims)
+        });
     }
     if auto_focus {
         button.insert(AutoFocus);
@@ -478,8 +467,8 @@ fn spawn_theme_button(
         });
     }
 
-    button.with_children(|btn| {
-        let mut title_cmd = btn.spawn(card_text(
+    button.with_children(|contents| {
+        let mut title = contents.spawn(card_text(
             &data.title_text,
             theme::fonts::BUTTON,
             text_color,
@@ -488,18 +477,17 @@ fn spawn_theme_button(
         if let Some(style) = card_style
             && data.available
         {
-            title_cmd.insert(TextShadow {
-                color: style.colors.card_text_shadow,
+            title.insert(TextShadow {
+                color: style.colors.title_shadow,
                 offset: Vec2::new(0.0, 1.0),
             });
         }
-
         if data.available {
-            btn.spawn((
+            contents.spawn((
                 card_text(
                     &data.completed_text,
                     theme::fonts::SMALL,
-                    progress_color,
+                    theme::colors::TEXT_DARK,
                     window,
                 ),
                 ExplorationProgressText::Theme(data.id.clone()),
@@ -541,28 +529,6 @@ fn count_completed_for_theme(
             .count()
     });
     (completed, total)
-}
-
-fn update_exploration_card_hover(
-    mut query: Query<(
-        &Hovered,
-        Has<Pressed>,
-        &ExplorationCardHover,
-        &mut BackgroundColor,
-    )>,
-) {
-    for (hovered, pressed, card_hover, mut background) in &mut query {
-        let color = if pressed {
-            card_hover.pressed
-        } else if hovered.get() {
-            card_hover.hovered
-        } else {
-            card_hover.base
-        };
-        if background.0 != color {
-            background.0 = color;
-        }
-    }
 }
 
 fn handle_themes(
@@ -662,7 +628,6 @@ fn setup_theme_lessons(
     };
 
     let card_style = ExplorationCardStyle::for_exploration_theme(ctx.settings.exploration_theme);
-    let back_btn_color = card_style.map_or(theme::colors::PRIMARY, |s| s.colors.back_button_bg);
 
     let action_labels = LessonActionLabels {
         play_series: i18n.t(&TranslationKey::PlaySeries).into_owned(),
@@ -670,7 +635,6 @@ fn setup_theme_lessons(
     };
 
     let lesson_buttons = build_lesson_button_data(theme_data, progress, &i18n);
-
     let mut root = commands.spawn((
         screen_root(),
         ExplorationScreenRoot,
@@ -721,7 +685,7 @@ fn setup_theme_lessons(
             parent.spawn((
                 standard_button(
                     &back_label,
-                    back_btn_color,
+                    theme::button_styles::BACK,
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
@@ -827,7 +791,7 @@ fn spawn_lesson_button(
     card_style: Option<ExplorationCardStyle>,
     index: usize,
 ) {
-    let (bg, text_color, progress_color) = card_colors(card_style, true, theme::colors::SUCCESS);
+    let (bg, text_color) = card_colors(card_style, true);
     let dims = card_dimensions(card_style);
     let mut card = parent.spawn((
         Node {
@@ -836,66 +800,114 @@ fn spawn_lesson_button(
         },
         BackgroundColor(bg),
         BorderColor::all(theme::colors::INPUT_BORDER),
-        Hovered::default(),
     ));
     if let Some(style) = card_style {
         insert_card_overlay(&mut card, style, true, index, &dims);
     }
 
     card.with_children(|contents| {
-        let mut title_cmd = contents.spawn(card_text(
-            &data.title_text,
-            theme::fonts::BUTTON,
+        spawn_lesson_heading(
+            contents,
+            data,
             text_color,
+            theme::colors::TEXT_DARK,
             window,
-        ));
-        if let Some(style) = card_style {
-            title_cmd.insert(TextShadow {
-                color: style.colors.card_text_shadow,
-                offset: Vec2::new(0.0, 1.0),
-            });
-        }
+            card_style,
+        );
+        spawn_lesson_actions(
+            contents,
+            data,
+            action_labels,
+            auto_focus,
+            window,
+            card_style.is_some(),
+        );
+    });
+}
 
-        let has_progress = data.best_percent_text.is_some();
-        let progress = data.best_percent_text.as_deref().unwrap_or_default();
-        contents.spawn((
-            card_text(progress, theme::fonts::SMALL, progress_color, window),
-            ExplorationProgressText::Lesson(data.id.clone()),
-            Node {
-                display: if has_progress {
-                    Display::Flex
-                } else {
-                    Display::None
-                },
-                ..default()
+fn spawn_lesson_heading(
+    contents: &mut ChildSpawner,
+    data: &LessonButtonData,
+    text_color: Color,
+    progress_color: Color,
+    window: Entity,
+    card_style: Option<ExplorationCardStyle>,
+) {
+    let mut title = contents.spawn(card_text(
+        &data.title_text,
+        theme::fonts::BUTTON,
+        text_color,
+        window,
+    ));
+    if let Some(style) = card_style {
+        title.insert(TextShadow {
+            color: style.colors.title_shadow,
+            offset: Vec2::new(0.0, 1.0),
+        });
+    }
+
+    let has_progress = data.best_percent_text.is_some();
+    let progress = data.best_percent_text.as_deref().unwrap_or_default();
+    contents.spawn((
+        card_text(progress, theme::fonts::SMALL, progress_color, window),
+        ExplorationProgressText::Lesson(data.id.clone()),
+        Node {
+            display: if has_progress {
+                Display::Flex
+            } else {
+                Display::None
             },
-        ));
-        contents
-            .spawn(Node {
+            ..default()
+        },
+    ));
+}
+
+fn spawn_lesson_actions(
+    contents: &mut ChildSpawner,
+    data: &LessonButtonData,
+    action_labels: &LessonActionLabels,
+    auto_focus: bool,
+    window: Entity,
+    decorated_sky_card: bool,
+) {
+    contents
+        .spawn((
+            Node {
                 width: percent(100.0),
                 flex_direction: FlexDirection::Column,
                 row_gap: theme::scaled(theme::spacing::SMALL),
+                padding: if decorated_sky_card {
+                    UiRect::top(theme::scaled(theme::spacing::SMALL))
+                } else {
+                    UiRect::default()
+                },
+                border: if decorated_sky_card {
+                    UiRect::top(px(1.0))
+                } else {
+                    UiRect::default()
+                },
                 ..default()
-            })
-            .with_children(|actions| {
-                spawn_lesson_action(
-                    actions,
-                    data,
-                    LessonLaunchAction::CompleteSeries,
-                    &action_labels.play_series,
-                    auto_focus,
-                    window,
-                );
-                spawn_lesson_action(
-                    actions,
-                    data,
-                    LessonLaunchAction::ChooseExercise,
-                    &action_labels.choose_exercise,
-                    false,
-                    window,
-                );
-            });
-    });
+            },
+            BorderColor::all(Color::srgba(0.30, 0.55, 0.84, 0.54)),
+        ))
+        .with_children(|actions| {
+            spawn_lesson_action(
+                actions,
+                data,
+                LessonLaunchAction::CompleteSeries,
+                &action_labels.play_series,
+                auto_focus,
+                window,
+            );
+            spawn_lesson_action(
+                actions,
+                data,
+                LessonLaunchAction::ChooseExercise,
+                &action_labels.choose_exercise,
+                false,
+                window,
+            );
+        });
 }
 
 fn spawn_lesson_action(
@@ -906,12 +918,12 @@ fn spawn_lesson_action(
     auto_focus: bool,
     window: Entity,
 ) {
-    let color = match action {
-        LessonLaunchAction::CompleteSeries => theme::colors::PRIMARY,
-        LessonLaunchAction::ChooseExercise => theme::colors::SECONDARY,
+    let palette = match action {
+        LessonLaunchAction::CompleteSeries => theme::button_styles::ACTION_PRIMARY,
+        LessonLaunchAction::ChooseExercise => theme::button_styles::ACTION_SECONDARY,
     };
     let mut button = parent.spawn((
-        button_base(color),
+        button_base(palette),
         Node {
             width: percent(100.0),
             min_height: theme::scaled(40.0),
@@ -925,15 +937,10 @@ fn spawn_lesson_action(
             lesson_id: data.id.clone(),
             action,
         },
-        ExplorationCardHover {
-            base: color,
-            hovered: color.lighter(0.08),
-            pressed: color.darker(0.08),
-        },
         children![(
             Text::new(label.to_owned()),
             theme::typography::text(theme::fonts::SMALL, window),
-            TextColor(theme::colors::TEXT_LIGHT),
+            TextColor(palette.foreground),
             TextLayout::justify(Justify::Center),
         )],
     ));

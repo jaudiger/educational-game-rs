@@ -81,7 +81,7 @@ fn spawn_validate_button(parent: &mut ChildSpawnerCommands, i18n: &I18n, window:
         .with_child((
             standard_button(
                 &i18n.t(&TranslationKey::Validate),
-                theme::colors::PRIMARY,
+                theme::button_styles::ACTION_PRIMARY,
                 theme::scaled(theme::sizes::BUTTON_WIDTH),
                 window,
             ),

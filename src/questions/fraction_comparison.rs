@@ -170,7 +170,7 @@ fn comparison_button(label: &str, answer: ComparisonAnswer, window: Entity) -> i
     (
         standard_button(
             label,
-            theme::colors::SECONDARY,
+            theme::button_styles::ANSWER,
             theme::scaled(180.0),
             window,
         ),

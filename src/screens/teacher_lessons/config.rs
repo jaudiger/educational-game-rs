@@ -9,9 +9,9 @@ use crate::plugins::teacher::{TeacherScreenParam, TeacherViewOverlay};
 use crate::screens::teacher_shared::exercise_type_label;
 use crate::states::AppState;
 use crate::ui::components::{
-    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, HoverTooltip,
-    TeacherListLevel, button_base, disclosure_chevron, disclosure_chevron_transform, icon_button,
-    spawn_confirmation_modal, teacher_list_exercise_row, teacher_list_header_border,
+    ButtonActivated, ButtonVisualStyle, ConfirmationDialogAction, ConfirmationDialogActionEvent,
+    HoverTooltip, TeacherListLevel, button_base, disclosure_chevron, disclosure_chevron_transform,
+    icon_button, spawn_confirmation_modal, teacher_list_exercise_row, teacher_list_header_border,
     teacher_list_header_node, teacher_list_label, teacher_list_separator_gap,
 };
 use crate::ui::theme;
@@ -234,7 +234,7 @@ fn exercise_group_bundle(group: ExerciseGroupData, window: Entity) -> impl Bundl
         },
         Children::spawn(SpawnWith(move |section: &mut ChildSpawner| {
             section.spawn((
-                button_base(Color::NONE),
+                button_base(theme::button_styles::DISCLOSURE),
                 ExerciseGroupToggle {
                     lesson_id: button_lesson_id,
                     exercise_type,
@@ -384,10 +384,10 @@ fn spawn_counter_controls(
     })
     .with_children(|controls| {
         if exercise.has_visual {
-            let toggle_bg = if exercise.show_visual {
-                theme::colors::PRIMARY
+            let toggle_style = if exercise.show_visual {
+                theme::button_styles::ACTION_PRIMARY
             } else {
-                theme::colors::TOGGLE_INACTIVE
+                theme::button_styles::NEUTRAL
             };
             controls
                 .spawn(Node {
@@ -400,8 +400,7 @@ fn spawn_counter_controls(
                         6.0,
                         "\u{25c9}",
                         theme::fonts::SMALL,
-                        toggle_bg,
-                        theme::colors::TEXT_LIGHT,
+                        toggle_style,
                         window,
                     ),
                     VisualToggleButton {
@@ -417,7 +416,7 @@ fn spawn_counter_controls(
         let inc_entity = controls.spawn_empty().id();
 
         controls.world_mut().entity_mut(dec_entity).insert((
-            counter_button("\u{2212}", theme::colors::ERROR, window),
+            counter_button("\u{2212}", theme::button_styles::DANGER, window),
             CountButton {
                 lesson_id: lesson_id_owned.clone(),
                 exercise_id: exercise_id_owned.clone(),
@@ -437,7 +436,7 @@ fn spawn_counter_controls(
             },
         ));
         controls.world_mut().entity_mut(inc_entity).insert((
-            counter_button("+", theme::colors::SUCCESS, window),
+            counter_button("+", theme::button_styles::ACTION_SECONDARY, window),
             CountButton {
                 lesson_id: lesson_id_owned,
                 exercise_id: exercise_id_owned,
@@ -448,16 +447,8 @@ fn spawn_counter_controls(
     });
 }
 
-fn counter_button(label: &str, background: Color, window: Entity) -> impl Bundle {
-    icon_button(
-        30.0,
-        6.0,
-        label,
-        theme::fonts::SMALL,
-        background,
-        theme::colors::TEXT_LIGHT,
-        window,
-    )
+fn counter_button(label: &str, palette: theme::ButtonPalette, window: Entity) -> impl Bundle {
+    icon_button(30.0, 6.0, label, theme::fonts::SMALL, palette, window)
 }
 
 pub(super) fn handle_count_change(
@@ -565,7 +556,7 @@ fn set_exercise_count(
 pub(super) fn handle_visual_toggle(
     mut activations: MessageReader<ButtonActivated>,
     buttons: Query<&VisualToggleButton>,
-    mut backgrounds: Query<(&mut BackgroundColor, &VisualToggleButton)>,
+    mut styles: Query<(&mut ButtonVisualStyle, &VisualToggleButton)>,
     mut persistence: SaveDataMut<'_>,
     session: Option<Res<PlayerSession>>,
 ) {
@@ -609,13 +600,13 @@ pub(super) fn handle_visual_toggle(
                 );
             }
         });
-        for (mut background, toggle) in &mut backgrounds {
+        for (mut style, toggle) in &mut styles {
             if toggle.lesson_id == lesson_id && toggle.exercise_id == exercise_id {
-                *background = BackgroundColor(if new_visual {
-                    theme::colors::PRIMARY
+                style.0 = if new_visual {
+                    theme::button_styles::ACTION_PRIMARY
                 } else {
-                    theme::colors::TOGGLE_INACTIVE
-                });
+                    theme::button_styles::NEUTRAL
+                };
             }
         }
     }
@@ -710,7 +701,7 @@ pub(super) fn handle_reset_click(
             &confirm_message,
             &teacher.i18n.t(&TranslationKey::Delete),
             &teacher.i18n.t(&TranslationKey::Cancel),
-            theme::colors::ERROR,
+            theme::button_styles::DANGER,
             window,
             Some(camera),
         );

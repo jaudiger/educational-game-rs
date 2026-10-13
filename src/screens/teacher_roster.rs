@@ -15,8 +15,8 @@ use crate::plugins::teacher::{
 };
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES, LessonPhase, cleanup_root};
 use crate::ui::components::{
-    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base,
-    icon_button, persistence_notice, spawn_confirmation_modal,
+    ButtonActivated, ButtonVisualStyle, ConfirmationDialogAction, ConfirmationDialogActionEvent,
+    button_base, icon_button, persistence_notice, spawn_confirmation_modal,
 };
 use crate::ui::text_input::{TextInputState, text_input};
 use crate::ui::theme;
@@ -224,7 +224,7 @@ fn spawn_add_student_row(
             ),
             text_input(200.0, TextInputState::new(30), window),
             (
-                button_base(theme::colors::SUCCESS),
+                button_base(theme::button_styles::ACTION_SECONDARY),
                 Node {
                     min_width: theme::scaled(60.0),
                     height: theme::scaled(theme::sizes::INPUT_FIELD_HEIGHT),
@@ -239,7 +239,7 @@ fn spawn_add_student_row(
                 children![(
                     Text::new(add_label),
                     theme::typography::text(theme::fonts::SMALL, window),
-                    TextColor(theme::colors::TEXT_LIGHT),
+                    TextColor(theme::button_styles::ACTION_SECONDARY.foreground),
                 )],
             ),
         ],
@@ -254,15 +254,15 @@ fn spawn_student_row(
     show_delete: bool,
     window: Entity,
 ) {
-    let bg = if is_selected {
-        theme::colors::PRIMARY_HOVER
+    let palette = if is_selected {
+        theme::button_styles::LIST_ITEM_SELECTED
     } else {
-        theme::colors::CARD_BG
+        theme::button_styles::LIST_ITEM
     };
 
     parent
         .spawn((
-            button_base(bg),
+            button_base(palette),
             Node {
                 flex_direction: FlexDirection::Row,
                 justify_content: JustifyContent::SpaceBetween,
@@ -287,8 +287,7 @@ fn spawn_student_row(
                         4.0,
                         "X",
                         theme::fonts::SMALL,
-                        theme::colors::ERROR,
-                        theme::colors::TEXT_LIGHT,
+                        theme::button_styles::NEUTRAL,
                         window,
                     ),
                     RemoveStudentButton(index),
@@ -376,7 +375,7 @@ fn handle_remove_student_click(
             &i18n.t(&TranslationKey::RemoveStudentConfirm(student_name.clone())),
             &i18n.t(&TranslationKey::Delete),
             &i18n.t(&TranslationKey::Cancel),
-            theme::colors::ERROR,
+            theme::button_styles::DANGER,
             window,
             Some(camera),
         );
@@ -437,14 +436,14 @@ fn handle_confirm_remove_student(
 
 /// Highlight the selected row and clear all others.
 fn update_roster_selection(
-    bg_query: &mut Query<(&StudentRow, &mut BackgroundColor)>,
+    style_query: &mut Query<(&StudentRow, &mut ButtonVisualStyle)>,
     selected_index: usize,
 ) {
-    for (student_row, mut bg) in bg_query {
-        *bg = if student_row.0 == selected_index {
-            theme::colors::PRIMARY_HOVER.into()
+    for (student_row, mut style) in style_query {
+        style.0 = if student_row.0 == selected_index {
+            theme::button_styles::LIST_ITEM_SELECTED
         } else {
-            theme::colors::CARD_BG.into()
+            theme::button_styles::LIST_ITEM
         };
     }
 }
@@ -454,7 +453,7 @@ fn handle_student_click(
     mut activations: MessageReader<ButtonActivated>,
     mut row_queries: ParamSet<(
         Query<(Entity, &mut StudentRow)>,
-        Query<(&StudentRow, &mut BackgroundColor)>,
+        Query<(&StudentRow, &mut ButtonVisualStyle)>,
     )>,
     mut commands: Commands,
     active_student: Option<Res<ActiveStudent>>,
@@ -550,14 +549,14 @@ fn clear_student_selection_outside_student_rows(
 
 fn sync_roster_selection(
     active_student: Option<Res<ActiveStudent>>,
-    mut bg_query: Query<(&StudentRow, &mut BackgroundColor)>,
+    mut style_query: Query<(&StudentRow, &mut ButtonVisualStyle)>,
 ) {
     let selected_index = active_student.as_deref().map(|student| student.0);
-    for (row, mut bg) in &mut bg_query {
-        *bg = if selected_index == Some(row.0) {
-            theme::colors::PRIMARY_HOVER.into()
+    for (row, mut style) in &mut style_query {
+        style.0 = if selected_index == Some(row.0) {
+            theme::button_styles::LIST_ITEM_SELECTED
         } else {
-            theme::colors::CARD_BG.into()
+            theme::button_styles::LIST_ITEM
         };
     }
 }

@@ -98,7 +98,7 @@ fn return_button(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
     (
         standard_button(
             &i18n.t(&TranslationKey::Back),
-            theme::colors::PRIMARY,
+            theme::button_styles::BACK,
             theme::scaled(theme::sizes::BUTTON_WIDTH),
             window,
         ),

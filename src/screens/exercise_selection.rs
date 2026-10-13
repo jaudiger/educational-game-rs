@@ -1,7 +1,5 @@
 use bevy::input_focus::AutoFocus;
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
-use bevy::ui::Pressed;
 use bevy::ui_widgets::{ScrollArea, ScrollIntoView};
 use bevy::window::PrimaryWindow;
 
@@ -32,7 +30,6 @@ impl Plugin for ExerciseSelectionScreenPlugin {
             (
                 handle_exercise_selection,
                 handle_exercise_group_disclosure,
-                update_exercise_row_hover,
                 scroll_selected_exercise_into_view,
             )
                 .run_if(in_state(ExplorationView::ExerciseSelection)),
@@ -45,13 +42,6 @@ struct ExerciseSelectionRoot;
 
 #[derive(Component, Reflect)]
 struct ExerciseButton(String);
-
-#[derive(Component, Reflect)]
-struct ExerciseRowStyle {
-    base: Color,
-    hovered: Color,
-    pressed: Color,
-}
 
 #[derive(Component, Reflect)]
 struct ExerciseGroupToggle(QuestionType);
@@ -103,16 +93,6 @@ struct ExerciseSelectionScreenData {
     sky_theme: bool,
 }
 
-#[derive(Clone, Copy)]
-struct ExerciseRowPalette {
-    base: Color,
-    hovered: Color,
-    pressed: Color,
-    selected: Color,
-    selected_hovered: Color,
-    selected_pressed: Color,
-}
-
 #[allow(clippy::too_many_arguments)]
 fn setup_exercise_selection(
     mut commands: Commands,
@@ -135,6 +115,7 @@ fn setup_exercise_selection(
     };
 
     let groups = localized_exercise_groups(lesson, &i18n);
+    let sky_theme = settings.exploration_theme == ExplorationTheme::Sky;
     let selected_exercise_id = launch_selection
         .as_deref()
         .and_then(|selection| match selection {
@@ -152,7 +133,7 @@ fn setup_exercise_selection(
         back_label: i18n.t(&TranslationKey::BackToLessons).into_owned(),
         groups,
         selected_exercise_id,
-        sky_theme: settings.exploration_theme == ExplorationTheme::Sky,
+        sky_theme,
     };
     spawn_exercise_selection_screen(&mut commands, data, *primary_window);
 }
@@ -193,18 +174,17 @@ fn spawn_exercise_selection_screen(
 ) {
     let sky_theme = data.sky_theme;
     let list_background = if sky_theme {
-        Color::srgba(0.88, 0.93, 1.0, 0.76)
+        theme::colors::LIST_SURFACE
     } else {
         theme::colors::CARD_BG
     };
-    let row_palette = exercise_row_palette(sky_theme);
     let mut root = commands.spawn((
         screen_root(),
         ExerciseSelectionRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            spawn_exercise_selection_content(parent, data, list_background, row_palette, window);
+            spawn_exercise_selection_content(parent, data, list_background, window);
         })),
     ));
     root.insert(Node {
@@ -222,33 +202,10 @@ fn spawn_exercise_selection_screen(
     }
 }
 
-const fn exercise_row_palette(sky_theme: bool) -> ExerciseRowPalette {
-    if sky_theme {
-        ExerciseRowPalette {
-            base: Color::srgba(0.95, 0.97, 1.0, 0.96),
-            hovered: Color::srgba(0.86, 0.92, 1.0, 0.98),
-            pressed: Color::srgba(0.80, 0.88, 1.0, 1.0),
-            selected: Color::srgba(0.79, 0.88, 1.0, 1.0),
-            selected_hovered: Color::srgba(0.71, 0.83, 1.0, 1.0),
-            selected_pressed: Color::srgba(0.64, 0.78, 0.98, 1.0),
-        }
-    } else {
-        ExerciseRowPalette {
-            base: Color::srgb(0.97, 0.97, 0.99),
-            hovered: Color::srgb(0.91, 0.94, 0.99),
-            pressed: Color::srgb(0.86, 0.91, 0.98),
-            selected: Color::srgb(0.84, 0.90, 1.0),
-            selected_hovered: Color::srgb(0.77, 0.86, 1.0),
-            selected_pressed: Color::srgb(0.70, 0.82, 0.98),
-        }
-    }
-}
-
 fn spawn_exercise_selection_content(
     parent: &mut ChildSpawner,
     data: ExerciseSelectionScreenData,
     list_background: Color,
-    row_palette: ExerciseRowPalette,
     window: Entity,
 ) {
     let ExerciseSelectionScreenData {
@@ -259,47 +216,59 @@ fn spawn_exercise_selection_content(
         sky_theme,
     } = data;
     let has_exercises = groups.iter().any(|group| !group.exercises.is_empty());
-    parent.spawn((
-        Text::new(lesson_context),
-        theme::typography::text(theme::fonts::HEADING, window),
-        TextColor(theme::colors::TEXT_DARK),
-    ));
-    let mut exercise_list = parent.spawn((
-        ScrollArea,
-        Node {
-            width: percent(88.0),
-            flex_grow: 1.0,
-            flex_basis: px(0.0),
-            min_height: px(0.0),
-            overflow: Overflow::scroll_y(),
-            border: px(1.0).all(),
-            border_radius: BorderRadius::all(theme::scaled(theme::sizes::CARD_BORDER_RADIUS)),
-            ..default()
-        },
-        BackgroundColor(list_background),
-        BorderColor::all(theme::colors::INPUT_BORDER),
-        Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
-            scroll_area.spawn(exercise_groups_node(
-                groups,
-                selected_exercise_id,
-                row_palette,
-                window,
-            ));
-        })),
-    ));
     if sky_theme {
-        exercise_list.insert((
+        parent.spawn((
+            Text::new(lesson_context),
+            theme::typography::text(theme::fonts::HEADING, window),
+            TextColor(theme::colors::TEXT_DARK),
+        ));
+        parent.spawn((
+            ScrollArea,
+            Node {
+                width: percent(88.0),
+                flex_grow: 1.0,
+                flex_basis: px(0.0),
+                min_height: px(0.0),
+                overflow: Overflow::scroll_y(),
+                border: px(1.0).all(),
+                border_radius: BorderRadius::all(theme::scaled(24.0)),
+                ..default()
+            },
+            BackgroundColor(list_background),
+            BorderColor::all(Color::srgba(0.30, 0.55, 0.84, 0.78)),
             BoxShadow::new(
-                Color::srgba(0.08, 0.12, 0.28, 0.15),
+                Color::srgba(0.08, 0.14, 0.27, 0.15),
                 Val::Px(0.0),
-                Val::Px(4.0),
-                Val::Px(16.0),
-                Val::Px(2.0),
+                Val::Px(3.0),
+                Val::Px(12.0),
+                Val::Px(1.0),
             ),
             FloatingCard {
                 phase: 0.0,
                 amplitude: theme::animation::FLOATING_AMPLITUDE,
             },
+            Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
+                scroll_area.spawn(exercise_groups_node(groups, selected_exercise_id, window));
+            })),
+        ));
+    } else {
+        parent.spawn((
+            ScrollArea,
+            Node {
+                width: percent(88.0),
+                flex_grow: 1.0,
+                flex_basis: px(0.0),
+                min_height: px(0.0),
+                overflow: Overflow::scroll_y(),
+                border: px(1.0).all(),
+                border_radius: BorderRadius::all(theme::scaled(theme::sizes::CARD_BORDER_RADIUS)),
+                ..default()
+            },
+            BackgroundColor(list_background),
+            BorderColor::all(theme::colors::INPUT_BORDER),
+            Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
+                scroll_area.spawn(exercise_groups_node(groups, selected_exercise_id, window));
+            })),
         ));
     }
     spawn_exercise_selection_footer(parent, back_label, has_exercises, window);
@@ -323,7 +292,7 @@ fn spawn_exercise_selection_footer(
             let mut back = footer.spawn((
                 standard_button(
                     &back_label,
-                    theme::colors::PRIMARY,
+                    theme::button_styles::BACK,
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
@@ -339,7 +308,6 @@ fn spawn_exercise_selection_footer(
 fn exercise_groups_node(
     groups: Vec<ExerciseGroupData>,
     selected_exercise_id: Option<String>,
-    row_palette: ExerciseRowPalette,
     window: Entity,
 ) -> impl Bundle + use<> {
     (
@@ -372,7 +340,6 @@ fn exercise_groups_node(
                         selected_exercise_id,
                         autofocus_exercise_id,
                     },
-                    row_palette,
                     window,
                 );
             }
@@ -380,12 +347,7 @@ fn exercise_groups_node(
     )
 }
 
-fn spawn_exercise_group(
-    parent: &mut ChildSpawner,
-    view: ExerciseGroupView,
-    row_palette: ExerciseRowPalette,
-    window: Entity,
-) {
+fn spawn_exercise_group(parent: &mut ChildSpawner, view: ExerciseGroupView, window: Entity) {
     let ExerciseGroupView {
         group,
         expanded,
@@ -406,7 +368,7 @@ fn spawn_exercise_group(
         },
         Children::spawn(SpawnWith(move |section: &mut ChildSpawner| {
             let mut toggle = section.spawn((
-                button_base(Color::NONE),
+                button_base(theme::button_styles::DISCLOSURE),
                 ExerciseGroupToggle(exercise_type),
                 Node {
                     width: percent(100.0),
@@ -460,9 +422,8 @@ fn spawn_exercise_group(
                 Children::spawn(SpawnWith(move |items: &mut ChildSpawner| {
                     for exercise in exercises {
                         let selected = selected_exercise_id.as_deref() == Some(&exercise.id);
-                        let row_style = exercise_row_style(row_palette, selected);
                         let mut button = items.spawn((
-                            exercise_button(&exercise.label, row_style, selected, window),
+                            exercise_button(&exercise.label, selected, window),
                             ExerciseButton(exercise.id.clone()),
                         ));
                         if selected {
@@ -477,31 +438,15 @@ fn spawn_exercise_group(
     ));
 }
 
-const fn exercise_row_style(palette: ExerciseRowPalette, selected: bool) -> ExerciseRowStyle {
-    if selected {
-        ExerciseRowStyle {
-            base: palette.selected,
-            hovered: palette.selected_hovered,
-            pressed: palette.selected_pressed,
-        }
+fn exercise_button(label: &str, selected: bool, window: Entity) -> impl Bundle + use<> {
+    let palette = if selected {
+        theme::button_styles::EXERCISE_ITEM_SELECTED
     } else {
-        ExerciseRowStyle {
-            base: palette.base,
-            hovered: palette.hovered,
-            pressed: palette.pressed,
-        }
-    }
-}
-
-fn exercise_button(
-    label: &str,
-    row_style: ExerciseRowStyle,
-    selected: bool,
-    window: Entity,
-) -> impl Bundle + use<> {
+        theme::button_styles::EXERCISE_ITEM
+    };
+    let border = palette.border.map_or(Color::NONE, |states| states.normal);
     (
-        button_base(row_style.base),
-        row_style,
+        button_base(palette),
         Node {
             width: percent(100.0),
             min_height: theme::scaled(64.0),
@@ -515,15 +460,11 @@ fn exercise_button(
             border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
             ..default()
         },
-        BorderColor::all(if selected {
-            theme::colors::PRIMARY
-        } else {
-            Color::srgba(0.35, 0.48, 0.67, 0.22)
-        }),
+        BorderColor::all(border),
         children![(
             Text::new(label.to_owned()),
             theme::typography::text(theme::fonts::BODY, window),
-            TextColor(theme::colors::TEXT_DARK),
+            TextColor(palette.foreground),
             TextLayout::justify(Justify::Left),
         )],
     )
@@ -578,28 +519,6 @@ fn handle_exercise_group_disclosure(
                     }
                 }
             }
-        }
-    }
-}
-
-fn update_exercise_row_hover(
-    mut rows: Query<(
-        &Hovered,
-        Has<Pressed>,
-        &ExerciseRowStyle,
-        &mut BackgroundColor,
-    )>,
-) {
-    for (hovered, pressed, style, mut background) in &mut rows {
-        let color = if pressed {
-            style.pressed
-        } else if hovered.get() {
-            style.hovered
-        } else {
-            style.base
-        };
-        if background.0 != color {
-            background.0 = color;
         }
     }
 }

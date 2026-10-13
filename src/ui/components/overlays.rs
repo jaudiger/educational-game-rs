@@ -17,7 +17,7 @@ pub fn spawn_confirmation_modal(
     message: &str,
     confirm_label: &str,
     cancel_label: &str,
-    confirm_color: Color,
+    confirm_palette: theme::ButtonPalette,
     window: Entity,
     camera: Option<Entity>,
 ) -> Entity {
@@ -70,8 +70,7 @@ pub fn spawn_confirmation_modal(
                         confirm.insert(PopoverConfirmButton);
                         let _ = confirm.apply_scene(action_button_scene(
                             &confirm_owned,
-                            confirm_color,
-                            theme::colors::TEXT_LIGHT,
+                            confirm_palette,
                             window,
                         ));
 
@@ -79,8 +78,7 @@ pub fn spawn_confirmation_modal(
                         cancel.insert(PopoverCancelButton);
                         let _ = cancel.apply_scene(action_button_scene(
                             &cancel_owned,
-                            theme::colors::TOGGLE_INACTIVE,
-                            theme::colors::TEXT_DARK,
+                            theme::button_styles::NEUTRAL,
                             window,
                         ));
                     })),

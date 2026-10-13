@@ -206,7 +206,11 @@ fn spawn_next_button(
     parent.spawn((
         standard_button(
             &i18n.t(label),
-            theme::colors::PRIMARY,
+            if matches!(label, TranslationKey::ReturnToExerciseList) {
+                theme::button_styles::BACK
+            } else {
+                theme::button_styles::ACTION_PRIMARY
+            },
             theme::scaled(theme::sizes::BUTTON_WIDTH),
             window,
         ),

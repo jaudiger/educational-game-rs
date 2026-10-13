@@ -179,7 +179,7 @@ fn spawn_save_slots_ui(
             parent.spawn((
                 standard_button(
                     &back,
-                    theme::colors::PRIMARY,
+                    theme::button_styles::BACK,
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
@@ -203,7 +203,7 @@ fn spawn_slot_card(
         .copied()
         .unwrap_or(theme::colors::PASTEL_BLUE);
     let mut cmd = parent.spawn((
-        button_base(theme::colors::CARD_BG),
+        button_base(theme::button_styles::SLOT_CARD),
         Node {
             width: theme::scaled(theme::sizes::CARD_MIN_WIDTH),
             min_height: theme::scaled(theme::sizes::CARD_MIN_HEIGHT),
@@ -247,8 +247,7 @@ fn spawn_slot_card(
                     6.0,
                     "X",
                     theme::fonts::SMALL,
-                    theme::colors::ERROR,
-                    theme::colors::TEXT_LIGHT,
+                    theme::button_styles::DANGER,
                     window,
                 ),
                 DeleteSlotButton(index),
@@ -468,8 +467,7 @@ fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
             create.insert(ConfirmCreateButton);
             let _ = create.apply_scene(action_button_scene(
                 &create_label,
-                theme::colors::SUCCESS,
-                theme::colors::TEXT_LIGHT,
+                theme::button_styles::ACTION_PRIMARY,
                 window,
             ));
 
@@ -477,8 +475,7 @@ fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
             cancel.insert(CancelCreateButton);
             let _ = cancel.apply_scene(action_button_scene(
                 &cancel_label,
-                theme::colors::TOGGLE_INACTIVE,
-                theme::colors::TEXT_DARK,
+                theme::button_styles::NEUTRAL,
                 window,
             ));
         })),
@@ -514,7 +511,7 @@ fn handle_delete_click(
             &i18n.t(&TranslationKey::DeleteSlotN(slot_index + 1)),
             &i18n.t(&TranslationKey::Delete),
             &i18n.t(&TranslationKey::Cancel),
-            theme::colors::ERROR,
+            theme::button_styles::DANGER,
             *primary_window,
             None,
         );

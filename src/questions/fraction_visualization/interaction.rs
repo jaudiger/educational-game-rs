@@ -1,28 +1,28 @@
 use bevy::prelude::*;
 
 use crate::data::QuestionResponse;
-use crate::questions::fraction_bar::{COLOR_UNCOLORED, FractionSlice};
+use crate::questions::fraction_bar::FractionSlice;
 use crate::questions::registry::QuestionResponseSubmitted;
 use crate::questions::registry::submit_response;
-use crate::ui::components::ButtonActivated;
+use crate::ui::components::{ButtonActivated, ButtonVisualStyle};
 use crate::ui::theme;
 
 use super::ValidateButton;
 
 pub(super) fn handle_slice_toggle(
     mut activations: MessageReader<ButtonActivated>,
-    mut slice_query: Query<(&mut FractionSlice, &mut BackgroundColor)>,
+    mut slice_query: Query<(&mut FractionSlice, &mut ButtonVisualStyle)>,
 ) {
     let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     for entity in activated_entities {
-        let Ok((mut slice, mut bg)) = slice_query.get_mut(entity) else {
+        let Ok((mut slice, mut style)) = slice_query.get_mut(entity) else {
             continue;
         };
         slice.colored = !slice.colored;
-        *bg = if slice.colored {
-            BackgroundColor(theme::colors::PRIMARY)
+        style.0 = if slice.colored {
+            theme::button_styles::FRACTION_SLICE_COLORED
         } else {
-            BackgroundColor(COLOR_UNCOLORED)
+            theme::button_styles::FRACTION_SLICE_UNCOLORED
         };
     }
 }

@@ -2,21 +2,26 @@ use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::scene::{Scene, SceneComponent, bsn};
+use bevy::ui::Pressed;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 use bevy::ui_widgets::{Activate, Button};
 
 use crate::ui::animation::AnimatedButton;
-use crate::ui::theme;
+use crate::ui::theme::{self, ButtonPalette};
 
 #[derive(Message, Clone, Copy)]
 pub struct ButtonActivated(pub Entity);
+
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
+pub struct ButtonVisualStyle(pub ButtonPalette);
 
 pub struct ButtonActivationPlugin;
 
 impl Plugin for ButtonActivationPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<ButtonActivated>()
-            .add_observer(forward_button_activation);
+            .add_observer(forward_button_activation)
+            .add_systems(Update, update_button_visuals);
     }
 }
 
@@ -24,21 +29,45 @@ fn forward_button_activation(event: On<Activate>, mut messages: MessageWriter<Bu
     messages.write(ButtonActivated(event.entity));
 }
 
-/// Returns the common button components shared by all interactive buttons.
+#[allow(clippy::type_complexity)]
+fn update_button_visuals(
+    mut buttons: Query<(
+        &Hovered,
+        Has<Pressed>,
+        &ButtonVisualStyle,
+        &mut BackgroundColor,
+        Option<&mut BorderColor>,
+    )>,
+) {
+    for (hovered, pressed, style, mut background, border) in &mut buttons {
+        let is_hovered = hovered.get();
+        let background_color = style.0.background.resolve(is_hovered, pressed);
+        if background.0 != background_color {
+            background.0 = background_color;
+        }
+        if let (Some(border_states), Some(mut border)) = (style.0.border, border) {
+            let border_color = border_states.resolve(is_hovered, pressed);
+            if border.top != border_color
+                || border.right != border_color
+                || border.bottom != border_color
+                || border.left != border_color
+            {
+                border.set_all(border_color);
+            }
+        }
+    }
+}
+
+/// Returns the shared interactive button components with a semantic palette.
 ///
-/// Includes `Button`, `Hovered`, `BackgroundColor`, `AnimatedButton`, focus navigation
-/// (`AutoDirectionalNavigation`, `TabIndex(0)`), and focus ring `Outline`.
-///
-/// Does **not** include `Node` (layout) or children (text/icons). The caller
-/// provides those. Compose via tuple:
-/// ```ignore
-/// parent.spawn((button_base(color), Node { ... }, children![...], MyMarker));
-/// ```
-pub fn button_base(bg_color: Color) -> impl Bundle {
+/// The caller supplies layout and children. The visual system owns background
+/// and palette border colors for every interaction state.
+pub fn button_base(palette: ButtonPalette) -> impl Bundle {
     (
         Button,
         Hovered::default(),
-        BackgroundColor(bg_color),
+        BackgroundColor(palette.background.normal),
+        ButtonVisualStyle(palette),
         AnimatedButton,
         AutoDirectionalNavigation::default(),
         TabIndex(0),
@@ -50,15 +79,13 @@ pub fn button_base(bg_color: Color) -> impl Bundle {
     )
 }
 
-/// Scene component for the fixed action button hierarchy.
 #[derive(SceneComponent, Default, Clone, Reflect)]
 #[scene(ActionButtonProps)]
 pub struct ActionButton;
 
 pub struct ActionButtonProps {
     label: String,
-    bg_color: Color,
-    text_color: Color,
+    palette: ButtonPalette,
     window: Entity,
 }
 
@@ -66,28 +93,21 @@ impl Default for ActionButtonProps {
     fn default() -> Self {
         Self {
             label: String::new(),
-            bg_color: Color::default(),
-            text_color: Color::default(),
+            palette: theme::button_styles::ACTION_SECONDARY,
             window: Entity::PLACEHOLDER,
         }
     }
 }
 
-/// Returns the BSN scene for a compact action button.
+/// Returns a scene for a compact action button.
 ///
-/// The scene is applied to an empty entity so callers can compose markers on
-/// the resulting button without changing its parent relationship.
-pub fn action_button_scene(
-    label: &str,
-    bg_color: Color,
-    text_color: Color,
-    window: Entity,
-) -> impl Scene {
+/// The scene applies to an empty entity so callers can compose markers without
+/// changing the resulting button's parent relationship.
+pub fn action_button_scene(label: &str, palette: ButtonPalette, window: Entity) -> impl Scene {
     bsn! {
         @ActionButton {
             @label: {label.to_owned()},
-            @bg_color: {bg_color},
-            @text_color: {text_color},
+            @palette: {palette},
             @window: {window},
         }
     }
@@ -98,7 +118,8 @@ impl ActionButton {
         bsn! {
             Button
             Hovered::default()
-            BackgroundColor({props.bg_color})
+            BackgroundColor({props.palette.background.normal})
+            ButtonVisualStyle({props.palette})
             AnimatedButton
             AutoDirectionalNavigation::default()
             TabIndex(0)
@@ -119,7 +140,7 @@ impl ActionButton {
             Children [
                 Text({props.label})
                 @theme::typography::text_scene(theme::fonts::BUTTON_SMALL, props.window)
-                TextColor({props.text_color})
+                TextColor({props.palette.foreground})
                 TextLayout::justify(Justify::Center)
             ]
         }
@@ -127,20 +148,16 @@ impl ActionButton {
 }
 
 /// Returns a square icon-style button with centered text.
-///
-/// Wraps `button_base` with a square `Node` (`size` by `size`, given `radius`)
-/// and a single text child.
 pub fn icon_button(
     size: f32,
     radius: f32,
     label: &str,
     font_size: f32,
-    bg_color: Color,
-    text_color: Color,
+    palette: ButtonPalette,
     window: Entity,
 ) -> impl Bundle + use<> {
     (
-        button_base(bg_color),
+        button_base(palette),
         Node {
             width: theme::scaled(size),
             height: theme::scaled(size),
@@ -152,26 +169,21 @@ pub fn icon_button(
         children![(
             Text::new(label),
             theme::typography::text(font_size, window),
-            TextColor(text_color),
+            TextColor(palette.foreground),
             TextLayout::justify(Justify::Center),
         )],
     )
 }
 
-/// Returns a standard button bundle (min `width` by `BUTTON_HEIGHT`, rounded corners).
-///
-/// The button uses `min_width` so it grows to fit its label when the text is
-/// longer than the given minimum. Use inside `children![]` or `.spawn(...)`.
-/// The caller can add marker components by wrapping in a tuple:
-/// `(standard_button("Play", color, scaled(300.0), w), MyMarker)`.
+/// Returns a standard button whose width grows to fit its label.
 pub fn standard_button(
     label: &str,
-    bg_color: Color,
+    palette: ButtonPalette,
     min_width: Val,
     window: Entity,
 ) -> impl Bundle + use<> {
     (
-        button_base(bg_color),
+        button_base(palette),
         Node {
             min_width,
             height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
@@ -188,7 +200,7 @@ pub fn standard_button(
         children![(
             Text::new(label),
             theme::typography::text(theme::fonts::BUTTON, window),
-            TextColor(theme::colors::TEXT_LIGHT),
+            TextColor(palette.foreground),
             TextLayout::justify(Justify::Center),
         )],
     )

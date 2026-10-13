@@ -295,7 +295,7 @@ fn spawn_stats_root(
             parent.spawn((
                 standard_button(
                     &data.return_text,
-                    theme::colors::PRIMARY,
+                    theme::button_styles::BACK,
                     theme::scaled(theme::sizes::BUTTON_WIDTH),
                     window,
                 ),
@@ -661,8 +661,7 @@ fn reset_icon_button(window: Entity) -> impl Bundle {
         4.0,
         "X",
         theme::fonts::SMALL,
-        theme::colors::TOGGLE_INACTIVE,
-        theme::colors::TEXT_DARK,
+        theme::button_styles::NEUTRAL,
         window,
     )
 }
@@ -912,7 +911,7 @@ fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: En
 fn stats_disclosure_button(data: StatsDisclosureRowData, window: Entity) -> impl Bundle + use<> {
     let chevron_target = data.target.clone();
     (
-        button_base(Color::NONE),
+        button_base(theme::button_styles::DISCLOSURE),
         StatsDisclosureButton(data.target),
         teacher_list_header_button_node(),
         Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
@@ -1100,7 +1099,7 @@ fn handle_reset_click(
             &confirm_message,
             &i18n.t(&TranslationKey::Delete),
             &i18n.t(&TranslationKey::Cancel),
-            theme::colors::ERROR,
+            theme::button_styles::DANGER,
             window,
             Some(camera),
         );

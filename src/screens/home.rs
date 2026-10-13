@@ -57,7 +57,7 @@ fn setup_home(
                     (
                         standard_button(
                             &play,
-                            theme::colors::PRIMARY,
+                            theme::button_styles::ACTION_PRIMARY,
                             theme::scaled(theme::sizes::BUTTON_WIDTH),
                             window,
                         ),
@@ -67,7 +67,7 @@ fn setup_home(
                     (
                         standard_button(
                             &settings,
-                            theme::colors::SECONDARY,
+                            theme::button_styles::ACTION_SECONDARY,
                             theme::scaled(theme::sizes::BUTTON_WIDTH),
                             window,
                         ),
@@ -76,7 +76,7 @@ fn setup_home(
                     (
                         standard_button(
                             &quit,
-                            theme::colors::ERROR,
+                            theme::button_styles::DANGER,
                             theme::scaled(theme::sizes::BUTTON_WIDTH),
                             window,
                         ),

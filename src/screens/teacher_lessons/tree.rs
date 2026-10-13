@@ -288,7 +288,7 @@ fn theme_section_header(
         teacher_list_header_border(),
         Children::spawn(SpawnWith(move |header: &mut ChildSpawner| {
             header.spawn((
-                button_base(Color::NONE),
+                button_base(theme::button_styles::DISCLOSURE),
                 ThemeDisclosureButton(toggle_theme_id),
                 teacher_list_header_button_node(),
                 Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
@@ -407,7 +407,7 @@ fn lesson_tree_header(
         Children::spawn(SpawnWith(move |header: &mut ChildSpawner| {
             if show_config_controls {
                 header.spawn((
-                    button_base(Color::NONE),
+                    button_base(theme::button_styles::DISCLOSURE),
                     LessonDisclosureButton(lesson_id.clone()),
                     teacher_list_header_button_node(),
                     Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
@@ -510,8 +510,7 @@ fn reset_icon_button(window: Entity) -> impl Bundle + use<> {
         4.0,
         "X",
         theme::fonts::SMALL,
-        theme::colors::TOGGLE_INACTIVE,
-        theme::colors::TEXT_DARK,
+        theme::button_styles::NEUTRAL,
         window,
     )
 }

@@ -29,14 +29,7 @@ const KEY_GAP: f32 = 6.0;
 /// Border radius for keys.
 const KEY_RADIUS: f32 = 8.0;
 
-/// Returns a numeric keypad bundle (display + keypad grid).
-///
-/// Layout:
-/// - Display row (shows current input)
-/// - Row: 1 2 3
-/// - Row: 4 5 6
-/// - Row: 7 8 9
-/// - Row: Del 0 OK
+/// Returns a numeric keypad with a display, digit controls, delete, and validate.
 pub fn numeric_keypad(current_value: &str, window: Entity) -> impl Bundle {
     let value_owned = current_value.to_owned();
     (
@@ -48,16 +41,13 @@ pub fn numeric_keypad(current_value: &str, window: Entity) -> impl Bundle {
             ..default()
         },
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            // Display
             parent.spawn(display_node(&value_owned, window));
 
-            // Digit rows (first row gets AutoFocus on digit 1)
             parent.spawn(digit_row_with_auto_focus(&[1u8, 2, 3], window));
             for row_digits in &[[4u8, 5, 6], [7, 8, 9]] {
                 parent.spawn(digit_row(row_digits, window));
             }
 
-            // Bottom row: Delete / 0 / Validate
             parent.spawn(bottom_row(window));
         })),
     )
@@ -96,7 +86,7 @@ fn digit_row(digits: &[u8; 3], window: Entity) -> impl Bundle {
         },
         Children::spawn(SpawnIter(d.into_iter().map(move |digit| {
             (
-                key_button(&digit.to_string(), theme::colors::SECONDARY, window),
+                key_button(&digit.to_string(), theme::button_styles::ANSWER, window),
                 KeypadDigitButton(digit),
             )
         }))),
@@ -114,7 +104,7 @@ fn digit_row_with_auto_focus(digits: &[u8; 3], window: Entity) -> impl Bundle {
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             for (i, digit) in d.into_iter().enumerate() {
                 let mut cmd = parent.spawn((
-                    key_button(&digit.to_string(), theme::colors::SECONDARY, window),
+                    key_button(&digit.to_string(), theme::button_styles::ANSWER, window),
                     KeypadDigitButton(digit),
                 ));
                 if i == 0 {
@@ -134,15 +124,15 @@ fn bottom_row(window: Entity) -> impl Bundle {
         },
         children![
             (
-                key_button("⌫", theme::colors::ERROR, window),
+                key_button("⌫", theme::button_styles::DANGER, window),
                 KeypadDeleteButton
             ),
             (
-                key_button("0", theme::colors::SECONDARY, window),
+                key_button("0", theme::button_styles::ANSWER, window),
                 KeypadDigitButton(0)
             ),
             (
-                key_button("OK", theme::colors::SUCCESS, window),
+                key_button("OK", theme::button_styles::ACTION_PRIMARY, window),
                 KeypadValidateButton
             ),
         ],
@@ -150,14 +140,13 @@ fn bottom_row(window: Entity) -> impl Bundle {
 }
 
 /// Returns a single key button bundle.
-fn key_button(label: &str, bg: Color, window: Entity) -> impl Bundle + use<> {
+fn key_button(label: &str, palette: theme::ButtonPalette, window: Entity) -> impl Bundle + use<> {
     icon_button(
         KEY_SIZE,
         KEY_RADIUS,
         label,
         theme::fonts::BUTTON,
-        bg,
-        theme::colors::TEXT_LIGHT,
+        palette,
         window,
     )
 }

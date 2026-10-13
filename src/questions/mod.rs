@@ -79,7 +79,7 @@ pub fn spawn_indexed_choices<F, B>(
 
                 if let Some((n, d)) = pure_fraction {
                     let mut cmd = col.spawn((
-                        button_base(theme::colors::SECONDARY),
+                        button_base(theme::button_styles::ANSWER),
                         Node {
                             min_width: theme::scaled(theme::sizes::BUTTON_WIDTH),
                             height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
@@ -102,8 +102,8 @@ pub fn spawn_indexed_choices<F, B>(
                             n,
                             d,
                             theme::fonts::BUTTON,
-                            theme::colors::TEXT_LIGHT,
-                            theme::colors::TEXT_LIGHT,
+                            theme::button_styles::ANSWER.foreground,
+                            theme::button_styles::ANSWER.foreground,
                             window,
                         ));
                     });
@@ -114,7 +114,7 @@ pub fn spawn_indexed_choices<F, B>(
                     let mut cmd = col.spawn((
                         standard_button(
                             choice_text,
-                            theme::colors::SECONDARY,
+                            theme::button_styles::ANSWER,
                             theme::scaled(theme::sizes::BUTTON_WIDTH),
                             window,
                         ),

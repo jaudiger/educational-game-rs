@@ -164,13 +164,17 @@ pub mod colors {
     use bevy::prelude::Color;
 
     pub const PRIMARY: Color = Color::srgb(0.2, 0.5, 0.9);
-    pub const PRIMARY_HOVER: Color = Color::srgb(0.3, 0.6, 1.0);
     pub const SECONDARY: Color = Color::srgb(0.95, 0.6, 0.1);
+    pub const BACK_BUTTON: Color = PRIMARY;
+    pub const ACTION_PLAY: Color = Color::srgb(0.3333, 0.5961, 0.8863);
+    pub const ACTION_CHOOSE: Color = Color::srgb(0.2588, 0.6549, 0.5490);
     pub const SUCCESS: Color = Color::srgb(0.2, 0.8, 0.3);
     pub const ERROR: Color = Color::srgb(0.9, 0.2, 0.2);
     pub const BACKGROUND: Color = Color::srgb(0.95, 0.95, 0.97);
     pub const CARD_BG: Color = Color::srgb(1.0, 1.0, 1.0);
+    pub const LIST_SURFACE: Color = Color::srgb(0.9686, 0.9804, 0.9922);
     pub const TEXT_DARK: Color = Color::srgb(0.15, 0.15, 0.2);
+    pub const NAVIGATION_INK: Color = Color::srgb(0.0588, 0.0902, 0.1647);
     pub const TEXT_LIGHT: Color = Color::srgb(1.0, 1.0, 1.0);
     pub const TEXT_MUTED: Color = Color::srgb(0.5, 0.5, 0.55);
     pub const INPUT_BG: Color = Color::srgb(1.0, 1.0, 1.0);
@@ -183,6 +187,163 @@ pub mod colors {
     pub const PASTEL_PEACH: Color = Color::srgb(1.0, 0.74, 0.55);
     pub const PASTEL_LAVENDER: Color = Color::srgb(0.73, 0.68, 0.91);
     pub const PASTEL_MINT: Color = Color::srgb(0.55, 0.82, 0.70);
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Reflect)]
+pub struct ButtonColorStates {
+    pub normal: Color,
+    pub hovered: Color,
+    pub pressed: Color,
+}
+
+impl ButtonColorStates {
+    pub const fn new(normal: Color, hovered: Color, pressed: Color) -> Self {
+        Self {
+            normal,
+            hovered,
+            pressed,
+        }
+    }
+
+    pub const fn flat(color: Color) -> Self {
+        Self::new(color, color, color)
+    }
+
+    pub const fn resolve(self, is_hovered: bool, is_pressed: bool) -> Color {
+        if is_pressed {
+            self.pressed
+        } else if is_hovered {
+            self.hovered
+        } else {
+            self.normal
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Reflect)]
+pub struct ButtonPalette {
+    pub background: ButtonColorStates,
+    pub foreground: Color,
+    pub border: Option<ButtonColorStates>,
+}
+
+impl ButtonPalette {
+    pub const fn new(background: ButtonColorStates, foreground: Color) -> Self {
+        Self {
+            background,
+            foreground,
+            border: None,
+        }
+    }
+
+    pub const fn with_border(
+        background: ButtonColorStates,
+        foreground: Color,
+        border: ButtonColorStates,
+    ) -> Self {
+        Self {
+            background,
+            foreground,
+            border: Some(border),
+        }
+    }
+}
+
+pub mod button_styles {
+    use super::{ButtonColorStates, ButtonPalette, colors};
+    use bevy::prelude::Color;
+
+    pub const BACK: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::flat(colors::BACK_BUTTON),
+        colors::NAVIGATION_INK,
+    );
+    pub const ACTION_PRIMARY: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            colors::ACTION_PLAY,
+            Color::srgb(0.3137, 0.5765, 0.8627),
+            Color::srgb(0.3098, 0.5686, 0.8510),
+        ),
+        colors::TEXT_DARK,
+    );
+    pub const ACTION_SECONDARY: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            colors::ACTION_CHOOSE,
+            Color::srgb(0.2392, 0.6235, 0.5255),
+            Color::srgb(0.2314, 0.6157, 0.5176),
+        ),
+        colors::TEXT_DARK,
+    );
+    pub const ANSWER: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            Color::srgb(0.9569, 0.6510, 0.4235),
+            Color::srgb(0.9176, 0.6039, 0.3725),
+            Color::srgb(0.8706, 0.5451, 0.3059),
+        ),
+        colors::TEXT_DARK,
+    );
+    pub const NEUTRAL: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            Color::srgb(0.7882, 0.8118, 0.8471),
+            Color::srgb(0.7255, 0.7608, 0.8118),
+            Color::srgb(0.6627, 0.7098, 0.7647),
+        ),
+        colors::TEXT_DARK,
+    );
+    pub const DANGER: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            Color::srgb(0.9137, 0.5686, 0.5686),
+            Color::srgb(0.8863, 0.5255, 0.5255),
+            Color::srgb(0.8471, 0.4784, 0.4784),
+        ),
+        colors::TEXT_DARK,
+    );
+    pub const EXERCISE_ITEM: ButtonPalette = ButtonPalette::with_border(
+        ButtonColorStates::new(
+            Color::srgb(0.8980, 0.9333, 0.9686),
+            Color::srgb(0.6902, 0.8039, 0.9137),
+            Color::srgb(0.5843, 0.7412, 0.8824),
+        ),
+        colors::TEXT_DARK,
+        ButtonColorStates::new(
+            Color::srgb(0.5608, 0.6588, 0.7490),
+            Color::srgb(0.2588, 0.4196, 0.5686),
+            Color::srgb(0.2039, 0.3529, 0.4863),
+        ),
+    );
+    pub const EXERCISE_ITEM_SELECTED: ButtonPalette = ButtonPalette::with_border(
+        ACTION_PRIMARY.background,
+        colors::TEXT_DARK,
+        ButtonColorStates::new(
+            Color::srgb(0.2588, 0.4196, 0.5686),
+            Color::srgb(0.2039, 0.3529, 0.4863),
+            Color::srgb(0.1569, 0.2706, 0.3725),
+        ),
+    );
+    pub const LIST_ITEM: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            Color::srgb(0.8980, 0.9333, 0.9686),
+            Color::srgb(0.8196, 0.8745, 0.9294),
+            Color::srgb(0.7412, 0.8196, 0.8980),
+        ),
+        colors::TEXT_DARK,
+    );
+    pub const LIST_ITEM_SELECTED: ButtonPalette = ACTION_PRIMARY;
+    pub const SLOT_CARD: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            colors::CARD_BG,
+            Color::srgb(0.8980, 0.9333, 0.9686),
+            Color::srgb(0.8275, 0.8824, 0.9412),
+        ),
+        colors::TEXT_DARK,
+    );
+    pub const DISCLOSURE: ButtonPalette =
+        ButtonPalette::new(ButtonColorStates::flat(Color::NONE), colors::TEXT_DARK);
+    pub const UNAVAILABLE: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::flat(colors::TOGGLE_INACTIVE),
+        colors::TEXT_DARK,
+    );
+    pub const FRACTION_SLICE_COLORED: ButtonPalette = ACTION_PRIMARY;
+    pub const FRACTION_SLICE_UNCOLORED: ButtonPalette = NEUTRAL;
 }
 
 pub mod fonts {

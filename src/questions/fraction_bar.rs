@@ -2,10 +2,12 @@
 
 use bevy::input_focus::AutoFocus;
 use bevy::input_focus::tab_navigation::TabIndex;
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 use bevy::ui_widgets::Button;
 
+use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
 
 /// Default total width of the bar in pixels.
@@ -31,14 +33,10 @@ pub struct FractionSlice {
     pub colored: bool,
 }
 
-/// Returns a fraction bar bundle.
+/// Returns a fraction bar with optional interactive slices and custom dimensions.
 ///
-/// * `denominator`: total number of slices.
-/// * `colored_count`: how many leading slices start coloured.
-/// * `bar_color`: colour used for coloured slices.
-/// * `interactive`: if `true`, each slice gets a [`Button`] and [`FractionSlice`].
-/// * `bar_width`: total width of the bar in pixels.
-/// * `bar_height`: height of each slice in pixels.
+/// The slice count and colored count determine its contents, while the bar color
+/// applies to colored slices. Interactive slices receive focus and hover states.
 #[allow(clippy::cast_precision_loss, clippy::too_many_arguments)]
 pub fn fraction_bar(
     denominator: u32,
@@ -64,12 +62,22 @@ pub fn fraction_bar(
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             for i in 0..denominator {
                 let is_colored = i < colored_count;
-                let bg = if is_colored {
-                    bar_color
+                let palette = if interactive {
+                    if is_colored {
+                        theme::button_styles::FRACTION_SLICE_COLORED
+                    } else {
+                        theme::button_styles::FRACTION_SLICE_UNCOLORED
+                    }
                 } else {
-                    COLOR_UNCOLORED
+                    theme::ButtonPalette::new(
+                        theme::ButtonColorStates::flat(if is_colored {
+                            bar_color
+                        } else {
+                            COLOR_UNCOLORED
+                        }),
+                        theme::colors::TEXT_DARK,
+                    )
                 };
-
                 let mut cmd = parent.spawn((
                     Node {
                         width: px(slice_width),
@@ -78,15 +86,17 @@ pub fn fraction_bar(
                         border_radius: slice_border_radius(i, denominator),
                         ..default()
                     },
-                    BackgroundColor(bg),
+                    BackgroundColor(palette.background.normal),
                     BorderColor::all(COLOR_SLICE_BORDER),
                 ));
 
                 if interactive {
                     cmd.insert((
+                        Hovered::default(),
                         FractionSlice {
                             colored: is_colored,
                         },
+                        ButtonVisualStyle(palette),
                         AutoDirectionalNavigation::default(),
                         TabIndex(0),
                         Outline::new(

@@ -20,6 +20,7 @@ use crate::data::{GameMode, GameSettings, PlayerContext};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES};
 use crate::ui::animation::AnimatedButton;
+use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
 
 /// Spawns and manages the secondary teacher window in class mode.
@@ -80,9 +81,6 @@ impl TeacherView {
 
 #[derive(Component, Reflect)]
 pub struct TeacherTabItem(pub TeacherTab);
-
-#[derive(Component, Reflect)]
-struct TeacherTabLabel;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
 pub enum TeacherTab {
@@ -288,16 +286,12 @@ pub fn tab_header(i18n: &I18n, active_tab: TeacherTab, window: Entity) -> impl B
 }
 
 fn tab_button(label: &str, active: bool, window: Entity) -> impl Bundle + use<> {
-    let background = if active {
-        theme::colors::PRIMARY
+    let palette = if active {
+        theme::button_styles::ACTION_PRIMARY
     } else {
-        theme::colors::TOGGLE_INACTIVE
+        theme::button_styles::NEUTRAL
     };
-    let text_color = if active {
-        theme::colors::TEXT_LIGHT
-    } else {
-        theme::colors::TEXT_DARK
-    };
+    // Keep pointer clicks bubbling to the TabList observer.
     (
         Tab,
         Hovered::default(),
@@ -308,7 +302,8 @@ fn tab_button(label: &str, active: bool, window: Entity) -> impl Bundle + use<> 
             Val::Px(theme::sizes::FOCUS_RING_OFFSET),
             Color::NONE,
         ),
-        BackgroundColor(background),
+        BackgroundColor(palette.background.normal),
+        ButtonVisualStyle(palette),
         Node {
             min_width: theme::scaled(160.0),
             height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
@@ -325,9 +320,8 @@ fn tab_button(label: &str, active: bool, window: Entity) -> impl Bundle + use<> 
         children![(
             Text::new(label),
             theme::typography::text(theme::fonts::BUTTON_SMALL, window),
-            TextColor(text_color),
+            TextColor(palette.foreground),
             TextLayout::justify(Justify::Center),
-            TeacherTabLabel,
         )],
     )
 }
@@ -418,30 +412,14 @@ fn sync_teacher_tab_selection(
 }
 
 fn update_teacher_tab_styles(
-    tabs: Query<(Has<Selected>, &mut BackgroundColor, &Children), With<TeacherTabItem>>,
-    mut labels: Query<&mut TextColor, With<TeacherTabLabel>>,
+    tabs: Query<(Has<Selected>, &mut ButtonVisualStyle), With<TeacherTabItem>>,
 ) {
-    for (selected, mut background, children) in tabs {
-        let background_color = if selected {
-            theme::colors::PRIMARY
+    for (selected, mut style) in tabs {
+        style.0 = if selected {
+            theme::button_styles::ACTION_PRIMARY
         } else {
-            theme::colors::TOGGLE_INACTIVE
+            theme::button_styles::NEUTRAL
         };
-        if background.0 != background_color {
-            background.0 = background_color;
-        }
-        let text_color = if selected {
-            theme::colors::TEXT_LIGHT
-        } else {
-            theme::colors::TEXT_DARK
-        };
-        for child in children.iter() {
-            if let Ok(mut color) = labels.get_mut(child)
-                && color.0 != text_color
-            {
-                color.0 = text_color;
-            }
-        }
     }
 }
 

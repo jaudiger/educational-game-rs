@@ -156,7 +156,7 @@ fn spawn_settings_ui(
                     (
                         standard_button(
                             &back,
-                            theme::colors::PRIMARY,
+                            theme::button_styles::BACK,
                             theme::scaled(theme::sizes::BUTTON_WIDTH),
                             window,
                         ),
