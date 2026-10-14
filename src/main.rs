@@ -5,6 +5,7 @@ mod data;
 mod i18n;
 mod plugins;
 mod questions;
+mod runtime_paths;
 mod screens;
 mod states;
 mod ui;
@@ -17,6 +18,7 @@ use questions::{
     FractionComparisonPlugin, FractionIdentificationPlugin, FractionVisualizationPlugin, McqPlugin,
     NumericInputPlugin,
 };
+use runtime_paths::RuntimePaths;
 use screens::{
     ExerciseSelectionScreenPlugin, HomeScreenPlugin, LessonPlayScreenPlugin,
     LessonSummaryScreenPlugin, SaveSlotsScreenPlugin, SettingsScreenPlugin,
@@ -30,6 +32,10 @@ use ui::{
 };
 
 fn main() {
+    let paths = RuntimePaths::resolve()
+        .unwrap_or_else(|error| panic!("Application path setup failed: {error}"));
+    let asset_directory = paths.asset_directory().to_string_lossy().into_owned();
+
     App::new()
         .add_plugins(
             DefaultPlugins
@@ -38,6 +44,10 @@ fn main() {
                         title: "Educational Game".into(),
                         ..default()
                     }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: asset_directory,
                     ..default()
                 })
                 .disable::<MenuPlugin>(),
@@ -52,12 +62,12 @@ fn main() {
         .add_plugins((
             BalloonCursorPlugin,
             ButtonActivationPlugin,
-            ContentPlugin,
+            ContentPlugin::new(paths.content_directory()),
             FocusNavigationPlugin,
             GameAudioPlugin,
             LessonMascotPlugin,
             NavigationPlugin,
-            PersistencePlugin::default(),
+            PersistencePlugin::new(paths.persistence_directory()),
             SettingsPlugin,
             SkyBackgroundPlugin,
             TeacherPlugin,

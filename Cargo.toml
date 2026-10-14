@@ -7,6 +7,7 @@ rust-version = "1.99"
 
 [dependencies]
 bevy = { version = "0.20", features = ["debug", "bevy_ui_widgets"] }
+directories = "6"
 rand = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

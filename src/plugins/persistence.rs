@@ -8,15 +8,9 @@ use crate::data::{
 use crate::i18n::I18n;
 use crate::ui::components::sync_persistence_notices;
 
-/// Loads and synchronously persists local save data and game settings.
+/// Loads and synchronously persists save data and game settings.
 pub struct PersistencePlugin {
     paths: PersistencePaths,
-}
-
-impl Default for PersistencePlugin {
-    fn default() -> Self {
-        Self::new("local")
-    }
 }
 
 impl PersistencePlugin {

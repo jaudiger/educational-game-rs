@@ -1,0 +1,169 @@
+name: Package builds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/*.rs'
+      - 'assets/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/*.rs'
+      - 'assets/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: linux-x64
+            package_name: educational-game-linux-x64
+            archive: tar.gz
+          - runner: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact: linux-arm64
+            package_name: educational-game-linux-arm64
+            archive: tar.gz
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: windows-x64
+            package_name: educational-game-windows-x64
+            archive: zip
+          - runner: windows-11-vs2026-arm
+            target: aarch64-pc-windows-msvc
+            artifact: windows-arm64
+            package_name: educational-game-windows-arm64
+            archive: zip
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            artifact: macos-arm64
+            package_name: educational-game-macos-arm64
+            archive: zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libasound2-dev \
+            libudev-dev \
+            libwayland-dev
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # stable
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo files
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            ~/.cargo/git/db
+            target
+          key: desktop-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            desktop-${{ runner.os }}-${{ matrix.target }}-
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Package Linux build
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ matrix.package_name }}
+        run: |
+          set -euo pipefail
+          stage="dist/$PACKAGE_NAME"
+          mkdir -p "$stage"
+          install -m 755 target/release/educational-game-rs "$stage/educational-game-rs"
+          cp -R assets "$stage/assets"
+          find "$stage" -name .DS_Store -delete
+          tar -czf "dist/$PACKAGE_NAME.tar.gz" -C dist "$PACKAGE_NAME"
+
+      - name: Package Windows build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ matrix.package_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $PWD "dist/$env:PACKAGE_NAME"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item target/release/educational-game-rs.exe $stage
+          $assets = Join-Path $stage 'assets'
+          New-Item -ItemType Directory -Force -Path $assets | Out-Null
+          Copy-Item -Path 'assets/*' -Destination $assets -Recurse
+          Get-ChildItem -Path $stage -Filter '.DS_Store' -File -Recurse | Remove-Item -Force
+          Compress-Archive -Path $stage -DestinationPath "dist/$env:PACKAGE_NAME.zip" -Force
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ matrix.package_name }}
+        run: |
+          set -euo pipefail
+          stage="dist/$PACKAGE_NAME"
+          app="$stage/Educational Game.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          install -m 755 target/release/educational-game-rs "$app/Contents/MacOS/educational-game-rs"
+          cp -R assets "$app/Contents/Resources/assets"
+          find "$stage" -name .DS_Store -delete
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)"
+          cat > "$app/Contents/Info.plist" <<EOF_PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>educational-game-rs</string>
+            <key>CFBundleIdentifier</key>
+            <string>org.educational-game.rs</string>
+            <key>CFBundleName</key>
+            <string>Educational Game</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>$version</string>
+            <key>CFBundleVersion</key>
+            <string>$version</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF_PLIST
+          ditto -c -k --sequesterRsrc --keepParent "$stage" "dist/$PACKAGE_NAME.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: educational-game-${{ matrix.artifact }}-${{ github.sha }}
+          path: dist/${{ matrix.package_name }}.${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 14
