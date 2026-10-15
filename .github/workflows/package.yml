@@ -1,24 +1,10 @@
 name: Package builds
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
-    paths:
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - '**/*.rs'
-      - '.cargo/**'
-      - 'assets/**'
-      - '.github/workflows/**'
-  pull_request:
-    paths:
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - '**/*.rs'
-      - '.cargo/**'
-      - 'assets/**'
-      - '.github/workflows/**'
-  workflow_dispatch:
 
 concurrency:
   group: desktop-${{ github.ref }}
@@ -29,6 +15,7 @@ permissions:
 
 jobs:
   package:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: ${{ matrix.artifact }}
     strategy:
       fail-fast: false
