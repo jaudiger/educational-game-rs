@@ -15,9 +15,13 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: audit-rust-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   audit-rust:
     permissions:
       contents: read
       checks: write
-    uses: jaudiger/reusable-workflows/.github/workflows/audit-rust.yml@769f5d6babad04c95206b14de840be01e30d99f9
+    uses: jaudiger/reusable-workflows/.github/workflows/audit-rust.yml@33a0a8da94ca9d6eb9bebea0d3b86af989b883e4

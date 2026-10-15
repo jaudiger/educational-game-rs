@@ -1,0 +1,17 @@
+name: Continuous Deployment
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deployment-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: jaudiger/reusable-workflows/.github/workflows/deploy-rust-cloudflare-pages.yml@33a0a8da94ca9d6eb9bebea0d3b86af989b883e4
+    secrets: inherit
