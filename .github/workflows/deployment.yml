@@ -13,5 +13,5 @@ concurrency:
 jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: jaudiger/reusable-workflows/.github/workflows/deploy-rust-cloudflare-pages.yml@33a0a8da94ca9d6eb9bebea0d3b86af989b883e4
+    uses: jaudiger/reusable-workflows/.github/workflows/deploy-rust-cloudflare-pages.yml@3839cfd022d5da89a6c5d3b31f5aa1e9b7fed2ec
     secrets: inherit
