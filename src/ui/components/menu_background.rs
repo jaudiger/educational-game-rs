@@ -3,11 +3,17 @@ use bevy::prelude::*;
 use crate::ui::animation::FloatingMenuDecoration;
 use crate::ui::theme;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum MenuBackgroundStyle {
-    Home,
-    SaveSlots,
-    Settings,
+#[derive(Clone, Copy, PartialEq)]
+pub struct MenuBackgroundStyle(f32);
+
+impl MenuBackgroundStyle {
+    pub const fn new(opacity: f32) -> Self {
+        Self(opacity)
+    }
+
+    const fn opacity(self) -> f32 {
+        self.0
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -92,16 +98,6 @@ const DECORATIONS: [Decoration; 5] = [
         speed: std::f32::consts::TAU / 15.0,
     },
 ];
-
-impl MenuBackgroundStyle {
-    const fn opacity(self) -> f32 {
-        match self {
-            Self::Home => 0.48,
-            Self::SaveSlots => 0.3,
-            Self::Settings => 0.18,
-        }
-    }
-}
 
 pub fn menu_background(style: MenuBackgroundStyle) -> impl Bundle + use<> {
     (

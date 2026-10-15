@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use super::Language;
 
-/// All translatable strings in the application.
+/// Common strings translated by every edition.
 ///
 /// Static variants return `Cow::Borrowed(&'static str)` via `translate()`.
 /// Parameterized variants (containing data) return `Cow::Owned(String)`.
@@ -10,20 +10,13 @@ use super::Language;
 #[derive(Clone, Debug, Default)]
 pub enum TranslationKey {
     // Common
-    Add,
     #[default]
     AppTitle,
     Back,
-    Cancel,
     ComingSoon,
-    Create,
     ExerciseCount(usize),
-    Delete,
-    NameLabel,
     Play,
-    Quit,
     Settings,
-    SaveWriteFailed,
 
     // Fraction Comparison
     CharacterAte(String, u32, u32),
@@ -37,36 +30,18 @@ pub enum TranslationKey {
 
     // Lesson Play
     CorrectAnswer,
-    FinishLesson,
     IncorrectAnswer,
-    NextQuestion,
     QuestionProgress(usize, usize),
     ReturnToExerciseList,
 
     // Lesson Summary
-    SummaryEncouragement,
-    SummaryGood,
-    SummaryPerfect,
-    SummaryPercentage(u32),
-    SummaryScore(u32, u32),
-    SummaryTitle,
 
     // Theme Exploration
     BackToLessons,
     BackToThemes,
-    BestPercent(u32),
-    ChooseExercise,
-    PlaySeries,
-    LessonsCompleted(usize, usize),
     Themes,
 
     // Save Slots
-    CreateSaveSlotN(usize),
-    DeleteSlotN(usize),
-    Empty,
-    SelectClass,
-    SelectSave,
-    SlotN(usize),
 
     // Settings
     ExplanationsLabel,
@@ -80,34 +55,16 @@ pub enum TranslationKey {
     ExplorationThemeOcean,
     ExplorationThemeSky,
     ExplorationThemeSpace,
-    Mode,
-    ModeClass,
-    ModeIndividual,
     MusicVolumeLabel,
     SfxVolumeLabel,
 
     // Teacher
-    NoLessonsCompleted,
-    NoStudentsYet,
     ExerciseTypeComparison,
     ExerciseTypeIdentification,
     ExerciseTypeMcq,
 
     ExerciseTypeNumericInput,
     ExerciseTypeVisualization,
-    RemoveStudentConfirm(String),
-    ResetAllStatsConfirm,
-    ResetLessonConfigConfirm(String),
-    ResetLessonStatsConfirm(String),
-    ResetThemeConfigConfirm(String),
-    ResetExerciseStatsConfirm(String, String),
-    ResetTypeStatsConfirm(String, String),
-    StudentStats(String),
-    StudentsOf(String),
-    TabLessons,
-    TabStudents,
-    TeacherDashboard,
-    Total,
 }
 
 /// Generate a `match $self { ... }` expression from three sections of the translation table.
@@ -119,13 +76,13 @@ pub enum TranslationKey {
 macro_rules! translate {
     (
         $self:expr, $lang:expr;
-        universal: [ $( $u_variant:ident => $u_text:expr ),* $(,)? ];
-        bilingual: [ $( $b_variant:ident => ( $fr:expr, $en:expr ) ),* $(,)? ];
+        universal: [ $( $(#[$u_meta:meta])* $u_variant:ident => $u_text:expr ),* $(,)? ];
+        bilingual: [ $( $(#[$b_meta:meta])* $b_variant:ident => ( $fr:expr, $en:expr ) ),* $(,)? ];
         $( $rest:tt )*
     ) => {
         match $self {
-            $( Self::$u_variant => $u_text.into(), )*
-            $( Self::$b_variant => match $lang {
+            $( $(#[$u_meta])* Self::$u_variant => $u_text.into(), )*
+            $( $(#[$b_meta])* Self::$b_variant => match $lang {
                 Language::French  => $fr.into(),
                 Language::English => $en.into(),
             }, )*
@@ -145,25 +102,16 @@ impl TranslationKey {
             universal: [
                 LanguageEnglish            => "English",
                 LanguageFrench             => "Fran\u{00e7}ais",
-                Mode                       => "Mode",
                 ExerciseTypeIdentification => "Identification",
                 SfxVolumeLabel             => "Interface",
-                Total                      => "Total",
             ];
             bilingual: [
                 // Common
-                Add                       => ("Ajouter",                                  "Add"),
                 AppTitle                  => ("Jeu \u{00c9}ducatif",                      "Educational Game"),
                 Back                      => ("Retour",                                    "Back"),
-                Cancel                    => ("Annuler",                                   "Cancel"),
                 ComingSoon                => ("(bient\u{00f4}t)",                          "(coming soon)"),
-                Create                    => ("Cr\u{00e9}er",                              "Create"),
-                Delete                    => ("Supprimer",                                 "Delete"),
-                NameLabel                 => ("Nom :",                                     "Name:"),
                 Play                      => ("Jouer",                                     "Play"),
-                Quit                      => ("Quitter",                                   "Quit"),
                 Settings                  => ("Param\u{00e8}tres",                         "Settings"),
-                SaveWriteFailed            => ("\u{00c9}chec de sauvegarde. Les changements peuvent \u{00ea}tre perdus \u{00e0} la fermeture.", "Save failed. Changes may be lost when the app closes."),
                 // Fraction Comparison
                 EqualAmount               => ("Pareil",                                    "Equal"),
                 // Fraction Identification
@@ -172,25 +120,14 @@ impl TranslationKey {
                 Validate                  => ("Valider",                                   "Validate"),
                 // Lesson Play
                 CorrectAnswer             => ("Bonne r\u{00e9}ponse !",                    "Correct!"),
-                FinishLesson              => ("Terminer la le\u{00e7}on",                  "Finish lesson"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
-                NextQuestion              => ("Question suivante",                          "Next question"),
                 ReturnToExerciseList      => ("Retour a la liste des exercices",           "Return to exercises"),
                 // Lesson Summary
-                SummaryEncouragement      => ("Continue, tu vas y arriver !",              "Keep going, you'll get there!"),
-                SummaryGood               => ("Bon travail !",                             "Good job!"),
-                SummaryPerfect            => ("Parfait ! Bravo !",                         "Perfect! Well done!"),
-                SummaryTitle              => ("R\u{00e9}sum\u{00e9}",                      "Summary"),
                 // Theme Exploration
                 BackToLessons           => ("Retour aux le\u{00e7}ons",                      "Back to lessons"),
                 BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
-                ChooseExercise          => ("Choisir un exercice",                      "Choose an exercise"),
-                                PlaySeries              => ("Jouer une s\u{00e9}rie",                    "Play a series"),
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
                 // Save Slots
-                Empty                     => ("Vide",                                      "Empty"),
-                SelectClass               => ("Choisir une classe",                        "Select Class"),
-                SelectSave                => ("Choisir une sauvegarde",                    "Select Save"),
                 // Settings
                 ExplanationsLabel         => ("Explications",                              "Explanations"),
                 ExplanationsOn            => ("Oui",                                       "Yes"),
@@ -201,20 +138,12 @@ impl TranslationKey {
                 ExplorationThemeOcean             => ("Oc\u{00e9}an",                              "Ocean"),
                 ExplorationThemeSky               => ("Ciel",                                      "Sky"),
                 ExplorationThemeSpace             => ("Espace",                                    "Space"),
-                ModeClass                 => ("Classe",                                    "Class"),
-                ModeIndividual            => ("Individuel",                                "Individual"),
                 MusicVolumeLabel          => ("Musique",                                   "Music"),
                 // Teacher
-                NoLessonsCompleted        => ("(aucune le\u{00e7}on termin\u{00e9}e)",     "(no lessons completed)"),
-                NoStudentsYet             => ("Aucun \u{00e9}l\u{00e8}ve pour l'instant",  "No students yet"),
                 ExerciseTypeComparison    => ("Comparaison",                               "Comparison"),
                 ExerciseTypeMcq           => ("QCM",                                       "MCQ"),
                 ExerciseTypeNumericInput  => ("Saisie num\u{00e9}rique",                   "Numeric Input"),
                 ExerciseTypeVisualization => ("Visualisation",                             "Visualization"),
-                ResetAllStatsConfirm      => ("R\u{00e9}initialiser toutes les stats ?",   "Reset all stats?"),
-                TabLessons                => ("Le\u{00e7}ons",                             "Lessons"),
-                TabStudents               => ("\u{00c9}l\u{00e8}ves",                      "Students"),
-                TeacherDashboard          => ("Tableau enseignant",                        "Teacher Dashboard"),
             ];
             // Parameterized variants need per-field destructuring and format! calls.
             Self::CharacterAte(name, n, d) => match language {
@@ -230,66 +159,6 @@ impl TranslationKey {
             Self::QuestionProgress(current, total) => match language {
                 Language::French  => format!("Question {current}/{total}").into(),
                 Language::English => format!("Question {current} of {total}").into(),
-            },
-            Self::SummaryPercentage(pct) => match language {
-                Language::French  => format!("R\u{00e9}ussite : {pct} %").into(),
-                Language::English => format!("Success: {pct}%").into(),
-            },
-            Self::SummaryScore(correct, total) => match language {
-                Language::French  => format!("Score : {correct}/{total}").into(),
-                Language::English => format!("Score: {correct}/{total}").into(),
-            },
-            Self::BestPercent(pct) => match language {
-                Language::French  => format!("{pct} %").into(),
-                Language::English => format!("{pct}%").into(),
-            },
-            Self::LessonsCompleted(done, total) => match language {
-                Language::French  => format!("{done}/{total} le\u{00e7}ons").into(),
-                Language::English => format!("{done}/{total} lessons").into(),
-            },
-            Self::CreateSaveSlotN(n) => match language {
-                Language::French  => format!("Cr\u{00e9}er - Emplacement {n}").into(),
-                Language::English => format!("Create Save - Slot {n}").into(),
-            },
-            Self::DeleteSlotN(n) => match language {
-                Language::French  => format!("Supprimer l'emplacement {n} ?").into(),
-                Language::English => format!("Delete Slot {n}?").into(),
-            },
-            Self::SlotN(n) => match language {
-                Language::French  => format!("Emplacement {n}").into(),
-                Language::English => format!("Slot {n}").into(),
-            },
-            Self::RemoveStudentConfirm(name) => match language {
-                Language::French  => format!("Supprimer {name} ?").into(),
-                Language::English => format!("Remove {name}?").into(),
-            },
-            Self::ResetLessonConfigConfirm(lesson) => match language {
-                Language::French  => format!("R\u{00e9}initialiser la configuration de {lesson} ?").into(),
-                Language::English => format!("Reset the configuration for {lesson}?").into(),
-            },
-            Self::ResetThemeConfigConfirm(theme) => match language {
-                Language::French  => format!("R\u{00e9}initialiser la configuration du th\u{00e8}me {theme} ?").into(),
-                Language::English => format!("Reset the configuration for the {theme} theme?").into(),
-            },
-            Self::ResetLessonStatsConfirm(lesson) => match language {
-                Language::French  => format!("R\u{00e9}initialiser les stats pour {lesson} ?").into(),
-                Language::English => format!("Reset stats for {lesson}?").into(),
-            },
-            Self::ResetTypeStatsConfirm(lesson, qtype) => match language {
-                Language::French  => format!("R\u{00e9}initialiser les stats {qtype} pour {lesson} ?").into(),
-                Language::English => format!("Reset {qtype} stats for {lesson}?").into(),
-            },
-            Self::ResetExerciseStatsConfirm(lesson, exercise) => match language {
-                Language::French  => format!("R\u{00e9}initialiser les stats {exercise} pour {lesson} ?").into(),
-                Language::English => format!("Reset {exercise} stats for {lesson}?").into(),
-            },
-            Self::StudentStats(name) => match language {
-                Language::French  => format!("{name} - Statistiques").into(),
-                Language::English => format!("{name} - Stats").into(),
-            },
-            Self::StudentsOf(name) => match language {
-                Language::French  => format!("\u{00c9}l\u{00e8}ves - {name}").into(),
-                Language::English => format!("Students - {name}").into(),
             },
         }
     }

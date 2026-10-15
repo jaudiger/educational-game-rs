@@ -143,14 +143,14 @@ pub fn text_input(width: f32, state: TextInputState, window: Entity) -> impl Bun
         Button,
         Node {
             width: theme::scaled(width),
-            height: theme::scaled(theme::sizes::INPUT_FIELD_HEIGHT),
+            height: theme::scaled(theme::production::sizes::INPUT_FIELD_HEIGHT),
             align_items: AlignItems::Center,
             padding: theme::scaled(theme::spacing::SMALL).horizontal(),
             border: px(2.0).all(),
             border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
             ..default()
         },
-        BackgroundColor(theme::colors::INPUT_BG),
+        BackgroundColor(theme::production::colors::INPUT_BG),
         BorderColor::all(border_color),
         state,
         children![(

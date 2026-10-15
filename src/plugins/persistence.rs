@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use bevy::prelude::*;
 
 use crate::data::{
-    ContentLibrary, GameSettings, PersistencePaths, PersistenceStatus, SaveData, load_or_default,
+    ContentLibrary, GameSettings, PersistedSettings, PersistencePaths, PersistenceStatus,
+    ProductionSettings, SaveData, SettingsChanged, load_or_default,
 };
 use crate::i18n::I18n;
 use crate::ui::components::sync_persistence_notices;
@@ -30,17 +31,19 @@ impl Plugin for PersistencePlugin {
             })
             .expect("failed to initialize save data")
         };
-        let settings = load_or_default(
+        let persisted_settings = load_or_default(
             self.paths.settings_file(),
-            GameSettings::default(),
-            GameSettings::validate_persisted,
+            PersistedSettings::default(),
+            PersistedSettings::validate,
         )
         .expect("failed to initialize game settings");
+        let (settings, production_settings) = persisted_settings.into_resources();
         let language = settings.language;
 
         app.insert_resource(self.paths.clone())
             .insert_resource(save_data)
             .insert_resource(settings)
+            .insert_resource(production_settings)
             .init_resource::<PersistenceStatus>()
             .insert_resource(I18n::new(language))
             .add_systems(
@@ -48,6 +51,25 @@ impl Plugin for PersistencePlugin {
                 sync_persistence_notices.run_if(
                     resource_changed::<PersistenceStatus>.or_else(resource_changed::<I18n>),
                 ),
-            );
+            )
+            .add_systems(Update, persist_changed_settings);
+    }
+}
+
+fn persist_changed_settings(
+    mut changed: MessageReader<SettingsChanged>,
+    settings: Res<GameSettings>,
+    production: Res<ProductionSettings>,
+    paths: Res<PersistencePaths>,
+    mut status: ResMut<PersistenceStatus>,
+) {
+    let has_changes = changed.read().count() > 0;
+    if has_changes {
+        crate::data::persist_game_settings(
+            &settings,
+            *production,
+            paths.settings_file(),
+            &mut status,
+        );
     }
 }

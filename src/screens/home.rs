@@ -2,50 +2,55 @@ use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
-use crate::ui::components::{
-    ButtonActivated, MenuBackgroundStyle, menu_background, screen_root, standard_button,
-};
+use crate::ui::components::{MenuBackgroundStyle, menu_background, screen_root, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
+
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
+pub struct HomePresentation {
+    pub title: String,
+    pub play: String,
+    pub settings: String,
+    pub quit: Option<String>,
+    pub play_destination: AppState,
+}
+
+#[derive(Component, Reflect)]
+pub struct HomeQuitAction;
 
 /// Main menu screen with play and settings buttons.
 pub struct HomeScreenPlugin;
 
 impl Plugin for HomeScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Home), setup_home)
-            .add_systems(Update, handle_quit.run_if(in_state(AppState::Home)));
+        app.init_resource::<HomePresentation>()
+            .add_systems(OnEnter(AppState::Home), setup_home);
     }
 }
 
-#[derive(Component, Reflect)]
-struct QuitButton;
-
-fn setup_home(
+pub fn setup_home(
     mut commands: Commands,
-    i18n: Res<I18n>,
+    presentation: Res<HomePresentation>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
     let window = *primary_window;
-    let title = i18n.t(&TranslationKey::AppTitle);
-    let play = i18n.t(&TranslationKey::Play);
-    let settings = i18n.t(&TranslationKey::Settings);
-    let quit = i18n.t(&TranslationKey::Quit);
+    let title = presentation.title.clone();
+    let play = presentation.play.clone();
+    let settings = presentation.settings.clone();
+    let quit = presentation.quit.clone();
+    let play_destination = presentation.play_destination;
 
     commands.spawn((
         screen_root(),
         DespawnOnExit(AppState::Home),
         children![
-            menu_background(MenuBackgroundStyle::Home),
-            // Title
+            menu_background(MenuBackgroundStyle::new(0.48)),
             (
                 Text::new(title),
                 theme::typography::text(theme::fonts::HERO, window),
                 TextColor(theme::colors::TEXT_DARK),
             ),
-            // Buttons group
             (
                 Node {
                     flex_direction: FlexDirection::Column,
@@ -53,18 +58,18 @@ fn setup_home(
                     row_gap: theme::scaled(theme::spacing::MEDIUM),
                     ..default()
                 },
-                children![
-                    (
+                Children::spawn(SpawnWith(move |buttons: &mut ChildSpawner| {
+                    buttons.spawn((
                         standard_button(
                             &play,
                             theme::button_styles::ACTION_PRIMARY,
                             theme::scaled(theme::sizes::BUTTON_WIDTH),
                             window,
                         ),
-                        NavigateTo(AppState::SaveSlots),
+                        NavigateTo(play_destination),
                         AutoFocus,
-                    ),
-                    (
+                    ));
+                    buttons.spawn((
                         standard_button(
                             &settings,
                             theme::button_styles::ACTION_SECONDARY,
@@ -72,30 +77,20 @@ fn setup_home(
                             window,
                         ),
                         NavigateTo(AppState::Settings),
-                    ),
-                    (
-                        standard_button(
-                            &quit,
-                            theme::button_styles::DANGER,
-                            theme::scaled(theme::sizes::BUTTON_WIDTH),
-                            window,
-                        ),
-                        QuitButton,
-                    ),
-                ],
+                    ));
+                    if let Some(quit) = quit {
+                        buttons.spawn((
+                            standard_button(
+                                &quit,
+                                theme::button_styles::DANGER,
+                                theme::scaled(theme::sizes::BUTTON_WIDTH),
+                                window,
+                            ),
+                            HomeQuitAction,
+                        ));
+                    }
+                })),
             ),
         ],
     ));
-}
-
-fn handle_quit(
-    mut activations: MessageReader<ButtonActivated>,
-    query: Query<(), With<QuitButton>>,
-    mut app_exit: MessageWriter<AppExit>,
-) {
-    for activation in activations.read() {
-        if query.contains(activation.0) {
-            app_exit.write(AppExit::Success);
-        }
-    }
 }

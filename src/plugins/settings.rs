@@ -1,15 +1,16 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::data::GameSettings;
+use crate::data::{GameSettings, SettingsChanged};
 use crate::i18n::{I18n, TranslationKey};
 
-/// Keeps the window title and i18n resource in sync with persisted settings.
+/// Keeps the window title and i18n resource in sync with current settings.
 pub struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, sync_window_title)
+        app.add_message::<SettingsChanged>()
+            .add_systems(Startup, sync_window_title)
             .add_systems(Update, sync_i18n.run_if(resource_changed::<GameSettings>))
             .add_systems(Update, sync_window_title.run_if(resource_changed::<I18n>));
     }
@@ -21,7 +22,7 @@ fn sync_window_title(mut window_query: Query<&mut Window, With<PrimaryWindow>>, 
     }
 }
 
-/// Keeps [`I18n`] in sync with the persisted language in [`GameSettings`].
+/// Keeps [`I18n`] in sync with the current language in [`GameSettings`].
 ///
 /// This is the **single source of sync**; no other code should write to
 /// `I18n::language` directly. The guard avoids marking `I18n` as changed

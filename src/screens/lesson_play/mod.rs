@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 
-use crate::data::{
-    ActiveStudent, GameMode, GameSettings, LastAnswer, LessonLaunchSelection, LessonSession,
-    PersistenceMut, PlayerSession, SelectedLesson,
-};
+use crate::data::{LastAnswer, LessonLaunchSelection, LessonSession, SelectedLesson};
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
 use crate::questions::registry::{
@@ -13,21 +10,42 @@ use crate::states::cleanup_root;
 use crate::states::{ActiveLesson, AppState, InLessonFlow, LessonPhase, StateScopedResourceExt};
 use crate::ui::components::ButtonActivated;
 
-mod explanations;
-mod layout;
-mod session;
+pub mod explanations;
+pub mod layout;
+#[cfg(not(feature = "demo"))]
+pub mod session;
 mod visuals;
 
 /// Lesson play screen orchestrating question display, feedback, and scoring.
 pub struct LessonPlayScreenPlugin;
 
+#[derive(SystemSet, Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum LessonFeedbackSet {
+    Cleanup,
+    RecordAnswer,
+    PreparePresentation,
+    Presentation,
+}
+
 impl Plugin for LessonPlayScreenPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<QuestionResponseSubmitted>()
+            .init_resource::<explanations::FeedbackPresentation>()
             .register_state_scoped_resource::<ActiveLesson, LessonSession>(ActiveLesson)
             .register_state_scoped_resource::<InLessonFlow, SelectedLesson>(InLessonFlow)
             .register_state_scoped_resource::<InLessonFlow, LessonLaunchSelection>(InLessonFlow)
             .register_state_scoped_resource::<ActiveLesson, LastAnswer>(ActiveLesson)
+            .init_resource::<layout::LessonPlanningInput>()
+            .configure_sets(
+                OnEnter(LessonPhase::ShowFeedback),
+                (
+                    LessonFeedbackSet::Cleanup,
+                    LessonFeedbackSet::RecordAnswer,
+                    LessonFeedbackSet::PreparePresentation,
+                    LessonFeedbackSet::Presentation,
+                )
+                    .chain(),
+            )
             .add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
             .add_systems(
                 Update,
@@ -37,21 +55,15 @@ impl Plugin for LessonPlayScreenPlugin {
             )
             .add_systems(
                 OnEnter(LessonPhase::ShowQuestion),
-                (
-                    clear_active_student_for_question,
-                    update_progress_text,
-                    transition_to_waiting,
-                )
-                    .chain(),
+                (update_progress_text, transition_to_waiting).chain(),
             )
             .add_systems(
                 OnEnter(LessonPhase::ShowFeedback),
-                (
-                    cleanup_root::<QuestionRoot>,
-                    record_answer,
-                    explanations::setup_feedback_ui,
-                )
-                    .chain(),
+                cleanup_root::<QuestionRoot>.in_set(LessonFeedbackSet::Cleanup),
+            )
+            .add_systems(
+                OnEnter(LessonPhase::ShowFeedback),
+                explanations::setup_feedback_ui.in_set(LessonFeedbackSet::Presentation),
             )
             .add_systems(OnEnter(LessonPhase::Transitioning), advance_question)
             .add_systems(
@@ -86,37 +98,6 @@ fn update_progress_text(
 
 fn transition_to_waiting(mut next_phase: ResMut<NextState<LessonPhase>>) {
     next_phase.set(LessonPhase::WaitingAnswer);
-}
-
-/// Updates the session score and immediately persists the active player answer.
-/// Runs before `setup_feedback_ui` so the UI reads the updated session.
-fn record_answer(
-    last_answer: Res<LastAnswer>,
-    mut session: ResMut<LessonSession>,
-    mut persistence: PersistenceMut<'_>,
-    active_student: Option<Res<ActiveStudent>>,
-    player_session: Option<Res<PlayerSession>>,
-    selected_lesson: Option<Res<SelectedLesson>>,
-) {
-    session::update_session_score(&mut session, &last_answer);
-
-    session::record_answer(
-        &session,
-        &last_answer,
-        persistence.settings.mode,
-        active_student.as_deref(),
-        player_session.as_deref(),
-        selected_lesson.as_deref(),
-        &mut persistence,
-    );
-}
-
-/// Clear `ActiveStudent` at the start of each question in class mode,
-/// so the teacher must re-select a student before the next answer.
-fn clear_active_student_for_question(mut commands: Commands, settings: Res<GameSettings>) {
-    if settings.mode == GameMode::Group {
-        commands.remove_resource::<ActiveStudent>();
-    }
 }
 
 fn advance_question(

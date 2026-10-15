@@ -3,13 +3,12 @@ use bevy::window::PrimaryWindow;
 
 use crate::data::content::{LocalizedExplanation, QuestionInstance};
 use crate::data::{
-    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonLaunchSelection,
-    LessonSession, PersistenceAction, PersistenceStatus, QuestionContainer,
+    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, QuestionContainer,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::LessonPhase;
 use crate::ui::animation::AnimateScale;
-use crate::ui::components::{persistence_message, save_write_failure_notice, standard_button};
+use crate::ui::components::standard_button;
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -28,7 +27,14 @@ enum FeedbackExplanation {
     },
 }
 
-/// Spawns feedback UI after `record_answer` has updated the session and save data.
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
+pub struct FeedbackPresentation {
+    pub next_button_label: String,
+    pub return_to_catalogue: bool,
+    pub save_notice: Option<String>,
+}
+
+/// Spawns shared answer feedback for the active exercise.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn setup_feedback_ui(
     mut commands: Commands,
@@ -37,32 +43,23 @@ pub(super) fn setup_feedback_ui(
     session: Res<LessonSession>,
     settings: Res<GameSettings>,
     i18n: Res<I18n>,
+    presentation: Res<FeedbackPresentation>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
-    write_status: Res<PersistenceStatus>,
-    launch_selection: Option<Res<LessonLaunchSelection>>,
 ) {
     let window = *primary_window;
     let is_correct = matches!(**last_answer, AnswerResult::Correct);
-    let is_last = session.current_index + 1 >= session.questions.len();
-    let default_selection = LessonLaunchSelection::CompleteLesson;
-    let selection = launch_selection.as_deref().unwrap_or(&default_selection);
-    let next_button_label = match selection {
-        LessonLaunchSelection::SingleExercise { .. } => TranslationKey::ReturnToExerciseList,
-        LessonLaunchSelection::CompleteLesson if is_last => TranslationKey::FinishLesson,
-        LessonLaunchSelection::CompleteLesson => TranslationKey::NextQuestion,
-    };
-    let save_notice = persistence_message(PersistenceAction::QuestionAnswer, *write_status, &i18n);
-    let explanation = session.current().map_or(FeedbackExplanation::Hidden, |q| {
-        build_feedback_explanation(settings.show_explanations, &q.instance)
-    });
+    let explanation = session
+        .current()
+        .map_or(FeedbackExplanation::Hidden, |question| {
+            build_feedback_explanation(settings.show_explanations, &question.instance)
+        });
 
     commands.entity(*container).with_children(|parent| {
         spawn_feedback_content(
             parent,
             &i18n,
             is_correct,
-            &next_button_label,
-            save_notice.as_deref(),
+            &presentation,
             &explanation,
             window,
         );
@@ -110,8 +107,7 @@ fn spawn_feedback_content(
     parent: &mut ChildSpawnerCommands,
     i18n: &I18n,
     is_correct: bool,
-    next_button_label: &TranslationKey,
-    save_notice: Option<&str>,
+    presentation: &FeedbackPresentation,
     explanation: &FeedbackExplanation,
     window: Entity,
 ) {
@@ -129,11 +125,15 @@ fn spawn_feedback_content(
         ))
         .with_children(|feedback| {
             spawn_result_text(feedback, i18n, is_correct, window);
-            if let Some(notice) = save_notice {
-                feedback.spawn(save_write_failure_notice(notice.to_owned(), window));
+            if let Some(notice) = &presentation.save_notice {
+                feedback.spawn((
+                    Text::new(notice.clone()),
+                    theme::typography::text(theme::fonts::SMALL, window),
+                    TextColor(theme::colors::ERROR),
+                ));
             }
             spawn_explanation_section(feedback, i18n, explanation, window);
-            spawn_next_button(feedback, i18n, next_button_label, window);
+            spawn_next_button(feedback, presentation, window);
         });
 }
 
@@ -199,14 +199,13 @@ fn spawn_result_text(
 
 fn spawn_next_button(
     parent: &mut ChildSpawnerCommands,
-    i18n: &I18n,
-    label: &TranslationKey,
+    presentation: &FeedbackPresentation,
     window: Entity,
 ) {
     parent.spawn((
         standard_button(
-            &i18n.t(label),
-            if matches!(label, TranslationKey::ReturnToExerciseList) {
+            &presentation.next_button_label,
+            if presentation.return_to_catalogue {
                 theme::button_styles::BACK
             } else {
                 theme::button_styles::ACTION_PRIMARY

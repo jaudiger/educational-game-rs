@@ -4,7 +4,7 @@ use bevy::text::{FontSize, FontSource};
 use bevy::ui_widgets::{Checkbox, RadioButton};
 use bevy::window::WindowResized;
 
-use super::components::{CheckboxMark, RadioMark, dispatch_confirmation_button_actions};
+use super::components::{CheckboxMark, RadioMark};
 use super::widget_styles;
 
 /// Reference design vmin (min dimension of the 1280x720 default window).
@@ -111,7 +111,6 @@ impl Plugin for ThemePlugin {
                 widget_styles::update_slider_thumb_position,
                 widget_styles::dismiss_tooltip_timer,
                 widget_styles::handle_hover_tooltips,
-                dispatch_confirmation_button_actions,
                 scale_fonts_on_window_resize,
             ),
         );
@@ -180,7 +179,6 @@ pub mod colors {
     pub const NAVIGATION_INK: Color = Color::srgb(0.0588, 0.0902, 0.1647);
     pub const TEXT_LIGHT: Color = Color::srgb(1.0, 1.0, 1.0);
     pub const TEXT_MUTED: Color = Color::srgb(0.5, 0.5, 0.55);
-    pub const INPUT_BG: Color = Color::srgb(1.0, 1.0, 1.0);
     pub const INPUT_BORDER: Color = Color::srgb(0.7, 0.7, 0.75);
     pub const TOGGLE_INACTIVE: Color = Color::srgb(0.8, 0.8, 0.85);
     pub const CARD_OVERLAY: Color = Color::srgba(1.0, 1.0, 1.0, 0.65);
@@ -322,23 +320,6 @@ pub mod button_styles {
             Color::srgb(0.1569, 0.2706, 0.3725),
         ),
     );
-    pub const LIST_ITEM: ButtonPalette = ButtonPalette::new(
-        ButtonColorStates::new(
-            Color::srgb(0.8980, 0.9333, 0.9686),
-            Color::srgb(0.8196, 0.8745, 0.9294),
-            Color::srgb(0.7412, 0.8196, 0.8980),
-        ),
-        colors::TEXT_DARK,
-    );
-    pub const LIST_ITEM_SELECTED: ButtonPalette = ACTION_PRIMARY;
-    pub const SLOT_CARD: ButtonPalette = ButtonPalette::new(
-        ButtonColorStates::new(
-            colors::CARD_BG,
-            Color::srgb(0.8980, 0.9333, 0.9686),
-            Color::srgb(0.8275, 0.8824, 0.9412),
-        ),
-        colors::TEXT_DARK,
-    );
     pub const DISCLOSURE: ButtonPalette =
         ButtonPalette::new(ButtonColorStates::flat(Color::NONE), colors::TEXT_DARK);
     pub const UNAVAILABLE: ButtonPalette = ButtonPalette::new(
@@ -356,7 +337,6 @@ pub mod fonts {
     pub const BODY: f32 = 24.0;
     pub const SMALL: f32 = 18.0;
     pub const BUTTON: f32 = 28.0;
-    pub const BUTTON_SMALL: f32 = 22.0;
 }
 
 pub mod spacing {
@@ -389,9 +369,6 @@ pub mod sizes {
     pub const BUTTON_BORDER_RADIUS: f32 = 12.0;
     pub const CARD_PADDING: f32 = 24.0;
     pub const CARD_BORDER_RADIUS: f32 = 16.0;
-    pub const CARD_MIN_WIDTH: f32 = 250.0;
-    pub const CARD_MIN_HEIGHT: f32 = 150.0;
-    pub const INPUT_FIELD_HEIGHT: f32 = 50.0;
     pub const SLIDER_WIDTH: f32 = 300.0;
     pub const SLIDER_HEIGHT: f32 = 24.0;
     pub const SLIDER_TRACK_HEIGHT: f32 = 6.0;
@@ -400,7 +377,6 @@ pub mod sizes {
     pub const CHECKBOX_MARK_SIZE: f32 = 18.0;
     pub const RADIO_SIZE: f32 = 32.0;
     pub const RADIO_MARK_SIZE: f32 = 16.0;
-    pub const POPOVER_MIN_WIDTH: f32 = 280.0;
     pub const TOOLTIP_BORDER_RADIUS: f32 = 8.0;
     pub const SKY_CARD_WIDTH: f32 = 350.0;
     pub const SKY_CARD_HEIGHT: f32 = 90.0;
@@ -410,3 +386,6 @@ pub mod sizes {
     pub const FOCUS_RING_WIDTH: f32 = 3.0;
     pub const FOCUS_RING_OFFSET: f32 = 2.0;
 }
+
+#[cfg(not(feature = "demo"))]
+pub mod production;

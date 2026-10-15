@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::data::content::{ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, QuestionType};
 use crate::data::{Language, LessonSessionConfig, PersistenceAction, PlayerSession, SaveDataMut};
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::plugins::teacher::{TeacherScreenParam, TeacherViewOverlay};
 use crate::screens::teacher_shared::exercise_type_label;
 use crate::states::AppState;
@@ -684,23 +684,21 @@ pub(super) fn handle_reset_click(
                     );
                 teacher
                     .i18n
-                    .t(&TranslationKey::ResetThemeConfigConfirm(title))
+                    .t(&ProductionTranslationKey::ResetThemeConfigConfirm(title))
                     .into_owned()
             }
             ConfigResetTarget::Lesson(lesson_id) => teacher
                 .i18n
-                .t(&TranslationKey::ResetLessonConfigConfirm(lesson_label(
-                    lesson_id,
-                    &content,
-                    &teacher.i18n,
-                )))
+                .t(&ProductionTranslationKey::ResetLessonConfigConfirm(
+                    lesson_label(lesson_id, &content, &teacher.i18n),
+                ))
                 .into_owned(),
         };
         let modal = spawn_confirmation_modal(
             &mut commands,
             &confirm_message,
-            &teacher.i18n.t(&TranslationKey::Delete),
-            &teacher.i18n.t(&TranslationKey::Cancel),
+            &teacher.i18n.t(&ProductionTranslationKey::Delete),
+            &teacher.i18n.t(&ProductionTranslationKey::Cancel),
             theme::button_styles::DANGER,
             window,
             Some(camera),

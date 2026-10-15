@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hash;
+use std::hash::{DefaultHasher, Hasher};
 
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};

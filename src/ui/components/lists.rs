@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 
-use super::theme;
+use super::{list_separator_border, theme};
 
 const TEACHER_LIST_ROW_HEIGHT: f32 = 36.0;
 
@@ -76,10 +76,6 @@ pub fn teacher_list_header_button_node() -> Node {
     }
 }
 
-pub fn list_separator_border() -> BorderColor {
-    BorderColor::all(list_separator_color())
-}
-
 pub fn teacher_list_header_border() -> BorderColor {
     list_separator_border()
 }
@@ -124,8 +120,4 @@ pub fn teacher_list_content_node() -> Node {
         padding: theme::scaled(theme::spacing::MEDIUM).all(),
         ..default()
     }
-}
-
-const fn list_separator_color() -> Color {
-    Color::srgba(0.35, 0.48, 0.67, 0.3)
 }

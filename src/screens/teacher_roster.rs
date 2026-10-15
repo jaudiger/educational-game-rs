@@ -8,7 +8,7 @@ use crate::data::{
     ActiveStudent, ClassStudent, GameMode, PersistenceAction, PersistenceStatus, PlayerSession,
     SaveData, SaveDataMut,
 };
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::{I18n, ProductionTranslationKey};
 use crate::plugins::teacher::{
     TeacherScreenParam, TeacherView, TeacherViewOverlay, TeacherWindow, TeacherWindowParam,
     TeacherWindowState, tab_header, teacher_roster_view_active, teacher_window_exists,
@@ -95,7 +95,7 @@ fn rebuild_roster_ui(
     if !matches!(&state.view, TeacherView::Students) {
         return;
     }
-    if ts.ctx.settings.mode != GameMode::Group {
+    if ts.ctx.production.mode != GameMode::Group {
         return;
     }
     let Ok(camera_entity) = ts.teacher.camera.single() else {
@@ -121,11 +121,16 @@ fn rebuild_roster_ui(
     let tab_header_bundle = tab_header(&ts.i18n, active_tab, window);
     let title_text = ts
         .i18n
-        .t(&TranslationKey::StudentsOf(class_save.name.clone()))
+        .t(&ProductionTranslationKey::StudentsOf(
+            class_save.name.clone(),
+        ))
         .into_owned();
-    let no_students_text = ts.i18n.t(&TranslationKey::NoStudentsYet).into_owned();
-    let name_label = ts.i18n.t(&TranslationKey::NameLabel).into_owned();
-    let add_label = ts.i18n.t(&TranslationKey::Add).into_owned();
+    let no_students_text = ts
+        .i18n
+        .t(&ProductionTranslationKey::NoStudentsYet)
+        .into_owned();
+    let name_label = ts.i18n.t(&ProductionTranslationKey::NameLabel).into_owned();
+    let add_label = ts.i18n.t(&ProductionTranslationKey::Add).into_owned();
     let write_notice =
         persistence_notice(PersistenceAction::TeacherRoster, *status, &ts.i18n, window);
 
@@ -227,7 +232,7 @@ fn spawn_add_student_row(
                 button_base(theme::button_styles::ACTION_SECONDARY),
                 Node {
                     min_width: theme::scaled(60.0),
-                    height: theme::scaled(theme::sizes::INPUT_FIELD_HEIGHT),
+                    height: theme::scaled(theme::production::sizes::INPUT_FIELD_HEIGHT),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     border_radius: BorderRadius::all(theme::scaled(
@@ -255,9 +260,9 @@ fn spawn_student_row(
     window: Entity,
 ) {
     let palette = if is_selected {
-        theme::button_styles::LIST_ITEM_SELECTED
+        theme::production::button_styles::LIST_ITEM_SELECTED
     } else {
-        theme::button_styles::LIST_ITEM
+        theme::production::button_styles::LIST_ITEM
     };
 
     parent
@@ -372,9 +377,11 @@ fn handle_remove_student_click(
 
         let modal_entity = spawn_confirmation_modal(
             &mut commands,
-            &i18n.t(&TranslationKey::RemoveStudentConfirm(student_name.clone())),
-            &i18n.t(&TranslationKey::Delete),
-            &i18n.t(&TranslationKey::Cancel),
+            &i18n.t(&ProductionTranslationKey::RemoveStudentConfirm(
+                student_name.clone(),
+            )),
+            &i18n.t(&ProductionTranslationKey::Delete),
+            &i18n.t(&ProductionTranslationKey::Cancel),
             theme::button_styles::DANGER,
             window,
             Some(camera),
@@ -441,9 +448,9 @@ fn update_roster_selection(
 ) {
     for (student_row, mut style) in style_query {
         style.0 = if student_row.0 == selected_index {
-            theme::button_styles::LIST_ITEM_SELECTED
+            theme::production::button_styles::LIST_ITEM_SELECTED
         } else {
-            theme::button_styles::LIST_ITEM
+            theme::production::button_styles::LIST_ITEM
         };
     }
 }
@@ -554,9 +561,9 @@ fn sync_roster_selection(
     let selected_index = active_student.as_deref().map(|student| student.0);
     for (row, mut style) in &mut style_query {
         style.0 = if selected_index == Some(row.0) {
-            theme::button_styles::LIST_ITEM_SELECTED
+            theme::production::button_styles::LIST_ITEM_SELECTED
         } else {
-            theme::button_styles::LIST_ITEM
+            theme::production::button_styles::LIST_ITEM
         };
     }
 }

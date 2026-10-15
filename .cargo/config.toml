@@ -1,0 +1,4 @@
+[target.'cfg(target_arch = "wasm32")']
+# 'wasm-opt' needs the target_features section to be kept, in order to optimize the WebAssembly binary.
+# This can become an issue when the symbols are not kept in the Wasm binary.
+rustflags = ["--codegen", "link-arg=--keep-section=target_features"]

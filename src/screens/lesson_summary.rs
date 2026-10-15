@@ -2,8 +2,8 @@ use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::data::{LessonSession, PersistenceAction, PersistenceStatus};
-use crate::i18n::{I18n, TranslationKey};
+use crate::data::{LessonScore, PersistenceAction, PersistenceStatus};
+use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::states::AppState;
 use crate::ui::components::{
     persistence_message, save_write_failure_notice, screen_root, standard_button,
@@ -22,22 +22,22 @@ impl Plugin for LessonSummaryScreenPlugin {
 
 fn setup_lesson_summary(
     mut commands: Commands,
-    session: Res<LessonSession>,
+    score: Res<LessonScore>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
     write_status: Res<PersistenceStatus>,
 ) {
     let window = *primary_window;
-    let correct = session.correct_count;
-    let total = session.total_answered;
+    let correct = score.correct_count;
+    let total = score.total_answered;
     let percentage = (correct * 100).checked_div(total).unwrap_or(0);
 
     let message_key = if percentage == 100 {
-        TranslationKey::SummaryPerfect
+        ProductionTranslationKey::SummaryPerfect
     } else if percentage >= 50 {
-        TranslationKey::SummaryGood
+        ProductionTranslationKey::SummaryGood
     } else {
-        TranslationKey::SummaryEncouragement
+        ProductionTranslationKey::SummaryEncouragement
     };
 
     let save_notice = persistence_message(PersistenceAction::QuestionAnswer, *write_status, &i18n);
@@ -58,7 +58,7 @@ fn setup_lesson_summary(
 
 fn summary_title(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
     (
-        Text::new(i18n.t(&TranslationKey::SummaryTitle)),
+        Text::new(i18n.t(&ProductionTranslationKey::SummaryTitle)),
         theme::typography::text(theme::fonts::TITLE, window),
         TextColor(theme::colors::TEXT_DARK),
     )
@@ -66,7 +66,7 @@ fn summary_title(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
 
 fn summary_score(i18n: &I18n, correct: u32, total: u32, window: Entity) -> impl Bundle + use<> {
     (
-        Text::new(i18n.t(&TranslationKey::SummaryScore(correct, total))),
+        Text::new(i18n.t(&ProductionTranslationKey::SummaryScore(correct, total))),
         theme::typography::text(theme::fonts::HEADING, window),
         TextColor(theme::colors::TEXT_DARK),
     )
@@ -74,16 +74,20 @@ fn summary_score(i18n: &I18n, correct: u32, total: u32, window: Entity) -> impl 
 
 fn summary_percentage(i18n: &I18n, percentage: u32, window: Entity) -> impl Bundle + use<> {
     (
-        Text::new(i18n.t(&TranslationKey::SummaryPercentage(percentage))),
+        Text::new(i18n.t(&ProductionTranslationKey::SummaryPercentage(percentage))),
         theme::typography::text(theme::fonts::HEADING, window),
         TextColor(theme::colors::PRIMARY),
     )
 }
 
-fn summary_message(i18n: &I18n, key: &TranslationKey, window: Entity) -> impl Bundle + use<> {
+fn summary_message(
+    i18n: &I18n,
+    key: &ProductionTranslationKey,
+    window: Entity,
+) -> impl Bundle + use<> {
     let color = match key {
-        TranslationKey::SummaryPerfect => theme::colors::SUCCESS,
-        TranslationKey::SummaryGood => theme::colors::PRIMARY,
+        ProductionTranslationKey::SummaryPerfect => theme::colors::SUCCESS,
+        ProductionTranslationKey::SummaryGood => theme::colors::PRIMARY,
         _ => theme::colors::SECONDARY,
     };
 

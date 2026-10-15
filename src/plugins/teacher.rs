@@ -16,8 +16,8 @@ use bevy::window::{
     WindowResolution,
 };
 
-use crate::data::{GameMode, GameSettings, PlayerContext};
-use crate::i18n::{I18n, TranslationKey};
+use crate::data::{GameMode, ProductionPlayerContext, ProductionSettings};
+use crate::i18n::{I18n, ProductionTranslationKey};
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES};
 use crate::ui::animation::AnimatedButton;
 use crate::ui::components::ButtonVisualStyle;
@@ -98,7 +98,7 @@ pub struct TeacherWindowParam<'w, 's> {
 
 #[derive(SystemParam)]
 pub struct TeacherScreenParam<'w, 's> {
-    pub ctx: PlayerContext<'w>,
+    pub ctx: ProductionPlayerContext<'w>,
     pub teacher: TeacherWindowParam<'w, 's>,
     pub i18n: Res<'w, I18n>,
 }
@@ -160,7 +160,7 @@ pub fn teacher_stats_view_active(query: Query<&TeacherWindowState, With<TeacherW
 
 fn spawn_teacher_window_if_class_mode(
     mut commands: Commands,
-    settings: Res<GameSettings>,
+    settings: Res<ProductionSettings>,
     i18n: Res<I18n>,
     existing: Query<(), With<TeacherWindow>>,
     primary_window: Query<&Window, With<PrimaryWindow>>,
@@ -180,7 +180,9 @@ fn spawn_teacher_window_if_class_mode(
     let window = commands
         .spawn((
             Window {
-                title: i18n.t(&TranslationKey::TeacherDashboard).into_owned(),
+                title: i18n
+                    .t(&ProductionTranslationKey::TeacherDashboard)
+                    .into_owned(),
                 resolution: WindowResolution::new(500, 700),
                 position,
                 resize_constraints: WindowResizeConstraints {
@@ -255,8 +257,8 @@ fn compute_left_of_primary(
 
 /// Returns a tab list bundle with the current app styling.
 pub fn tab_header(i18n: &I18n, active_tab: TeacherTab, window: Entity) -> impl Bundle {
-    let students_label = i18n.t(&TranslationKey::TabStudents).into_owned();
-    let lessons_label = i18n.t(&TranslationKey::TabLessons).into_owned();
+    let students_label = i18n.t(&ProductionTranslationKey::TabStudents).into_owned();
+    let lessons_label = i18n.t(&ProductionTranslationKey::TabLessons).into_owned();
     (
         Node {
             flex_direction: FlexDirection::Row,
@@ -319,7 +321,7 @@ fn tab_button(label: &str, active: bool, window: Entity) -> impl Bundle + use<> 
         },
         children![(
             Text::new(label),
-            theme::typography::text(theme::fonts::BUTTON_SMALL, window),
+            theme::typography::text(theme::production::fonts::BUTTON_SMALL, window),
             TextColor(palette.foreground),
             TextLayout::justify(Justify::Center),
         )],

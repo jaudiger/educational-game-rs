@@ -1,10 +1,11 @@
 use bevy::prelude::*;
 
 /// Top-level application state driving screen transitions.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, States)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Reflect, States)]
 pub enum AppState {
     #[default]
     Home,
+    #[allow(dead_code)]
     SaveSlots,
     ThemeExploration,
     LessonPlay,
@@ -14,6 +15,7 @@ pub enum AppState {
 
 /// The `AppState` variants where the lesson flow is active.
 /// Used for screen cleanup and view resets on each intra-flow transition.
+#[allow(dead_code)]
 pub const LESSON_FLOW_STATES: [AppState; 3] = [
     AppState::ThemeExploration,
     AppState::LessonPlay,
@@ -60,5 +62,20 @@ impl ComputedStates for ActiveLesson {
             AppState::LessonPlay | AppState::LessonSummary => Some(Self),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy::prelude::ComputedStates;
+
+    use super::{ActiveLesson, AppState, InLessonFlow};
+
+    #[test]
+    fn production_destinations_remain_in_shared_lesson_scopes() {
+        assert!(InLessonFlow::compute(AppState::LessonSummary).is_some());
+        assert!(ActiveLesson::compute(AppState::LessonSummary).is_some());
+        assert!(InLessonFlow::compute(AppState::SaveSlots).is_none());
+        assert!(ActiveLesson::compute(AppState::ThemeExploration).is_none());
     }
 }

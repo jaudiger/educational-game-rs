@@ -116,18 +116,16 @@ fn setup_exercise_selection(
 
     let groups = localized_exercise_groups(lesson, &i18n);
     let sky_theme = settings.exploration_theme == ExplorationTheme::Sky;
-    let selected_exercise_id = launch_selection
-        .as_deref()
-        .and_then(|selection| match selection {
-            LessonLaunchSelection::SingleExercise { exercise_id } => Some(exercise_id.as_str()),
-            LessonLaunchSelection::CompleteLesson => None,
-        })
-        .filter(|id| {
-            groups
-                .iter()
-                .any(|group| group.exercises.iter().any(|exercise| exercise.id == *id))
-        })
-        .map(str::to_owned);
+    let selected_exercise_id = match launch_selection.as_deref() {
+        Some(LessonLaunchSelection::SingleExercise { exercise_id }) => Some(exercise_id.as_str()),
+        Some(LessonLaunchSelection::CompleteLesson) | None => None,
+    }
+    .filter(|id| {
+        groups
+            .iter()
+            .any(|group| group.exercises.iter().any(|exercise| exercise.id == *id))
+    })
+    .map(str::to_owned);
     let data = ExerciseSelectionScreenData {
         lesson_context: lesson.title.get(i18n.language).to_owned(),
         back_label: i18n.t(&TranslationKey::BackToLessons).into_owned(),

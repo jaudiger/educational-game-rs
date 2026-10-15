@@ -7,10 +7,10 @@ use bevy::ui_widgets::TextInput;
 use bevy::window::PrimaryWindow;
 
 use crate::data::{
-    ClassSave, GameMode, GameSettings, IndividualSave, PersistenceAction, PersistenceMut,
-    PersistenceStatus, PlayerContext, PlayerSession, SaveData,
+    ClassSave, GameMode, IndividualSave, PersistenceAction, PersistenceMut, PersistenceStatus,
+    PlayerSession, ProductionPlayerContext, ProductionSettings, SaveData,
 };
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::states::{AppState, InLessonFlow, StateScopedResourceExt};
 use crate::ui::components::{
     ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, MenuBackgroundStyle,
@@ -85,7 +85,7 @@ struct SaveSlotsRoot;
 
 fn setup_save_slots(
     mut commands: Commands,
-    settings: Res<GameSettings>,
+    settings: Res<ProductionSettings>,
     save_data: Res<SaveData>,
     status: Res<PersistenceStatus>,
     i18n: Res<I18n>,
@@ -113,8 +113,8 @@ fn spawn_save_slots_ui(
 ) {
     let notice = persistence_notice(PersistenceAction::SaveSlot, status, i18n, window);
     let title = match mode {
-        GameMode::Individual => i18n.t(&TranslationKey::SelectSave),
-        GameMode::Group => i18n.t(&TranslationKey::SelectClass),
+        GameMode::Individual => i18n.t(&ProductionTranslationKey::SelectSave),
+        GameMode::Group => i18n.t(&ProductionTranslationKey::SelectClass),
     };
     let back = i18n.t(&TranslationKey::Back);
 
@@ -129,8 +129,10 @@ fn spawn_save_slots_ui(
                     .as_ref()
                     .map(|s| s.name.clone()),
             };
-            let slot_label = i18n.t(&TranslationKey::SlotN(slot_index + 1)).into_owned();
-            let empty_label = i18n.t(&TranslationKey::Empty).into_owned();
+            let slot_label = i18n
+                .t(&ProductionTranslationKey::SlotN(slot_index + 1))
+                .into_owned();
+            let empty_label = i18n.t(&ProductionTranslationKey::Empty).into_owned();
             (slot_index, slot_name, slot_label, empty_label)
         })
         .collect();
@@ -140,7 +142,7 @@ fn spawn_save_slots_ui(
         DespawnOnExit(AppState::SaveSlots),
         SaveSlotsRoot,
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            parent.spawn(menu_background(MenuBackgroundStyle::SaveSlots));
+            parent.spawn(menu_background(MenuBackgroundStyle::new(0.3)));
 
             // Title
             parent.spawn((
@@ -203,10 +205,10 @@ fn spawn_slot_card(
         .copied()
         .unwrap_or(theme::colors::PASTEL_BLUE);
     let mut cmd = parent.spawn((
-        button_base(theme::button_styles::SLOT_CARD),
+        button_base(theme::production::button_styles::SLOT_CARD),
         Node {
-            width: theme::scaled(theme::sizes::CARD_MIN_WIDTH),
-            min_height: theme::scaled(theme::sizes::CARD_MIN_HEIGHT),
+            width: theme::scaled(theme::production::sizes::CARD_MIN_WIDTH),
+            min_height: theme::scaled(theme::production::sizes::CARD_MIN_HEIGHT),
             padding: theme::scaled(theme::sizes::CARD_PADDING).all(),
             flex_direction: FlexDirection::Column,
             justify_content: JustifyContent::Center,
@@ -312,7 +314,7 @@ fn handle_slot_click(
     query: Query<&SlotCard>,
     mut commands: Commands,
     mut state: ResMut<SaveSlotsState>,
-    ctx: PlayerContext<'_>,
+    ctx: ProductionPlayerContext<'_>,
     mut next_state: ResMut<NextState<AppState>>,
     creation_form: Query<Entity, With<CreationForm>>,
     popover_query: Query<(), With<DeletePopover>>,
@@ -329,7 +331,7 @@ fn handle_slot_click(
             continue;
         };
         let index = slot.0;
-        let is_filled = match ctx.settings.mode {
+        let is_filled = match ctx.production.mode {
             GameMode::Individual => ctx.save_data.individual_slots[index].is_some(),
             GameMode::Group => ctx.save_data.class_slots[index].is_some(),
         };
@@ -350,7 +352,7 @@ fn handle_slot_click(
 }
 
 fn spawn_creation_form(commands: &mut Commands, slot_index: usize, i18n: &I18n, window: Entity) {
-    let title = i18n.t(&TranslationKey::CreateSaveSlotN(slot_index + 1));
+    let title = i18n.t(&ProductionTranslationKey::CreateSaveSlotN(slot_index + 1));
     let (card_n, card_bg, card_border) = card_node(Node {
         width: theme::scaled(400.0),
         padding: theme::scaled(theme::sizes::CARD_PADDING).all(),
@@ -391,7 +393,7 @@ fn spawn_creation_form(commands: &mut Commands, slot_index: usize, i18n: &I18n, 
 }
 
 fn creation_name_input(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
-    let name_label = i18n.t(&TranslationKey::NameLabel);
+    let name_label = i18n.t(&ProductionTranslationKey::NameLabel);
     (
         Node {
             flex_direction: FlexDirection::Row,
@@ -408,7 +410,7 @@ fn creation_name_input(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
             (
                 Node {
                     width: theme::scaled(250.0),
-                    height: theme::scaled(theme::sizes::INPUT_FIELD_HEIGHT),
+                    height: theme::scaled(theme::production::sizes::INPUT_FIELD_HEIGHT),
                     align_items: AlignItems::Center,
                     padding: theme::scaled(theme::spacing::SMALL).horizontal(),
                     border: px(2.0).all(),
@@ -429,7 +431,7 @@ fn creation_name_input(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
                 TextLayout::no_wrap(),
                 theme::typography::text(theme::fonts::BODY, window),
                 TextColor(theme::colors::TEXT_DARK),
-                BackgroundColor(theme::colors::INPUT_BG),
+                BackgroundColor(theme::production::colors::INPUT_BG),
                 BorderColor::all(theme::colors::PRIMARY),
                 AutoFocus,
                 SaveSlotNameInput,
@@ -454,8 +456,8 @@ fn sync_creation_name_input_border(
 }
 
 fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
-    let create_label = i18n.t(&TranslationKey::Create);
-    let cancel_label = i18n.t(&TranslationKey::Cancel);
+    let create_label = i18n.t(&ProductionTranslationKey::Create);
+    let cancel_label = i18n.t(&ProductionTranslationKey::Cancel);
     (
         Node {
             flex_direction: FlexDirection::Row,
@@ -508,9 +510,9 @@ fn handle_delete_click(
         let slot_index = delete_btn.0;
         let modal_entity = spawn_confirmation_modal(
             &mut commands,
-            &i18n.t(&TranslationKey::DeleteSlotN(slot_index + 1)),
-            &i18n.t(&TranslationKey::Delete),
-            &i18n.t(&TranslationKey::Cancel),
+            &i18n.t(&ProductionTranslationKey::DeleteSlotN(slot_index + 1)),
+            &i18n.t(&ProductionTranslationKey::Delete),
+            &i18n.t(&ProductionTranslationKey::Cancel),
             theme::button_styles::DANGER,
             *primary_window,
             None,
@@ -526,10 +528,12 @@ fn handle_delete_click(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_confirm_delete(
     event: On<ConfirmationDialogActionEvent>,
     target_query: Query<&ConfirmDeleteTarget>,
     mut persistence: PersistenceMut<'_>,
+    production: Res<ProductionSettings>,
     mut commands: Commands,
     root_query: Query<Entity, With<SaveSlotsRoot>>,
     i18n: Res<I18n>,
@@ -543,7 +547,7 @@ fn handle_confirm_delete(
         return;
     };
     let index = target.0;
-    let mode = persistence.settings.mode;
+    let mode = production.mode;
 
     persistence.update_save_data(PersistenceAction::SaveSlot, |data| match mode {
         GameMode::Individual => data.individual_slots[index] = None,
@@ -571,6 +575,7 @@ fn handle_create_confirm(
     mut input_focus: ResMut<InputFocus>,
     mut state: ResMut<SaveSlotsState>,
     mut persistence: PersistenceMut<'_>,
+    production: Res<ProductionSettings>,
     mut commands: Commands,
     mut next_state: ResMut<NextState<AppState>>,
     input: Option<Single<(Entity, &EditableText), With<SaveSlotNameInput>>>,
@@ -605,7 +610,7 @@ fn handle_create_confirm(
         return;
     }
 
-    let mode = persistence.settings.mode;
+    let mode = production.mode;
     persistence.update_save_data(PersistenceAction::SaveSlot, |data| match mode {
         GameMode::Individual => {
             data.individual_slots[slot_index] = Some(IndividualSave {

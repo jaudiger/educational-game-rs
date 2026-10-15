@@ -5,13 +5,20 @@ authors = ["Jérémy Audiger"]
 edition = "2024"
 rust-version = "1.99"
 
+[features]
+default = []
+demo = []
+
 [dependencies]
-bevy = { version = "0.20", features = ["debug", "bevy_ui_widgets"] }
-directories = "6"
-rand = "0.10"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tempfile = "3"
+bevy = { version = "0.20.0", features = ["debug", "bevy_ui_widgets"] }
+directories = "6.0.0"
+rand = "0.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tempfile = "3.27.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

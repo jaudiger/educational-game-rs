@@ -7,9 +7,9 @@ use crate::data::content::{Lesson, QuestionType};
 use crate::data::save::score_percentage;
 use crate::data::{
     ContentLibrary, GameMode, Language, LessonProgress, PersistenceAction, PersistenceStatus,
-    PlayerContext, PlayerSession, SaveDataMut,
+    PlayerSession, ProductionPlayerContext, SaveDataMut,
 };
-use crate::i18n::{I18n, TranslationKey};
+use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::plugins::teacher::{
     TeacherScreenParam, TeacherView, TeacherViewOverlay, TeacherWindow, TeacherWindowParam,
     TeacherWindowState, tab_header, teacher_stats_view_active, teacher_window_exists,
@@ -183,7 +183,7 @@ fn rebuild_stats_ui(
         return;
     };
     let student_index = *student_index;
-    if ts.ctx.settings.mode != GameMode::Group {
+    if ts.ctx.production.mode != GameMode::Group {
         return;
     }
     let Ok(camera_entity) = ts.teacher.camera.single() else {
@@ -207,9 +207,14 @@ fn rebuild_stats_ui(
     let tab = tab_header(&ts.i18n, active_tab, window);
     let title_text = ts
         .i18n
-        .t(&TranslationKey::StudentStats(student.name.clone()))
+        .t(&ProductionTranslationKey::StudentStats(
+            student.name.clone(),
+        ))
         .into_owned();
-    let no_lessons_text = ts.i18n.t(&TranslationKey::NoLessonsCompleted).into_owned();
+    let no_lessons_text = ts
+        .i18n
+        .t(&ProductionTranslationKey::NoLessonsCompleted)
+        .into_owned();
     let return_text = ts.i18n.t(&TranslationKey::Back).into_owned();
     let stats_data = precompute_stats(&student.progress, &content, &ts.i18n, &disclosures);
 
@@ -593,7 +598,7 @@ fn precompute_stats(
     i18n: &I18n,
     disclosures: &StatsDisclosureState,
 ) -> Vec<ThemeStatsData> {
-    let total_text = i18n.t(&TranslationKey::Total).into_owned();
+    let total_text = i18n.t(&ProductionTranslationKey::Total).into_owned();
     let total_label = format!("{total_text}: ");
     content
         .themes
@@ -1023,7 +1028,7 @@ fn handle_reset_click(
     existing_popover: Query<Entity, With<StatsResetPopover>>,
     i18n: Res<I18n>,
     content: Res<ContentLibrary>,
-    ctx: PlayerContext<'_>,
+    ctx: ProductionPlayerContext<'_>,
     teacher: TeacherWindowParam<'_, '_>,
     teacher_state: Query<&TeacherWindowState, With<TeacherWindow>>,
 ) {
@@ -1062,7 +1067,9 @@ fn handle_reset_click(
         }
 
         let confirm_message = match &reset_btn.0 {
-            StatsResetTarget::All => i18n.t(&TranslationKey::ResetAllStatsConfirm).into_owned(),
+            StatsResetTarget::All => i18n
+                .t(&ProductionTranslationKey::ResetAllStatsConfirm)
+                .into_owned(),
             StatsResetTarget::Theme(theme_id) => {
                 let title = content
                     .themes
@@ -1072,22 +1079,22 @@ fn handle_reset_click(
                         || theme_id.clone(),
                         |theme| theme.title.get(i18n.language).to_owned(),
                     );
-                i18n.t(&TranslationKey::ResetLessonStatsConfirm(title))
+                i18n.t(&ProductionTranslationKey::ResetLessonStatsConfirm(title))
                     .into_owned()
             }
             StatsResetTarget::Lesson(lesson_id) => i18n
-                .t(&TranslationKey::ResetLessonStatsConfirm(lesson_label(
-                    lesson_id, &content, &i18n,
-                )))
+                .t(&ProductionTranslationKey::ResetLessonStatsConfirm(
+                    lesson_label(lesson_id, &content, &i18n),
+                ))
                 .into_owned(),
             StatsResetTarget::Type(lesson_id, exercise_type) => i18n
-                .t(&TranslationKey::ResetTypeStatsConfirm(
+                .t(&ProductionTranslationKey::ResetTypeStatsConfirm(
                     lesson_label(lesson_id, &content, &i18n),
                     exercise_type_label(*exercise_type, &i18n),
                 ))
                 .into_owned(),
             StatsResetTarget::Exercise(lesson_id, exercise_id) => i18n
-                .t(&TranslationKey::ResetExerciseStatsConfirm(
+                .t(&ProductionTranslationKey::ResetExerciseStatsConfirm(
                     lesson_label(lesson_id, &content, &i18n),
                     exercise_label(lesson_id, exercise_id, &content, i18n.language),
                 ))
@@ -1097,8 +1104,8 @@ fn handle_reset_click(
         let modal_entity = spawn_confirmation_modal(
             &mut commands,
             &confirm_message,
-            &i18n.t(&TranslationKey::Delete),
-            &i18n.t(&TranslationKey::Cancel),
+            &i18n.t(&ProductionTranslationKey::Delete),
+            &i18n.t(&ProductionTranslationKey::Cancel),
             theme::button_styles::DANGER,
             window,
             Some(camera),

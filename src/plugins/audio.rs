@@ -63,7 +63,7 @@ impl SfxKind {
 /// restart the music.
 const fn music_for_state(state: AppState) -> MusicTrack {
     match state {
-        AppState::Home | AppState::SaveSlots | AppState::Settings => MusicTrack::Menu,
+        AppState::Home | AppState::Settings | AppState::SaveSlots => MusicTrack::Menu,
         AppState::ThemeExploration => MusicTrack::Exploration,
         AppState::LessonPlay | AppState::LessonSummary => MusicTrack::Lesson,
     }

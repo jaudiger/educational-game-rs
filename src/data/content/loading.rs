@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
+#[cfg(not(target_arch = "wasm32"))]
 use std::ffi::OsStr;
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 use serde::Deserialize;
@@ -34,8 +37,8 @@ struct CategoryDocument {
     exercises: Vec<QuestionEntry>,
 }
 
-/// Loads and validates the complete declarative content catalog.
-#[allow(clippy::too_many_lines)]
+/// Loads and validates the complete declarative content catalog from disk.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_content_library(directory: impl AsRef<Path>) -> Result<ContentLibrary, String> {
     let directory = directory.as_ref();
     let entries = fs::read_dir(directory).map_err(|error| {
@@ -67,36 +70,65 @@ pub fn load_content_library(directory: impl AsRef<Path>) -> Result<ContentLibrar
     for path in paths {
         let contents = fs::read_to_string(&path)
             .map_err(|error| format!("Cannot read theme file {}: {error}", path.display()))?;
+        documents.push((path.display().to_string(), contents));
+    }
+
+    load_content_library_from_documents(documents, directory.display().to_string())
+}
+
+/// Loads and validates the compile-time embedded theme catalog.
+#[cfg(target_arch = "wasm32")]
+pub fn load_embedded_content_library() -> Result<ContentLibrary, String> {
+    let documents = embedded_content::THEME_DOCUMENTS
+        .iter()
+        .map(|(filename, contents)| ((*filename).to_owned(), (*contents).to_owned()))
+        .collect::<Vec<_>>();
+    if documents.is_empty() {
+        return Err("No theme JSON files found in embedded content catalog".to_owned());
+    }
+
+    load_content_library_from_documents(documents, "embedded content catalog".to_owned())
+}
+
+#[cfg(target_arch = "wasm32")]
+mod embedded_content {
+    include!(concat!(env!("OUT_DIR"), "/embedded_content.rs"));
+}
+
+#[allow(clippy::too_many_lines)]
+fn load_content_library_from_documents(
+    source_documents: Vec<(String, String)>,
+    catalog_source: String,
+) -> Result<ContentLibrary, String> {
+    let mut documents = Vec::with_capacity(source_documents.len());
+    for (source, contents) in source_documents {
         let document = serde_json::from_str::<ThemeDocument>(&contents)
-            .map_err(|error| format!("Invalid theme file {}: {error}", path.display()))?;
-        documents.push((path, document));
+            .map_err(|error| format!("Invalid theme file {source}: {error}"))?;
+        documents.push((source, document));
     }
 
     let mut themes = Vec::with_capacity(documents.len());
-    let mut theme_sources: HashMap<String, std::path::PathBuf> = HashMap::new();
-    let mut lesson_sources: HashMap<String, std::path::PathBuf> = HashMap::new();
+    let mut theme_sources: HashMap<String, String> = HashMap::new();
+    let mut lesson_sources: HashMap<String, String> = HashMap::new();
     let mut issues = Vec::new();
 
-    for (path, document) in documents {
+    for (source, document) in documents {
         if document.available && document.lessons.is_empty() {
             issues.push(format!(
                 "{}: available theme {} has no lessons",
-                path.display(),
-                document.id
+                source, document.id
             ));
         }
         if document.id.is_empty() {
-            issues.push(format!("{}: theme ID must not be empty", path.display()));
+            issues.push(format!("{source}: theme ID must not be empty"));
         }
         if let Some(previous) = theme_sources.get(&document.id) {
             issues.push(format!(
                 "{}: duplicate theme ID {} (first declared in {})",
-                path.display(),
-                document.id,
-                previous.display()
+                source, document.id, previous
             ));
         } else {
-            theme_sources.insert(document.id.clone(), path.clone());
+            theme_sources.insert(document.id.clone(), source.clone());
         }
 
         let mut lessons = Vec::with_capacity(document.lessons.len());
@@ -104,20 +136,16 @@ pub fn load_content_library(directory: impl AsRef<Path>) -> Result<ContentLibrar
             if lesson_document.id.is_empty() {
                 issues.push(format!(
                     "{}: theme {}, lesson ID must not be empty",
-                    path.display(),
-                    document.id
+                    source, document.id
                 ));
             }
             if let Some(previous) = lesson_sources.get(&lesson_document.id) {
                 issues.push(format!(
                     "{}: theme {}, duplicate global lesson ID {} (first declared in {})",
-                    path.display(),
-                    document.id,
-                    lesson_document.id,
-                    previous.display()
+                    source, document.id, lesson_document.id, previous
                 ));
             } else {
-                lesson_sources.insert(lesson_document.id.clone(), path.clone());
+                lesson_sources.insert(lesson_document.id.clone(), source.clone());
             }
 
             let mut category_types = HashSet::new();
@@ -126,26 +154,20 @@ pub fn load_content_library(directory: impl AsRef<Path>) -> Result<ContentLibrar
                 if !category_types.insert(category.question_type) {
                     issues.push(format!(
                         "{}: theme {}, lesson {}, duplicate category group {:?}",
-                        path.display(),
-                        document.id,
-                        lesson_document.id,
-                        category.question_type
+                        source, document.id, lesson_document.id, category.question_type
                     ));
                 }
                 if category.exercises.is_empty() {
                     issues.push(format!(
                         "{}: theme {}, lesson {}, category {:?} has no exercises",
-                        path.display(),
-                        document.id,
-                        lesson_document.id,
-                        category.question_type
+                        source, document.id, lesson_document.id, category.question_type
                     ));
                 }
                 for exercise in &category.exercises {
                     if exercise.definition.question_type() != category.question_type {
                         issues.push(format!(
                             "{}: theme {}, lesson {}, exercise {}, category {:?} does not match definition type {:?}",
-                            path.display(),
+                            source,
                             document.id,
                             lesson_document.id,
                             exercise.id,
@@ -170,9 +192,7 @@ pub fn load_content_library(directory: impl AsRef<Path>) -> Result<ContentLibrar
             for issue in lesson.validation_issues() {
                 issues.push(format!(
                     "{}: theme {}, lesson {}: {issue}",
-                    path.display(),
-                    document.id,
-                    lesson.id
+                    source, document.id, lesson.id
                 ));
             }
             lessons.push(lesson);
@@ -199,7 +219,7 @@ pub fn load_content_library(directory: impl AsRef<Path>) -> Result<ContentLibrar
     if !catalog_issues.is_empty() {
         return Err(format!(
             "Invalid catalog under {}: {}",
-            directory.display(),
+            catalog_source,
             catalog_issues.join("; ")
         ));
     }

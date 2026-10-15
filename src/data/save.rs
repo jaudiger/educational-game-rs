@@ -3,14 +3,23 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use bevy::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::content::ContentLibrary;
-use super::progress::GameMode;
+use super::content::{ContentLibrary, LessonPlanningConfig};
+use super::production::GameMode;
 
 /// Teacher-configured settings for a single lesson in a class slot.
 #[derive(Clone, Debug, Serialize)]
 pub struct LessonSessionConfig {
     pub counts: HashMap<String, usize>,
     pub show_visuals: HashMap<String, bool>,
+}
+
+impl LessonSessionConfig {
+    pub fn planning_input(&self) -> LessonPlanningConfig {
+        LessonPlanningConfig {
+            counts: self.counts.clone(),
+            show_visuals: self.show_visuals.clone(),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -328,4 +337,10 @@ pub fn get_current_progress(
                 .map(|s| &s.progress)
         }
     }
+}
+
+#[derive(Resource, Clone, Copy, Debug, Default, Reflect)]
+pub struct LessonScore {
+    pub correct_count: u32,
+    pub total_answered: u32,
 }

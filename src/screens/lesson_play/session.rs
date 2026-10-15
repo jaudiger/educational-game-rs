@@ -1,20 +1,52 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use bevy::prelude::*;
+
 use crate::data::{
-    ActiveStudent, AnswerResult, GameMode, LessonSession, PersistenceAction, PersistenceMut,
-    PlayerSession, SaveData, SelectedLesson,
+    ActiveStudent, AnswerResult, GameMode, LastAnswer, LessonScore, LessonSession,
+    PersistenceAction, PersistenceMut, PlayerSession, ProductionSettings, SaveData, SelectedLesson,
 };
 
-pub(super) const fn update_session_score(session: &mut LessonSession, result: &AnswerResult) {
+#[allow(clippy::too_many_arguments)]
+pub fn record_answer(
+    last_answer: Res<LastAnswer>,
+    production: Res<ProductionSettings>,
+    session: Res<LessonSession>,
+    mut score: ResMut<LessonScore>,
+    mut persistence: PersistenceMut<'_>,
+    active_student: Option<Res<ActiveStudent>>,
+    player_session: Option<Res<PlayerSession>>,
+    selected_lesson: Option<Res<SelectedLesson>>,
+) {
+    update_session_score(&mut score, &last_answer);
+
+    record_persisted_answer(
+        &session,
+        &last_answer,
+        production.mode,
+        active_student.as_deref(),
+        player_session.as_deref(),
+        selected_lesson.as_deref(),
+        &mut persistence,
+    );
+}
+
+pub fn clear_active_student(mut commands: Commands, production: Res<ProductionSettings>) {
+    if production.mode == GameMode::Group {
+        commands.remove_resource::<ActiveStudent>();
+    }
+}
+
+const fn update_session_score(score: &mut LessonScore, result: &AnswerResult) {
     let is_correct = matches!(result, AnswerResult::Correct);
-    session.total_answered += 1;
+    score.total_answered += 1;
     if is_correct {
-        session.correct_count += 1;
+        score.correct_count += 1;
     }
 }
 
 /// Records the answer in the active player's cumulative exercise progress.
-pub(super) fn record_answer(
+fn record_persisted_answer(
     session: &LessonSession,
     last_answer: &AnswerResult,
     mode: GameMode,

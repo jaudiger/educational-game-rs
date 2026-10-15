@@ -1,0 +1,71 @@
+<!--
+ *
+ * Copyright (c) Jérémy Audiger.
+ * All rights reserved.
+ *
+ -->
+<!doctype html>
+<html>
+    <head>
+        <!-- Config tags -->
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="index,follow" />
+
+        <!-- Usual tags -->
+        <title>Educational Game with Rust + Bevy (WebAssembly)</title>
+        <meta
+            name="description"
+            content="An educational game built with Rust and the Bevy game engine, offering interactive learning exercises for children in WebAssembly."
+        />
+        <link rel="canonical" href="https://educational-game-rs.jaudiger.dev/" />
+
+        <!-- OG tags -->
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Educational Game with Rust + Bevy (WebAssembly)" />
+        <meta
+            property="og:description"
+            content="An educational game built with Rust and the Bevy game engine, offering interactive learning exercises for children in WebAssembly."
+        />
+        <meta property="og:url" content="https://educational-game-rs.jaudiger.dev/" />
+
+        <!-- Center the canvas, and expand it to fill the viewport -->
+        <style>
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }
+
+            #bevy-canvas {
+                display: block;
+                width: 100%;
+                height: 100%;
+            }
+        </style>
+
+        <!-- These links package runtime assets with Trunk -->
+        <link data-trunk rel="copy-dir" href="assets/audio" data-target-path="assets/audio" />
+        <link data-trunk rel="copy-dir" href="assets/cursor" data-target-path="assets/cursor" />
+        <link data-trunk rel="copy-dir" href="assets/fonts" data-target-path="assets/fonts" />
+        <!-- This link configures the Trunk WASM build -->
+        <!-- Also, include support for `wasm-bindgen --weak-refs`: https://rustwasm.github.io/docs/wasm-bindgen/reference/weak-references.html -->
+        <link
+            data-trunk
+            rel="rust"
+            data-bin="educational-game-rs"
+            data-cargo-features="demo"
+            data-wasm-opt="z"
+            data-weak-refs
+        />
+    </head>
+
+    <body>
+        <canvas id="bevy-canvas"></canvas>
+    </body>
+</html>

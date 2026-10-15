@@ -6,14 +6,13 @@ use bevy::ui_widgets::{
 };
 use bevy::window::PrimaryWindow;
 
-use crate::data::progress::{ExplorationTheme, GameMode, Language};
-use crate::data::{GameSettings, GameSettingsMut, PersistenceAction, PersistenceStatus};
+use crate::data::progress::{ExplorationTheme, Language};
+use crate::data::{GameSettings, GameSettingsMut};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
 use crate::ui::components::{
-    MenuBackgroundStyle, checkbox_scene, menu_background, persistence_notice,
-    radio_button_muted_scene, radio_button_scene, radio_group, screen_root, slider_scene,
-    standard_button,
+    MenuBackgroundStyle, checkbox_scene, menu_background, radio_button_muted_scene,
+    radio_button_scene, radio_group, screen_root, slider_scene, standard_button,
 };
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -23,13 +22,23 @@ pub struct SettingsScreenPlugin;
 
 impl Plugin for SettingsScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Settings), setup_settings)
+        app.init_resource::<SettingsPresentation>()
+            .configure_sets(
+                Update,
+                (SettingsScreenSet::Prepare, SettingsScreenSet::Render).chain(),
+            )
+            .add_systems(OnEnter(AppState::Settings), setup_settings)
             .add_systems(
                 Update,
-                (
-                    update_volume_label,
-                    rebuild_settings_on_language_change.run_if(resource_changed::<I18n>),
-                )
+                update_volume_label.run_if(in_state(AppState::Settings)),
+            )
+            .add_systems(
+                Update,
+                rebuild_settings_on_presentation_change
+                    .in_set(SettingsScreenSet::Render)
+                    .run_if(
+                        resource_changed::<I18n>.or_else(resource_changed::<SettingsPresentation>),
+                    )
                     .run_if(in_state(AppState::Settings)),
             );
     }
@@ -52,8 +61,31 @@ enum BoolSettingField {
     GamepadNavigation,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ModePresentation {
+    pub label: String,
+    pub individual_label: String,
+    pub group_label: String,
+    pub group_selected: bool,
+}
+
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
+pub struct SettingsPresentation {
+    pub mode: Option<ModePresentation>,
+    pub notice: Option<String>,
+}
+
+#[derive(SystemSet, Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SettingsScreenSet {
+    Prepare,
+    Render,
+}
+
+#[derive(Event, Clone, Copy, Debug)]
+pub struct ModeSelectionRequested(#[allow(dead_code)] pub bool);
+
 #[derive(Component, Reflect)]
-struct ModeRadio(GameMode);
+struct ModeRadio(bool);
 
 #[derive(Component, Reflect)]
 struct LanguageRadio(Language);
@@ -61,27 +93,102 @@ struct LanguageRadio(Language);
 #[derive(Component, Reflect)]
 struct ExplorationThemeRadio(ExplorationTheme);
 
-fn setup_settings(
+pub fn setup_settings(
     mut commands: Commands,
     settings: Res<GameSettings>,
-    status: Res<PersistenceStatus>,
+    presentation: Res<SettingsPresentation>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
-    spawn_settings_ui(&mut commands, &settings, *status, &i18n, *primary_window);
+    spawn_settings_ui(
+        &mut commands,
+        &settings,
+        &presentation,
+        &i18n,
+        *primary_window,
+    );
 }
 
 fn spawn_settings_ui(
     commands: &mut Commands,
     settings: &GameSettings,
-    status: PersistenceStatus,
+    presentation: &SettingsPresentation,
     i18n: &I18n,
     window: Entity,
 ) {
-    let notice = persistence_notice(PersistenceAction::GameSettings, status, i18n, window);
-    let title = i18n.t(&TranslationKey::Settings);
-    let back = i18n.t(&TranslationKey::Back);
-
+    let mode_controls = presentation
+        .mode
+        .as_ref()
+        .map(|mode| mode_section(mode, window));
+    let language_controls = language_section(settings.language, i18n, window);
+    let theme_controls = exploration_theme_section(settings.exploration_theme, i18n, window);
+    let explanation_controls = bool_setting_section(
+        BoolSettingField::ShowExplanations,
+        settings.show_explanations,
+        i18n,
+        window,
+    );
+    let navigation_controls = bool_setting_section(
+        BoolSettingField::GamepadNavigation,
+        settings.gamepad_navigation,
+        i18n,
+        window,
+    );
+    let music_controls = volume_section(VolumeChannel::Music, settings.music_volume, i18n, window);
+    let sfx_controls = volume_section(VolumeChannel::Sfx, settings.sfx_volume, i18n, window);
+    let notice = presentation.notice.clone();
+    let controls = Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+        if let Some(mode_controls) = mode_controls {
+            parent.spawn(mode_controls);
+        }
+        parent.spawn(language_controls);
+        parent.spawn(theme_controls);
+        parent.spawn(explanation_controls);
+        parent.spawn(navigation_controls);
+        parent.spawn(music_controls);
+        parent.spawn(sfx_controls);
+    }));
+    let title = (
+        Text::new(i18n.t(&TranslationKey::Settings)),
+        theme::typography::text(theme::fonts::TITLE, window),
+        TextColor(theme::colors::TEXT_DARK),
+    );
+    let back = (
+        standard_button(
+            &i18n.t(&TranslationKey::Back),
+            theme::button_styles::BACK,
+            theme::scaled(theme::sizes::BUTTON_WIDTH),
+            window,
+        ),
+        NavigateTo(AppState::Home),
+    );
+    let scroll = (
+        ScrollArea,
+        Node {
+            width: percent(100.0),
+            flex_grow: 1.0,
+            flex_basis: px(0.0),
+            min_height: px(0.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: theme::scaled(theme::spacing::LARGE),
+            overflow: Overflow::scroll_y(),
+            ..default()
+        },
+        controls,
+    );
+    let card_children = Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+        parent.spawn(title);
+        parent.spawn(scroll);
+        if let Some(notice) = notice {
+            parent.spawn((
+                Text::new(notice),
+                theme::typography::text(theme::fonts::SMALL, window),
+                TextColor(theme::colors::ERROR),
+            ));
+        }
+        parent.spawn(back);
+    }));
     let card = (
         Node {
             width: percent(92.0),
@@ -98,82 +205,23 @@ fn spawn_settings_ui(
         },
         BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.88)),
         BorderColor::all(theme::colors::CARD_BORDER),
+        card_children,
     );
 
     commands.spawn((
         screen_root(),
         DespawnOnExit(AppState::Settings),
         SettingsRoot,
-        children![
-            menu_background(MenuBackgroundStyle::Settings),
-            (
-                card,
-                children![
-                    (
-                        Text::new(title),
-                        theme::typography::text(theme::fonts::TITLE, window),
-                        TextColor(theme::colors::TEXT_DARK),
-                    ),
-                    (
-                        ScrollArea,
-                        Node {
-                            width: percent(100.0),
-                            flex_grow: 1.0,
-                            flex_basis: px(0.0),
-                            min_height: px(0.0),
-                            flex_direction: FlexDirection::Column,
-                            align_items: AlignItems::Center,
-                            row_gap: theme::scaled(theme::spacing::LARGE),
-                            overflow: Overflow::scroll_y(),
-                            ..default()
-                        },
-                        children![
-                            mode_section(settings.mode, i18n, window),
-                            language_section(settings.language, i18n, window),
-                            exploration_theme_section(settings.exploration_theme, i18n, window),
-                            bool_setting_section(
-                                BoolSettingField::ShowExplanations,
-                                settings.show_explanations,
-                                i18n,
-                                window,
-                            ),
-                            bool_setting_section(
-                                BoolSettingField::GamepadNavigation,
-                                settings.gamepad_navigation,
-                                i18n,
-                                window,
-                            ),
-                            volume_section(
-                                VolumeChannel::Music,
-                                settings.music_volume,
-                                i18n,
-                                window
-                            ),
-                            volume_section(VolumeChannel::Sfx, settings.sfx_volume, i18n, window),
-                        ],
-                    ),
-                    notice,
-                    (
-                        standard_button(
-                            &back,
-                            theme::button_styles::BACK,
-                            theme::scaled(theme::sizes::BUTTON_WIDTH),
-                            window,
-                        ),
-                        NavigateTo(AppState::Home),
-                    ),
-                ],
-            ),
-        ],
+        children![menu_background(MenuBackgroundStyle::new(0.18)), card],
     ));
 }
 
-fn mode_section(current_mode: GameMode, i18n: &I18n, window: Entity) -> impl Bundle + use<> {
-    let mode_label = i18n.t(&TranslationKey::Mode);
-    let individual_checked = current_mode == GameMode::Individual;
-    let class_checked = current_mode == GameMode::Group;
-    let individual_label = i18n.t(&TranslationKey::ModeIndividual).into_owned();
-    let class_label = i18n.t(&TranslationKey::ModeClass).into_owned();
+fn mode_section(mode: &ModePresentation, window: Entity) -> impl Bundle + use<> {
+    let individual_checked = !mode.group_selected;
+    let class_checked = mode.group_selected;
+    let individual_label = mode.individual_label.clone();
+    let class_label = mode.group_label.clone();
+    let mode_label = mode.label.clone();
 
     (
         Node {
@@ -193,14 +241,14 @@ fn mode_section(current_mode: GameMode, i18n: &I18n, window: Entity) -> impl Bun
                 observe(handle_mode_radio_change),
                 Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
                     let mut cmd = parent.spawn_empty();
-                    cmd.insert(ModeRadio(GameMode::Individual));
+                    cmd.insert(ModeRadio(false));
                     if individual_checked {
                         cmd.insert(Checked);
                     }
                     let _ = cmd.apply_scene(radio_button_scene(&individual_label, window));
 
                     let mut cmd = parent.spawn_empty();
-                    cmd.insert(ModeRadio(GameMode::Group));
+                    cmd.insert(ModeRadio(true));
                     if class_checked {
                         cmd.insert(Checked);
                     }
@@ -214,18 +262,15 @@ fn mode_section(current_mode: GameMode, i18n: &I18n, window: Entity) -> impl Bun
 fn handle_mode_radio_change(
     event: On<ValueChange<Entity>>,
     radio_query: Query<(Entity, &ModeRadio)>,
-    mut settings: GameSettingsMut<'_>,
     mut commands: Commands,
 ) {
-    let Ok((_, mode_radio)) = radio_query.get(event.value) else {
+    let Ok((_, selected)) = radio_query.get(event.value) else {
         return;
     };
-    let mode = mode_radio.0;
-    settings.update(|s| s.mode = mode);
-
-    // Update Checked states on all radio buttons
+    let group_selected = selected.0;
+    commands.trigger(ModeSelectionRequested(group_selected));
     for (entity, radio) in radio_query.iter().collect::<Vec<_>>() {
-        if radio.0 == mode {
+        if radio.0 == group_selected {
             commands.entity(entity).insert(Checked);
         } else {
             commands.entity(entity).remove::<Checked>();
@@ -307,14 +352,10 @@ fn handle_language_radio_change(
     }
 }
 
-/// Reactively rebuilds the settings UI when [`I18n`] changes (language switch).
-///
-/// Registered with `resource_changed::<I18n>` so it fires automatically after
-/// `sync_i18n` (in [`SettingsPlugin`]) propagates the language change.
-fn rebuild_settings_on_language_change(
+fn rebuild_settings_on_presentation_change(
     mut commands: Commands,
     settings: Res<GameSettings>,
-    status: Res<PersistenceStatus>,
+    presentation: Res<SettingsPresentation>,
     i18n: Res<I18n>,
     root_query: Query<Entity, With<SettingsRoot>>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
@@ -322,7 +363,13 @@ fn rebuild_settings_on_language_change(
     for entity in &root_query {
         commands.entity(entity).despawn();
     }
-    spawn_settings_ui(&mut commands, &settings, *status, &i18n, *primary_window);
+    spawn_settings_ui(
+        &mut commands,
+        &settings,
+        &presentation,
+        &i18n,
+        *primary_window,
+    );
 }
 
 fn exploration_theme_section(

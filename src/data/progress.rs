@@ -5,14 +5,6 @@ use super::content::{AnswerResult, ResolvedQuestion};
 
 pub use crate::i18n::Language;
 
-/// Individual or group (class) play mode.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect, Deserialize, Serialize)]
-pub enum GameMode {
-    #[default]
-    Individual,
-    Group,
-}
-
 /// Visual theme applied to the theme exploration screen.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect, Deserialize, Serialize)]
 pub enum ExplorationTheme {
@@ -22,14 +14,13 @@ pub enum ExplorationTheme {
     Space,
 }
 
-/// Persistent user preferences (volume, language, mode, exploration theme).
+/// User preferences; Production persists them between runs.
 #[derive(Resource, Clone, Debug, Reflect, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameSettings {
     pub music_volume: f32,
     pub sfx_volume: f32,
     pub show_explanations: bool,
-    pub mode: GameMode,
     pub language: Language,
     pub exploration_theme: ExplorationTheme,
     pub gamepad_navigation: bool,
@@ -41,7 +32,6 @@ impl Default for GameSettings {
             music_volume: 0.75,
             sfx_volume: 0.75,
             show_explanations: true,
-            mode: GameMode::Individual,
             language: Language::default(),
             exploration_theme: ExplorationTheme::default(),
             gamepad_navigation: false,
@@ -50,6 +40,7 @@ impl Default for GameSettings {
 }
 
 impl GameSettings {
+    #[allow(dead_code)]
     pub(crate) fn validate_persisted(&self) -> Result<(), String> {
         let mut invalid_fields = Vec::new();
         if !self.music_volume.is_finite() || !(0.0..=1.0).contains(&self.music_volume) {
@@ -83,14 +74,12 @@ pub enum LessonLaunchSelection {
     },
 }
 
-/// Runtime state for an active lesson: exercise list, index, and scores.
+/// Runtime state for an active lesson: exercise list and index.
 #[derive(Resource, Clone, Debug, Default, Reflect)]
 pub struct LessonSession {
     #[reflect(ignore)]
     pub questions: Vec<ResolvedQuestion>,
     pub current_index: usize,
-    pub correct_count: u32,
-    pub total_answered: u32,
 }
 
 impl LessonSession {
@@ -113,3 +102,6 @@ pub struct QuestionContainer;
 /// Inserted by question plugins, read by lesson play for feedback display.
 #[derive(Resource, Clone, Debug, Deref, Reflect)]
 pub struct LastAnswer(#[reflect(ignore)] pub AnswerResult);
+
+#[derive(Message, Clone, Copy, Debug)]
+pub struct SettingsChanged;

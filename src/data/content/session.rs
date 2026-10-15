@@ -4,22 +4,27 @@ use rand::Rng;
 use rand::seq::SliceRandom;
 
 use super::generation::resolve_question;
-use super::types::{Lesson, QuestionEntry, QuestionInstance, ResolvedQuestion};
+use super::types::{
+    Lesson, MAX_QUESTION_REPETITIONS, QuestionEntry, QuestionInstance, ResolvedQuestion,
+};
 use crate::data::{
-    ActiveTheme, ContentLibrary, LessonLaunchSelection, LessonSession, LessonSessionConfig,
-    SelectedLesson,
+    ActiveTheme, ContentLibrary, LessonLaunchSelection, LessonSession, SelectedLesson,
 };
 
-/// Maximum re-roll attempts when deduplicating generated question instances.
 const MAX_DEDUP_RETRIES: u32 = 20;
 
-/// Build a session for the selected lesson launch mode.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LessonPlanningConfig {
+    pub counts: std::collections::HashMap<String, usize>,
+    pub show_visuals: std::collections::HashMap<String, bool>,
+}
+
 pub fn build_session_with_selection(
     selected_lesson: &SelectedLesson,
     selection: &LessonLaunchSelection,
     content: &ContentLibrary,
     active_theme: &ActiveTheme,
-    lesson_config: Option<&LessonSessionConfig>,
+    lesson_config: Option<&LessonPlanningConfig>,
 ) -> Result<LessonSession, Vec<String>> {
     let Some(lesson_id) = selected_lesson.as_ref() else {
         return Err(vec!["No lesson is selected".to_owned()]);
@@ -58,17 +63,19 @@ pub fn build_session_with_selection(
     };
     let mut rng = rand::rng();
     match selection {
-        LessonLaunchSelection::CompleteLesson => plan_session(lesson, lesson_config, &mut rng),
-        selection @ LessonLaunchSelection::SingleExercise { .. } => {
+        crate::data::LessonLaunchSelection::CompleteLesson => {
+            plan_session(lesson, lesson_config, &mut rng)
+        }
+        selection @ crate::data::LessonLaunchSelection::SingleExercise { .. } => {
             plan_session_with_selection(lesson, selection, lesson_config, &mut rng)
         }
     }
 }
 
-/// Plan a complete-series session using only the lesson catalog, settings, and RNG.
+#[allow(dead_code)]
 pub fn plan_session(
     lesson: &Lesson,
-    lesson_config: Option<&LessonSessionConfig>,
+    lesson_config: Option<&LessonPlanningConfig>,
     rng: &mut impl Rng,
 ) -> Result<LessonSession, Vec<String>> {
     plan_session_with_selection(
@@ -79,11 +86,10 @@ pub fn plan_session(
     )
 }
 
-/// Plan either the configured series or one exercise selected by stable ID.
 pub fn plan_session_with_selection(
     lesson: &Lesson,
     selection: &LessonLaunchSelection,
-    lesson_config: Option<&LessonSessionConfig>,
+    lesson_config: Option<&LessonPlanningConfig>,
     rng: &mut impl Rng,
 ) -> Result<LessonSession, Vec<String>> {
     match selection {
@@ -96,7 +102,7 @@ pub fn plan_session_with_selection(
 
 fn plan_complete_session(
     lesson: &Lesson,
-    lesson_config: Option<&LessonSessionConfig>,
+    lesson_config: Option<&LessonPlanningConfig>,
     rng: &mut impl Rng,
 ) -> Result<LessonSession, Vec<String>> {
     let mut issues = lesson.validation_issues();
@@ -132,8 +138,6 @@ fn plan_complete_session(
     Ok(LessonSession {
         questions: pool,
         current_index: 0,
-        correct_count: 0,
-        total_answered: 0,
     })
 }
 
@@ -177,12 +181,10 @@ fn plan_single_exercise(
     Ok(LessonSession {
         questions: vec![question],
         current_index: 0,
-        correct_count: 0,
-        total_answered: 0,
     })
 }
 
-fn validate_lesson_config(lesson: &Lesson, config: &LessonSessionConfig) -> Vec<String> {
+fn validate_lesson_config(lesson: &Lesson, config: &LessonPlanningConfig) -> Vec<String> {
     let mut issues = Vec::new();
     for (id, count) in &config.counts {
         if !lesson.questions.iter().any(|entry| entry.id == *id) {
@@ -191,7 +193,7 @@ fn validate_lesson_config(lesson: &Lesson, config: &LessonSessionConfig) -> Vec<
             ));
             continue;
         }
-        if *count > crate::data::content::MAX_QUESTION_REPETITIONS {
+        if *count > MAX_QUESTION_REPETITIONS {
             issues.push(format!("Exercise {id} exceeds the repetition limit"));
         }
     }
@@ -225,4 +227,46 @@ fn resolve_unique(
         }
     }
     resolve_question(&entry.definition, rng)
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use std::collections::HashMap;
+    use std::path::Path;
+
+    use rand::rng;
+
+    use super::{LessonPlanningConfig, plan_session_with_selection};
+    use crate::data::content::load_content_library;
+    use crate::data::{LessonLaunchSelection, content::Lesson};
+
+    #[test]
+    fn single_exercise_planning_ignores_complete_series_settings() {
+        let library = load_content_library(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/content/themes"),
+        )
+        .expect("development content is valid");
+        let lesson: &Lesson = library
+            .themes
+            .iter()
+            .find(|theme| theme.available)
+            .and_then(|theme| theme.lessons.first())
+            .expect("available content includes a lesson");
+        let exercise = lesson
+            .questions
+            .first()
+            .expect("the lesson contains an exercise");
+        let selection = LessonLaunchSelection::SingleExercise {
+            exercise_id: exercise.id.clone(),
+        };
+        let config = LessonPlanningConfig {
+            counts: [(exercise.id.clone(), 0)].into(),
+            show_visuals: HashMap::new(),
+        };
+        let session = plan_session_with_selection(lesson, &selection, Some(&config), &mut rng())
+            .expect("a selected catalogue exercise is playable");
+
+        assert_eq!(session.questions.len(), 1);
+        assert_eq!(session.questions[0].exercise_id, exercise.id);
+    }
 }

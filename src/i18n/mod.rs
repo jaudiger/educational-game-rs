@@ -1,10 +1,31 @@
 pub mod keys;
+#[cfg(not(feature = "demo"))]
+mod production_keys;
 
 use std::borrow::Cow;
 
 use bevy::prelude::*;
 
 pub use keys::TranslationKey;
+#[cfg(not(feature = "demo"))]
+pub use production_keys::ProductionTranslationKey;
+
+pub trait Translate {
+    fn translate_to(&self, language: Language) -> Cow<'static, str>;
+}
+
+impl Translate for TranslationKey {
+    fn translate_to(&self, language: Language) -> Cow<'static, str> {
+        self.translate(language)
+    }
+}
+
+#[cfg(not(feature = "demo"))]
+impl Translate for ProductionTranslationKey {
+    fn translate_to(&self, language: Language) -> Cow<'static, str> {
+        self.translate(language)
+    }
+}
 
 /// Supported UI languages for translation.
 #[derive(
@@ -29,9 +50,8 @@ impl I18n {
 
     /// Translate a key to the active language.
     ///
-    /// Returns `Cow<'static, str>`: static variants are zero-alloc (`Borrowed`),
-    /// parameterized variants (e.g. `SlotN`, `StudentsOf`) allocate (`Owned`).
-    pub fn t(&self, key: &TranslationKey) -> Cow<'static, str> {
-        key.translate(self.language)
+    /// Returns borrowed static text or an owned formatted translation.
+    pub fn t(&self, key: &impl Translate) -> Cow<'static, str> {
+        key.translate_to(self.language)
     }
 }

@@ -2,10 +2,10 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use crate::data::content::build_session_with_selection;
+use crate::data::content::{LessonPlanningConfig, build_session_with_selection};
 use crate::data::{
-    ActiveTheme, ContentLibrary, GameMode, LessonLaunchSelection, PersistenceStatus, PlayerContext,
-    QuestionContainer, SelectedLesson,
+    ActiveTheme, ContentLibrary, GameSettings, LessonLaunchSelection, QuestionContainer,
+    SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
@@ -15,48 +15,41 @@ use crate::ui::theme::{self, GameImages};
 
 use super::{ProgressText, QuitLessonButton};
 
+#[derive(Resource)]
+pub struct RejectedLessonLaunch;
+
+#[derive(Resource, Default)]
+pub struct LessonPlanningInput(pub Option<LessonPlanningConfig>);
+
 #[allow(clippy::too_many_arguments)]
-pub(super) fn setup_lesson_play(
+pub fn setup_lesson_play(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     images: Res<GameImages>,
     selected_lesson: Res<SelectedLesson>,
     launch_selection: Option<Res<LessonLaunchSelection>>,
+    rejected_launch: Option<Res<RejectedLessonLaunch>>,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
     i18n: Res<I18n>,
-    ctx: PlayerContext<'_>,
+    planning_input: Res<LessonPlanningInput>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
-    mut write_status: ResMut<PersistenceStatus>,
     mut next_app_state: ResMut<NextState<AppState>>,
+    settings: Res<GameSettings>,
 ) {
     let window = *primary_window;
-    write_status.clear_save_data();
+    if rejected_launch.is_some() {
+        return;
+    }
     let default_selection = LessonLaunchSelection::CompleteLesson;
     let selection = launch_selection.as_deref().unwrap_or(&default_selection);
-    // Teacher configuration applies only to complete lesson launches.
-    let lesson_config = if matches!(selection, LessonLaunchSelection::CompleteLesson)
-        && ctx.settings.mode == GameMode::Group
-    {
-        ctx.session.as_ref().and_then(|slot| {
-            ctx.save_data.class_slots[slot.slot_index]
-                .as_ref()
-                .and_then(|cs| {
-                    selected_lesson
-                        .0
-                        .as_ref()
-                        .and_then(|lid| cs.lesson_configs.get(lid))
-                })
-        })
-    } else {
-        None
-    };
+    let planning_config = planning_input.0.as_ref();
     let session = match build_session_with_selection(
         &selected_lesson,
         selection,
         &content,
         &active_theme,
-        lesson_config,
+        planning_config,
     ) {
         Ok(session) if !session.questions.is_empty() => session,
         Ok(_) => {
@@ -100,7 +93,7 @@ pub(super) fn setup_lesson_play(
         ))
         .with_children(|parent| {
             // Mascot first: absolutely positioned, renders behind siblings.
-            spawn_lesson_mascot(parent, ctx.settings.exploration_theme, &asset_server);
+            spawn_lesson_mascot(parent, settings.exploration_theme, &asset_server);
             spawn_top_bar(parent, &progress, window);
             spawn_question_container(parent);
         });

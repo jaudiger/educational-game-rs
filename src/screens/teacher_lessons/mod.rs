@@ -113,7 +113,7 @@ fn rebuild_lessons_ui(
     for entity in &existing.roots {
         commands.entity(entity).despawn();
     }
-    if ts.ctx.settings.mode != GameMode::Group {
+    if ts.ctx.production.mode != GameMode::Group {
         return;
     }
     let Ok(camera_entity) = ts.teacher.camera.single() else {

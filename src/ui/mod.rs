@@ -3,6 +3,7 @@ pub mod components;
 pub mod focus_navigation;
 pub mod navigation;
 pub mod rich_text;
+#[cfg(not(feature = "demo"))]
 pub mod text_input;
 pub mod theme;
 pub mod widget_styles;
@@ -11,5 +12,6 @@ pub use animation::UiAnimationPlugin;
 pub use components::ButtonActivationPlugin;
 pub use focus_navigation::FocusNavigationPlugin;
 pub use navigation::NavigationPlugin;
+#[cfg(not(feature = "demo"))]
 pub use text_input::TextInputPlugin;
 pub use theme::ThemePlugin;

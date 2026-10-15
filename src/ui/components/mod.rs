@@ -1,20 +1,23 @@
 mod buttons;
 mod forms;
+#[cfg(not(feature = "demo"))]
 mod lists;
 mod menu_background;
 mod overlays;
+#[cfg(not(feature = "demo"))]
+mod production;
 
 pub use buttons::*;
 pub use forms::*;
+#[cfg(not(feature = "demo"))]
 pub use lists::*;
 pub use menu_background::*;
 pub use overlays::*;
+#[cfg(not(feature = "demo"))]
+pub use production::*;
 
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
-
-use crate::data::{PersistenceAction, PersistenceStatus};
-use crate::i18n::{I18n, TranslationKey};
 
 use super::theme;
 
@@ -53,14 +56,6 @@ pub struct HoverTooltip {
 #[derive(Component, Reflect)]
 pub struct HoverTooltipPopover;
 
-/// Marks a confirmation popover's confirm button.
-#[derive(Component, Reflect)]
-pub struct PopoverConfirmButton;
-
-/// Marks a confirmation popover's cancel button.
-#[derive(Component, Reflect)]
-pub struct PopoverCancelButton;
-
 /// Returns the standard full-screen root layout used by every screen.
 ///
 /// Provides a centered column filling the entire viewport, with the game
@@ -98,6 +93,10 @@ pub fn card_node(mut node: Node) -> (Node, BackgroundColor, BorderColor) {
         BackgroundColor(theme::colors::CARD_BG),
         BorderColor::all(theme::colors::INPUT_BORDER),
     )
+}
+
+pub fn list_separator_border() -> BorderColor {
+    BorderColor::all(Color::srgba(0.35, 0.48, 0.67, 0.3))
 }
 
 pub fn disclosure_chevron_transform(expanded: bool) -> UiTransform {
@@ -150,59 +149,5 @@ pub fn operator_visual_group<B: Bundle>(
             ),
             visual,
         ],
-    )
-}
-
-#[derive(Component, Reflect)]
-pub struct PersistenceNotice(PersistenceAction);
-
-pub fn persistence_message(
-    action: PersistenceAction,
-    status: PersistenceStatus,
-    i18n: &I18n,
-) -> Option<String> {
-    status
-        .failed(action)
-        .then(|| i18n.t(&TranslationKey::SaveWriteFailed).into_owned())
-}
-
-pub fn persistence_notice(
-    action: PersistenceAction,
-    status: PersistenceStatus,
-    i18n: &I18n,
-    window: Entity,
-) -> impl Bundle + use<> {
-    let message = persistence_message(action, status, i18n).unwrap_or_default();
-    (
-        Text::new(message),
-        PersistenceNotice(action),
-        theme::typography::text(theme::fonts::SMALL, window),
-        TextColor(theme::colors::ERROR),
-    )
-}
-
-pub fn sync_persistence_notices(
-    status: Res<PersistenceStatus>,
-    i18n: Res<I18n>,
-    mut notice_query: Query<(&PersistenceNotice, &mut Text)>,
-) {
-    for (notice, mut text) in &mut notice_query {
-        let message = if status.failed(notice.0) {
-            i18n.t(&TranslationKey::SaveWriteFailed).into_owned()
-        } else {
-            String::new()
-        };
-        if **text != message {
-            message.clone_into(&mut **text);
-        }
-    }
-}
-
-/// Returns the inline notice shown when a save write fails.
-pub fn save_write_failure_notice(text: String, window: Entity) -> impl Bundle + use<> {
-    (
-        Text::new(text),
-        theme::typography::text(theme::fonts::SMALL, window),
-        TextColor(theme::colors::ERROR),
     )
 }
