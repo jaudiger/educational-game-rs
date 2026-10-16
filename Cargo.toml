@@ -10,7 +10,7 @@ default = []
 demo = []
 
 [dependencies]
-bevy = { version = "0.20.0", features = ["debug", "bevy_ui_widgets"] }
+bevy = { version = "0.20.0", default-features = false, features = ["2d", "ui", "audio"] }
 directories = "6.0.0"
 rand = "0.10.3"
 serde = { version = "1.0.229", features = ["derive"] }

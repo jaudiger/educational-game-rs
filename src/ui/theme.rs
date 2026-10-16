@@ -1,4 +1,3 @@
-use bevy::asset::{embedded_asset, load_embedded_asset};
 use bevy::prelude::*;
 use bevy::text::{FontSize, FontSource};
 use bevy::ui_widgets::{Checkbox, RadioButton};
@@ -90,11 +89,9 @@ pub struct ThemePlugin;
 
 impl Plugin for ThemePlugin {
     fn build(&self, app: &mut App) {
-        embedded_asset!(app, "question-background.png");
         let asset_server = app.world().resource::<AssetServer>();
         let font_handle: Handle<Font> = asset_server.load("fonts/FiraMono-Regular.ttf");
-        let question_bg: Handle<Image> =
-            load_embedded_asset!(asset_server, "question-background.png");
+        let question_bg: Handle<Image> = asset_server.load("ui/question-background.png");
         app.insert_resource(GameFonts {
             regular: font_handle,
         });

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
-use bevy::ui_widgets::MenuPlugin;
+use bevy::ui_widgets::{ListBoxPlugin, MenuPlugin};
 
 use crate::plugins::ContentPlugin;
 
@@ -56,7 +56,8 @@ pub fn bootstrap() -> PlatformBootstrap {
             meta_check: bevy::asset::AssetMetaCheck::Never,
             ..default()
         })
-        .disable::<MenuPlugin>();
+        .disable::<MenuPlugin>()
+        .disable::<ListBoxPlugin>();
 
     #[cfg(not(target_arch = "wasm32"))]
     let content = ContentPlugin::new(content_directory);
