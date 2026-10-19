@@ -148,7 +148,11 @@ fn spawn_choice_buttons(
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
+            justify_content: JustifyContent::Center,
+            width: percent(100.0),
             column_gap: theme::scaled(theme::spacing::MEDIUM),
+            row_gap: theme::scaled(theme::spacing::MEDIUM),
             margin: theme::scaled(theme::spacing::LARGE).top(),
             ..default()
         })

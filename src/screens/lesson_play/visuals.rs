@@ -309,10 +309,12 @@ fn spawn_conversion_row(
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
             width: percent(100.0),
             column_gap: theme::scaled(theme::spacing::SMALL),
+            row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
         })
         .with_children(|row| {
@@ -323,8 +325,12 @@ fn spawn_conversion_row(
             ));
             row.spawn(Node {
                 flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
+                max_width: percent(100.0),
                 column_gap: theme::scaled(theme::spacing::SMALL),
+                row_gap: theme::scaled(theme::spacing::SMALL),
                 ..default()
             })
             .with_children(|conversion| {

@@ -8,11 +8,11 @@ use bevy::prelude::*;
 
 use crate::ui::theme;
 
-/// Maximum width of the grid area in pixels.
+/// Maximum width of the grid area in design pixels.
 const GRID_MAX_WIDTH: f32 = 350.0;
-/// Maximum height of the grid area in pixels.
+/// Maximum height of the grid area in design pixels.
 const GRID_MAX_HEIGHT: f32 = 150.0;
-/// Gap between grid cells.
+/// Gap between grid cells in design pixels.
 const CELL_GAP: f32 = 2.0;
 /// Colour for grid cells.
 const CELL_COLOR: Color = Color::srgb(0.4, 0.7, 0.95);
@@ -37,7 +37,7 @@ fn multiplication_grid_visual(rows: u32, cols: u32) -> impl Bundle {
     (
         Node {
             flex_direction: FlexDirection::Column,
-            row_gap: px(CELL_GAP),
+            row_gap: theme::scaled(CELL_GAP),
             align_items: AlignItems::Center,
             ..default()
         },
@@ -45,15 +45,15 @@ fn multiplication_grid_visual(rows: u32, cols: u32) -> impl Bundle {
             (
                 Node {
                     flex_direction: FlexDirection::Row,
-                    column_gap: px(CELL_GAP),
+                    column_gap: theme::scaled(CELL_GAP),
                     ..default()
                 },
                 Children::spawn(SpawnIter((0..cols).map(move |_| {
                     (
                         Node {
-                            width: px(cell_size),
-                            height: px(cell_size),
-                            border_radius: BorderRadius::all(px(3.0)),
+                            width: theme::scaled(cell_size),
+                            height: theme::scaled(cell_size),
+                            border_radius: BorderRadius::all(theme::scaled(3.0)),
                             ..default()
                         },
                         BackgroundColor(CELL_COLOR),
@@ -76,8 +76,12 @@ pub fn spawn_prompt_and_grid(
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
+            justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
+            width: percent(100.0),
             column_gap: theme::scaled(theme::spacing::LARGE),
+            row_gap: theme::scaled(theme::spacing::MEDIUM),
             ..default()
         })
         .with_children(|row| {

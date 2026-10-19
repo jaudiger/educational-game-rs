@@ -10,20 +10,20 @@ use bevy::ui_widgets::Button;
 use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
 
-/// Default total width of the bar in pixels.
+/// Default total width of the bar in design pixels.
 pub const BAR_WIDTH: f32 = 500.0;
-/// Default height of each slice in pixels.
+/// Default height of each slice in design pixels.
 pub const BAR_HEIGHT: f32 = 80.0;
-/// Gap between slices in pixels.
+/// Gap between slices in design pixels.
 const SLICE_GAP: f32 = 3.0;
-/// Border radius for the outermost corners.
+/// Border radius for the outermost corners in design pixels.
 const CORNER_RADIUS: f32 = 6.0;
 
 /// Background colour for an uncoloured slice.
 pub const COLOR_UNCOLORED: Color = Color::srgb(0.73, 0.73, 0.78);
 /// Border colour drawn around every slice.
 const COLOR_SLICE_BORDER: Color = Color::srgb(0.60, 0.60, 0.65);
-/// Border thickness around each slice in pixels.
+/// Border thickness around each slice in design pixels.
 const SLICE_BORDER: f32 = 1.5;
 
 /// Marker component placed on each interactive slice of a fraction bar.
@@ -37,6 +37,7 @@ pub struct FractionSlice {
 ///
 /// The slice count and colored count determine its contents, while the bar color
 /// applies to colored slices. Interactive slices receive focus and hover states.
+/// The supplied dimensions are design pixels and scale with the target viewport.
 #[allow(clippy::cast_precision_loss, clippy::too_many_arguments)]
 pub fn fraction_bar(
     denominator: u32,
@@ -55,7 +56,7 @@ pub fn fraction_bar(
     (
         Node {
             flex_direction: FlexDirection::Row,
-            column_gap: px(SLICE_GAP),
+            column_gap: theme::scaled(SLICE_GAP),
             align_items: AlignItems::Center,
             ..default()
         },
@@ -80,9 +81,9 @@ pub fn fraction_bar(
                 };
                 let mut cmd = parent.spawn((
                     Node {
-                        width: px(slice_width),
-                        height: px(bar_height),
-                        border: UiRect::all(px(SLICE_BORDER)),
+                        width: theme::scaled(slice_width),
+                        height: theme::scaled(bar_height),
+                        border: UiRect::all(theme::scaled(SLICE_BORDER)),
                         border_radius: slice_border_radius(i, denominator),
                         ..default()
                     },
@@ -116,22 +117,22 @@ pub fn fraction_bar(
 
 fn slice_border_radius(index: u32, total: u32) -> BorderRadius {
     if total <= 1 {
-        return BorderRadius::all(px(CORNER_RADIUS));
+        return BorderRadius::all(theme::scaled(CORNER_RADIUS));
     }
     if index == 0 {
         return BorderRadius {
-            top_left: px(CORNER_RADIUS).into(),
-            bottom_left: px(CORNER_RADIUS).into(),
-            top_right: px(0.0).into(),
-            bottom_right: px(0.0).into(),
+            top_left: theme::scaled(CORNER_RADIUS).into(),
+            bottom_left: theme::scaled(CORNER_RADIUS).into(),
+            top_right: theme::scaled(0.0).into(),
+            bottom_right: theme::scaled(0.0).into(),
         };
     }
     if index == total - 1 {
         return BorderRadius {
-            top_left: px(0.0).into(),
-            bottom_left: px(0.0).into(),
-            top_right: px(CORNER_RADIUS).into(),
-            bottom_right: px(CORNER_RADIUS).into(),
+            top_left: theme::scaled(0.0).into(),
+            bottom_left: theme::scaled(0.0).into(),
+            top_right: theme::scaled(CORNER_RADIUS).into(),
+            bottom_right: theme::scaled(CORNER_RADIUS).into(),
         };
     }
     BorderRadius::ZERO

@@ -1,8 +1,9 @@
 use bevy::camera::ClearColorConfig;
 use bevy::camera::visibility::RenderLayers;
+use bevy::input::touch::{TouchInput, TouchPhase};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
-use bevy::window::{CursorOptions, PrimaryWindow};
+use bevy::window::{CursorMoved, CursorOptions, PrimaryWindow};
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
@@ -34,7 +35,7 @@ impl Plugin for BalloonCursorPlugin {
             .add_systems(
                 Update,
                 (
-                    follow_mouse_system,
+                    follow_pointer_system,
                     animate_balloon_system,
                     spawn_cloud_puffs_system,
                     animate_cloud_puffs_system,
@@ -48,6 +49,79 @@ impl Plugin for BalloonCursorPlugin {
 #[derive(Component, Reflect)]
 #[require(Transform, Visibility)]
 struct BalloonCursor;
+
+#[derive(Component, Default, Reflect)]
+struct TouchCursorState {
+    touches: Vec<(u64, Vec2)>,
+    active_touch: Option<u64>,
+    last_position: Option<Vec2>,
+}
+
+impl TouchCursorState {
+    fn update_touch(&mut self, phase: TouchPhase, id: u64, position: Vec2) {
+        match phase {
+            TouchPhase::Started => {
+                if let Some((_, touch_position)) = self
+                    .touches
+                    .iter_mut()
+                    .find(|(touch_id, _)| *touch_id == id)
+                {
+                    *touch_position = position;
+                } else {
+                    self.touches.push((id, position));
+                }
+
+                if self.active_touch.is_none() {
+                    self.active_touch = Some(id);
+                }
+            }
+            TouchPhase::Moved => {
+                if let Some((_, touch_position)) = self
+                    .touches
+                    .iter_mut()
+                    .find(|(touch_id, _)| *touch_id == id)
+                {
+                    *touch_position = position;
+                }
+            }
+            TouchPhase::Ended | TouchPhase::Canceled => {
+                let was_active = self.active_touch == Some(id);
+                if was_active {
+                    self.last_position = Some(position);
+                }
+                self.touches.retain(|(touch_id, _)| *touch_id != id);
+
+                if was_active {
+                    self.active_touch = self.touches.first().map(|(touch_id, _)| *touch_id);
+                }
+            }
+        }
+
+        if let Some(active_touch) = self.active_touch {
+            self.last_position = self
+                .touches
+                .iter()
+                .find(|(touch_id, _)| *touch_id == active_touch)
+                .map(|(_, position)| *position)
+                .or(self.last_position);
+        }
+    }
+
+    fn cursor_position(
+        &mut self,
+        mouse_moved: bool,
+        window_position: Option<Vec2>,
+    ) -> Option<Vec2> {
+        if self.active_touch.is_some() {
+            self.last_position
+        } else if mouse_moved {
+            self.last_position = None;
+            window_position
+        } else {
+            self.last_position.or(window_position)
+        }
+    }
+}
 
 #[derive(Component, Reflect)]
 struct BalloonEnvelope {
@@ -186,6 +260,7 @@ fn setup_balloon_cursor(
     // Spawn the cursor hierarchy (all entities on the cursor render layer)
     commands.spawn((
         BalloonCursor,
+        TouchCursorState::default(),
         cursor_layer.clone(),
         CloudPuffSpawner {
             timer: Timer::from_seconds(1.6, TimerMode::Repeating),
@@ -246,26 +321,41 @@ fn cleanup_balloon_cursor(
     commands.remove_resource::<BalloonCursorActive>();
 }
 
-fn follow_mouse_system(
-    window: Single<&Window, With<PrimaryWindow>>,
+fn follow_pointer_system(
+    primary_window: Single<(Entity, &Window), With<PrimaryWindow>>,
     camera_data: Single<(&Camera, &GlobalTransform), With<CursorCamera>>,
-    mut cursor_query: Query<&mut Transform, With<BalloonCursor>>,
+    cursor_query: Single<(&mut Transform, &mut TouchCursorState), With<BalloonCursor>>,
+    mut cursor_moved_events: MessageReader<CursorMoved>,
+    mut touch_events: MessageReader<TouchInput>,
 ) {
-    let Some(cursor_position) = window.cursor_position() else {
+    let (window_entity, window) = *primary_window;
+    let (mut transform, mut touch_state) = cursor_query.into_inner();
+
+    let mut mouse_moved = false;
+    for event in cursor_moved_events.read() {
+        if event.window == window_entity {
+            mouse_moved = true;
+        }
+    }
+
+    for touch in touch_events.read() {
+        if touch.window == window_entity {
+            touch_state.update_touch(touch.phase, touch.id, touch.position);
+        }
+    }
+
+    let Some(cursor_position) = touch_state.cursor_position(mouse_moved, window.cursor_position())
+    else {
         return;
     };
 
-    // Use the cursor overlay camera for coordinate conversion
     let (camera, camera_transform) = *camera_data;
-
     let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_position) else {
         return;
     };
 
-    for mut transform in &mut cursor_query {
-        transform.translation.x = world_pos.x;
-        transform.translation.y = world_pos.y;
-    }
+    transform.translation.x = world_pos.x;
+    transform.translation.y = world_pos.y;
 }
 
 fn animate_balloon_system(
@@ -347,5 +437,48 @@ fn animate_cloud_puffs_system(
         if puff.lifetime.is_finished() {
             commands.entity(entity).despawn();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TouchCursorState, TouchPhase};
+    use bevy::math::Vec2;
+
+    #[test]
+    fn touch_cursor_keeps_its_finger_and_promotes_the_next_touch() {
+        let mut state = TouchCursorState::default();
+        state.update_touch(TouchPhase::Started, 7, Vec2::new(10.0, 20.0));
+        state.update_touch(TouchPhase::Started, 3, Vec2::new(30.0, 40.0));
+        state.update_touch(TouchPhase::Moved, 3, Vec2::new(31.0, 41.0));
+
+        assert_eq!(state.last_position, Some(Vec2::new(10.0, 20.0)));
+
+        state.update_touch(TouchPhase::Moved, 7, Vec2::new(11.0, 21.0));
+        state.update_touch(TouchPhase::Ended, 7, Vec2::new(12.0, 22.0));
+
+        assert_eq!(state.active_touch, Some(3));
+        assert_eq!(state.last_position, Some(Vec2::new(31.0, 41.0)));
+
+        state.update_touch(TouchPhase::Canceled, 3, Vec2::new(32.0, 42.0));
+
+        assert_eq!(state.active_touch, None);
+        assert_eq!(state.last_position, Some(Vec2::new(32.0, 42.0)));
+    }
+
+    #[test]
+    fn fresh_mouse_movement_reclaims_the_cursor_after_touch() {
+        let mut state = TouchCursorState::default();
+        state.update_touch(TouchPhase::Started, 1, Vec2::new(10.0, 20.0));
+        state.update_touch(TouchPhase::Ended, 1, Vec2::new(11.0, 21.0));
+
+        assert_eq!(
+            state.cursor_position(false, Some(Vec2::new(100.0, 200.0))),
+            Some(Vec2::new(11.0, 21.0))
+        );
+        assert_eq!(
+            state.cursor_position(true, Some(Vec2::new(101.0, 201.0))),
+            Some(Vec2::new(101.0, 201.0))
+        );
     }
 }
