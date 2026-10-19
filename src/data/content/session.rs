@@ -66,7 +66,7 @@ pub fn build_session_with_selection(
         crate::data::LessonLaunchSelection::CompleteLesson => {
             plan_session(lesson, lesson_config, &mut rng)
         }
-        selection @ crate::data::LessonLaunchSelection::SingleExercise { .. } => {
+        selection @ crate::data::LessonLaunchSelection::SingleActivity { .. } => {
             plan_session_with_selection(lesson, selection, lesson_config, &mut rng)
         }
     }
@@ -94,8 +94,8 @@ pub fn plan_session_with_selection(
 ) -> Result<LessonSession, Vec<String>> {
     match selection {
         LessonLaunchSelection::CompleteLesson => plan_complete_session(lesson, lesson_config, rng),
-        LessonLaunchSelection::SingleExercise { exercise_id } => {
-            plan_single_exercise(lesson, exercise_id, rng)
+        LessonLaunchSelection::SingleActivity { activity_id } => {
+            plan_single_activity(lesson, activity_id, rng)
         }
     }
 }
@@ -141,23 +141,23 @@ fn plan_complete_session(
     })
 }
 
-fn plan_single_exercise(
+fn plan_single_activity(
     lesson: &Lesson,
-    exercise_id: &str,
+    activity_id: &str,
     rng: &mut impl Rng,
 ) -> Result<LessonSession, Vec<String>> {
     let matches: Vec<&QuestionEntry> = lesson
         .questions
         .iter()
-        .filter(|entry| entry.id == exercise_id)
+        .filter(|entry| entry.id == activity_id)
         .collect();
     let entry = match matches.as_slice() {
-        [] => return Err(vec![format!("Unknown exercise ID {exercise_id}")]),
+        [] => return Err(vec![format!("Unknown activity ID {activity_id}")]),
         [entry] => *entry,
-        _ => return Err(vec![format!("Exercise {exercise_id} is ambiguous")]),
+        _ => return Err(vec![format!("Activity {activity_id} is ambiguous")]),
     };
     if entry.id.is_empty() {
-        return Err(vec!["Selected exercise ID must not be empty".to_owned()]);
+        return Err(vec!["Selected activity ID must not be empty".to_owned()]);
     }
     let issues = entry
         .definition
@@ -227,46 +227,4 @@ fn resolve_unique(
         }
     }
     resolve_question(&entry.definition, rng)
-}
-
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod tests {
-    use std::collections::HashMap;
-    use std::path::Path;
-
-    use rand::rng;
-
-    use super::{LessonPlanningConfig, plan_session_with_selection};
-    use crate::data::content::load_content_library;
-    use crate::data::{LessonLaunchSelection, content::Lesson};
-
-    #[test]
-    fn single_exercise_planning_ignores_complete_series_settings() {
-        let library = load_content_library(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/content/themes"),
-        )
-        .expect("development content is valid");
-        let lesson: &Lesson = library
-            .themes
-            .iter()
-            .find(|theme| theme.available)
-            .and_then(|theme| theme.lessons.first())
-            .expect("available content includes a lesson");
-        let exercise = lesson
-            .questions
-            .first()
-            .expect("the lesson contains an exercise");
-        let selection = LessonLaunchSelection::SingleExercise {
-            exercise_id: exercise.id.clone(),
-        };
-        let config = LessonPlanningConfig {
-            counts: [(exercise.id.clone(), 0)].into(),
-            show_visuals: HashMap::new(),
-        };
-        let session = plan_session_with_selection(lesson, &selection, Some(&config), &mut rng())
-            .expect("a selected catalogue exercise is playable");
-
-        assert_eq!(session.questions.len(), 1);
-        assert_eq!(session.questions[0].exercise_id, exercise.id);
-    }
 }

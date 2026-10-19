@@ -18,5 +18,5 @@ pub enum ExplorationView {
     #[default]
     Themes,
     ThemeLessons,
-    ExerciseSelection,
+    ActivitySelection,
 }

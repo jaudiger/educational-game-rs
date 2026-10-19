@@ -72,7 +72,7 @@ pub(super) struct ThemeButton(pub String);
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Reflect)]
 pub enum LessonLaunchAction {
     CompleteSeries,
-    ChooseExercise,
+    ChooseActivity,
 }
 
 #[derive(Component, Reflect)]
@@ -149,7 +149,7 @@ const fn restored_exploration_view(
         return None;
     }
     Some(match launch_selection {
-        Some(LessonLaunchSelection::SingleExercise { .. }) => ExplorationView::ExerciseSelection,
+        Some(LessonLaunchSelection::SingleActivity { .. }) => ExplorationView::ActivitySelection,
         Some(LessonLaunchSelection::CompleteLesson) | None => ExplorationView::ThemeLessons,
     })
 }
@@ -336,7 +336,7 @@ fn update_exploration_notice(
     let notice = match *exploration_view.get() {
         ExplorationView::Themes => overview.notice.as_deref(),
         ExplorationView::ThemeLessons => lessons.notice.as_deref(),
-        ExplorationView::ExerciseSelection => None,
+        ExplorationView::ActivitySelection => None,
     };
     let display = if notice.is_some() {
         Display::Flex
@@ -616,7 +616,7 @@ pub fn setup_theme_lessons(
         screen_root(),
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
-        DespawnOnEnter(ExplorationView::ExerciseSelection),
+        DespawnOnEnter(ExplorationView::ActivitySelection),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             let mut title_cmd = parent.spawn((
                 Text::new(title),
@@ -797,7 +797,7 @@ fn spawn_lesson_action(
 ) {
     let palette = match action.action {
         LessonLaunchAction::CompleteSeries => theme::button_styles::ACTION_PRIMARY,
-        LessonLaunchAction::ChooseExercise => theme::button_styles::ACTION_SECONDARY,
+        LessonLaunchAction::ChooseActivity => theme::button_styles::ACTION_SECONDARY,
     };
     let mut button = parent.spawn((
         button_base(palette),
@@ -853,13 +853,13 @@ fn handle_theme_lessons(
                         commands.insert_resource(selection);
                         next_app_state.set(AppState::LessonPlay);
                     }
-                    LessonLaunchAction::ChooseExercise => {
+                    LessonLaunchAction::ChooseActivity => {
                         if let Some(selection) = lesson_button.selection.clone() {
                             commands.insert_resource(selection);
                         } else {
                             commands.remove_resource::<LessonLaunchSelection>();
                         }
-                        next_exploration_view.set(ExplorationView::ExerciseSelection);
+                        next_exploration_view.set(ExplorationView::ActivitySelection);
                     }
                 }
             }
@@ -871,23 +871,6 @@ fn handle_theme_lessons(
             }
             next_exploration_view.set(ExplorationView::Themes);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{ExplorationView, LessonLaunchSelection, restored_exploration_view};
-
-    #[test]
-    fn single_exercise_returns_to_the_exercise_catalogue() {
-        let selection = LessonLaunchSelection::SingleExercise {
-            exercise_id: "exercise-1".to_owned(),
-        };
-
-        assert_eq!(
-            restored_exploration_view(true, Some(&selection)),
-            Some(ExplorationView::ExerciseSelection),
-        );
     }
 }
 

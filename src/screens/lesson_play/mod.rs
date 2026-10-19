@@ -119,7 +119,7 @@ fn advance_question(
 const fn completed_session_destination(selection: &LessonLaunchSelection) -> AppState {
     match selection {
         LessonLaunchSelection::CompleteLesson => AppState::LessonSummary,
-        LessonLaunchSelection::SingleExercise { .. } => AppState::ThemeExploration,
+        LessonLaunchSelection::SingleActivity { .. } => AppState::ThemeExploration,
     }
 }
 

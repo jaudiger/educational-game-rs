@@ -64,13 +64,13 @@ impl GameSettings {
 #[derive(Resource, Clone, Debug, Default, Deref, Reflect)]
 pub struct SelectedLesson(pub Option<String>);
 
-/// Selects whether a lesson launches its configured series or one exercise.
+/// Selects whether a lesson launches its configured series or one activity.
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Reflect)]
 pub enum LessonLaunchSelection {
     #[default]
     CompleteLesson,
-    SingleExercise {
-        exercise_id: String,
+    SingleActivity {
+        activity_id: String,
     },
 }
 

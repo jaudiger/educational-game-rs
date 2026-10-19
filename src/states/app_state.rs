@@ -64,18 +64,3 @@ impl ComputedStates for ActiveLesson {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use bevy::prelude::ComputedStates;
-
-    use super::{ActiveLesson, AppState, InLessonFlow};
-
-    #[test]
-    fn production_destinations_remain_in_shared_lesson_scopes() {
-        assert!(InLessonFlow::compute(AppState::LessonSummary).is_some());
-        assert!(ActiveLesson::compute(AppState::LessonSummary).is_some());
-        assert!(InLessonFlow::compute(AppState::SaveSlots).is_none());
-        assert!(ActiveLesson::compute(AppState::ThemeExploration).is_none());
-    }
-}

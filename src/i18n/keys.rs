@@ -14,7 +14,7 @@ pub enum TranslationKey {
     AppTitle,
     Back,
     ComingSoon,
-    ExerciseCount(usize),
+    ActivityCount(usize),
     Play,
     Settings,
 
@@ -32,7 +32,7 @@ pub enum TranslationKey {
     CorrectAnswer,
     IncorrectAnswer,
     QuestionProgress(usize, usize),
-    ReturnToExerciseList,
+    ReturnToActivityList,
 
     // Lesson Summary
 
@@ -40,6 +40,11 @@ pub enum TranslationKey {
     BackToLessons,
     BackToThemes,
     Themes,
+    ActivityCategoryComparison,
+    ActivityCategoryIdentification,
+    ActivityCategoryMcq,
+    ActivityCategoryNumericInput,
+    ActivityCategoryVisualization,
 
     // Save Slots
 
@@ -57,14 +62,6 @@ pub enum TranslationKey {
     ExplorationThemeSpace,
     MusicVolumeLabel,
     SfxVolumeLabel,
-
-    // Teacher
-    ExerciseTypeComparison,
-    ExerciseTypeIdentification,
-    ExerciseTypeMcq,
-
-    ExerciseTypeNumericInput,
-    ExerciseTypeVisualization,
 }
 
 /// Generate a `match $self { ... }` expression from three sections of the translation table.
@@ -102,7 +99,6 @@ impl TranslationKey {
             universal: [
                 LanguageEnglish            => "English",
                 LanguageFrench             => "Fran\u{00e7}ais",
-                ExerciseTypeIdentification => "Identification",
                 SfxVolumeLabel             => "Interface",
             ];
             bilingual: [
@@ -121,12 +117,17 @@ impl TranslationKey {
                 // Lesson Play
                 CorrectAnswer             => ("Bonne r\u{00e9}ponse !",                    "Correct!"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
-                ReturnToExerciseList      => ("Retour a la liste des exercices",           "Return to exercises"),
+                ReturnToActivityList      => ("Retour a la liste des activit\u{00e9}s",   "Return to activities"),
                 // Lesson Summary
                 // Theme Exploration
                 BackToLessons           => ("Retour aux le\u{00e7}ons",                      "Back to lessons"),
                 BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
+                ActivityCategoryComparison => ("Comparer des fractions",                    "Compare fractions"),
+                ActivityCategoryIdentification => ("Reconna\u{00ee}tre une fraction",       "Identify a fraction"),
+                ActivityCategoryMcq => ("Choisir une r\u{00e9}ponse",                       "Choose an answer"),
+                ActivityCategoryNumericInput => ("Calculer",                                "Calculate"),
+                ActivityCategoryVisualization => ("Explorer les fractions",                 "Explore fractions"),
                 // Save Slots
                 // Settings
                 ExplanationsLabel         => ("Explications",                              "Explanations"),
@@ -139,22 +140,17 @@ impl TranslationKey {
                 ExplorationThemeSky               => ("Ciel",                                      "Sky"),
                 ExplorationThemeSpace             => ("Espace",                                    "Space"),
                 MusicVolumeLabel          => ("Musique",                                   "Music"),
-                // Teacher
-                ExerciseTypeComparison    => ("Comparaison",                               "Comparison"),
-                ExerciseTypeMcq           => ("QCM",                                       "MCQ"),
-                ExerciseTypeNumericInput  => ("Saisie num\u{00e9}rique",                   "Numeric Input"),
-                ExerciseTypeVisualization => ("Visualisation",                             "Visualization"),
             ];
             // Parameterized variants need per-field destructuring and format! calls.
             Self::CharacterAte(name, n, d) => match language {
                 Language::French  => format!("{name} mange {n}/{d}").into(),
                 Language::English => format!("{name} eats {n}/{d}").into(),
             },
-            Self::ExerciseCount(count) => match language {
-                Language::French if *count == 1 => format!("{count} exercice").into(),
-                Language::French => format!("{count} exercices").into(),
-                Language::English if *count == 1 => format!("{count} exercise").into(),
-                Language::English => format!("{count} exercises").into(),
+            Self::ActivityCount(count) => match language {
+                Language::French if *count == 1 => format!("{count} activit\u{00e9}").into(),
+                Language::French => format!("{count} activit\u{00e9}s").into(),
+                Language::English if *count == 1 => format!("{count} activity").into(),
+                Language::English => format!("{count} activities").into(),
             },
             Self::QuestionProgress(current, total) => match language {
                 Language::French  => format!("Question {current}/{total}").into(),

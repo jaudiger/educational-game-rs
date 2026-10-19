@@ -50,7 +50,7 @@ impl Plugin for TeacherLessonsScreenPlugin {
                 config::handle_count_change,
                 config::handle_visual_toggle,
                 config::handle_reset_click,
-                config::update_exercise_labels,
+                config::update_catalog_labels,
             )
                 .run_if(in_state(AppState::ThemeExploration))
                 .run_if(teacher_lessons_tree_view_active),

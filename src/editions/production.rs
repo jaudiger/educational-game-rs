@@ -231,8 +231,8 @@ fn prepare_production_feedback(
     let default_selection = LessonLaunchSelection::CompleteLesson;
     let selection = launch_selection.as_deref().unwrap_or(&default_selection);
     let (label, return_to_catalogue) = match selection {
-        LessonLaunchSelection::SingleExercise { .. } => (
-            i18n.t(&TranslationKey::ReturnToExerciseList).into_owned(),
+        LessonLaunchSelection::SingleActivity { .. } => (
+            i18n.t(&TranslationKey::ReturnToActivityList).into_owned(),
             true,
         ),
         LessonLaunchSelection::CompleteLesson

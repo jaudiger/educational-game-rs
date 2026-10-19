@@ -8,7 +8,7 @@ use crate::data::{
     ActiveTheme, ContentLibrary, ExplorationTheme, LessonLaunchSelection, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
-use crate::screens::teacher_shared::exercise_type_label;
+use crate::screens::activity_categories::activity_category_label;
 use crate::states::{AppState, ExplorationView};
 use crate::ui::animation::FloatingCard;
 use crate::ui::components::{
@@ -17,84 +17,84 @@ use crate::ui::components::{
 };
 use crate::ui::theme;
 
-pub struct ExerciseSelectionScreenPlugin;
+pub struct ActivitySelectionScreenPlugin;
 
-impl Plugin for ExerciseSelectionScreenPlugin {
+impl Plugin for ActivitySelectionScreenPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            OnEnter(ExplorationView::ExerciseSelection),
-            setup_exercise_selection,
+            OnEnter(ExplorationView::ActivitySelection),
+            setup_activity_selection,
         )
         .add_systems(
             Update,
             (
-                handle_exercise_selection,
-                handle_exercise_group_disclosure,
-                scroll_selected_exercise_into_view,
+                handle_activity_selection,
+                handle_activity_group_disclosure,
+                scroll_selected_activity_into_view,
             )
-                .run_if(in_state(ExplorationView::ExerciseSelection)),
+                .run_if(in_state(ExplorationView::ActivitySelection)),
         );
     }
 }
 
 #[derive(Component, Reflect)]
-struct ExerciseSelectionRoot;
+struct ActivitySelectionRoot;
 
 #[derive(Component, Reflect)]
-struct ExerciseButton(String);
+struct ActivityButton(String);
 
 #[derive(Component, Reflect)]
-struct ExerciseGroupToggle(QuestionType);
+struct ActivityGroupToggle(QuestionType);
 
 #[derive(Component, Reflect)]
-struct ExerciseGroupPanel(QuestionType);
+struct ActivityGroupPanel(QuestionType);
 
 #[derive(Component, Reflect)]
-struct ExerciseGroupChevron(QuestionType);
+struct ActivityGroupChevron(QuestionType);
 
 #[derive(Component, Reflect)]
-struct ScrollToSelectedExercise;
+struct ScrollToSelectedActivity;
 
 #[derive(Component, Reflect)]
 struct BackToLessonGridButton;
 
-struct ExerciseGroup<T> {
-    exercise_type: QuestionType,
-    exercises: Vec<T>,
+struct ActivityGroup<T> {
+    activity_type: QuestionType,
+    activities: Vec<T>,
 }
 
 #[derive(Clone)]
-struct ExerciseButtonData {
+struct ActivityButtonData {
     id: String,
     label: String,
 }
 
 #[derive(Clone)]
-struct ExerciseGroupData {
-    exercise_type: QuestionType,
+struct ActivityGroupData {
+    activity_type: QuestionType,
     label: String,
-    exercise_count: String,
-    exercises: Vec<ExerciseButtonData>,
+    activity_count: String,
+    activities: Vec<ActivityButtonData>,
 }
 
-struct ExerciseGroupView {
-    group: ExerciseGroupData,
+struct ActivityGroupView {
+    group: ActivityGroupData,
     expanded: bool,
     autofocus_group: bool,
-    selected_exercise_id: Option<String>,
-    autofocus_exercise_id: Option<String>,
+    selected_activity_id: Option<String>,
+    autofocus_activity_id: Option<String>,
 }
 
-struct ExerciseSelectionScreenData {
+struct ActivitySelectionScreenData {
     lesson_context: String,
     back_label: String,
-    groups: Vec<ExerciseGroupData>,
-    selected_exercise_id: Option<String>,
+    groups: Vec<ActivityGroupData>,
+    selected_activity_id: Option<String>,
     sky_theme: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn setup_exercise_selection(
+fn setup_activity_selection(
     mut commands: Commands,
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
@@ -114,60 +114,60 @@ fn setup_exercise_selection(
         return;
     };
 
-    let groups = localized_exercise_groups(lesson, &i18n);
+    let groups = localized_activity_groups(lesson, &i18n);
     let sky_theme = settings.exploration_theme == ExplorationTheme::Sky;
-    let selected_exercise_id = match launch_selection.as_deref() {
-        Some(LessonLaunchSelection::SingleExercise { exercise_id }) => Some(exercise_id.as_str()),
+    let selected_activity_id = match launch_selection.as_deref() {
+        Some(LessonLaunchSelection::SingleActivity { activity_id }) => Some(activity_id.as_str()),
         Some(LessonLaunchSelection::CompleteLesson) | None => None,
     }
     .filter(|id| {
         groups
             .iter()
-            .any(|group| group.exercises.iter().any(|exercise| exercise.id == *id))
+            .any(|group| group.activities.iter().any(|activity| activity.id == *id))
     })
     .map(str::to_owned);
-    let data = ExerciseSelectionScreenData {
+    let data = ActivitySelectionScreenData {
         lesson_context: lesson.title.get(i18n.language).to_owned(),
         back_label: i18n.t(&TranslationKey::BackToLessons).into_owned(),
         groups,
-        selected_exercise_id,
+        selected_activity_id,
         sky_theme,
     };
-    spawn_exercise_selection_screen(&mut commands, data, *primary_window);
+    spawn_activity_selection_screen(&mut commands, data, *primary_window);
 }
 
-fn localized_exercise_groups(
+fn localized_activity_groups(
     lesson: &crate::data::content::Lesson,
     i18n: &I18n,
-) -> Vec<ExerciseGroupData> {
-    group_exercises(
+) -> Vec<ActivityGroupData> {
+    group_activities(
         lesson
             .questions
             .iter()
-            .map(|exercise| (exercise.definition.question_type(), exercise)),
+            .map(|activity| (activity.definition.question_type(), activity)),
     )
     .into_iter()
-    .map(|group| ExerciseGroupData {
-        exercise_type: group.exercise_type,
-        label: exercise_type_label(group.exercise_type, i18n),
-        exercise_count: i18n
-            .t(&TranslationKey::ExerciseCount(group.exercises.len()))
+    .map(|group| ActivityGroupData {
+        activity_type: group.activity_type,
+        label: activity_category_label(group.activity_type, i18n),
+        activity_count: i18n
+            .t(&TranslationKey::ActivityCount(group.activities.len()))
             .into_owned(),
-        exercises: group
-            .exercises
+        activities: group
+            .activities
             .into_iter()
-            .map(|exercise| ExerciseButtonData {
-                id: exercise.id.clone(),
-                label: exercise.definition.prompt_label(i18n.language),
+            .map(|activity| ActivityButtonData {
+                id: activity.id.clone(),
+                label: activity.catalog_label.get(i18n.language).to_owned(),
             })
             .collect(),
     })
     .collect()
 }
 
-fn spawn_exercise_selection_screen(
+fn spawn_activity_selection_screen(
     commands: &mut Commands,
-    data: ExerciseSelectionScreenData,
+    data: ActivitySelectionScreenData,
     window: Entity,
 ) {
     let sky_theme = data.sky_theme;
@@ -178,11 +178,11 @@ fn spawn_exercise_selection_screen(
     };
     let mut root = commands.spawn((
         screen_root(),
-        ExerciseSelectionRoot,
+        ActivitySelectionRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            spawn_exercise_selection_content(parent, data, list_background, window);
+            spawn_activity_selection_content(parent, data, list_background, window);
         })),
     ));
     root.insert(Node {
@@ -200,20 +200,20 @@ fn spawn_exercise_selection_screen(
     }
 }
 
-fn spawn_exercise_selection_content(
+fn spawn_activity_selection_content(
     parent: &mut ChildSpawner,
-    data: ExerciseSelectionScreenData,
+    data: ActivitySelectionScreenData,
     list_background: Color,
     window: Entity,
 ) {
-    let ExerciseSelectionScreenData {
+    let ActivitySelectionScreenData {
         lesson_context,
         back_label,
         groups,
-        selected_exercise_id,
+        selected_activity_id,
         sky_theme,
     } = data;
-    let has_exercises = groups.iter().any(|group| !group.exercises.is_empty());
+    let has_activities = groups.iter().any(|group| !group.activities.is_empty());
     if sky_theme {
         parent.spawn((
             Text::new(lesson_context),
@@ -246,7 +246,7 @@ fn spawn_exercise_selection_content(
                 amplitude: theme::animation::FLOATING_AMPLITUDE,
             },
             Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
-                scroll_area.spawn(exercise_groups_node(groups, selected_exercise_id, window));
+                scroll_area.spawn(activity_groups_node(groups, selected_activity_id, window));
             })),
         ));
     } else {
@@ -265,17 +265,17 @@ fn spawn_exercise_selection_content(
             BackgroundColor(list_background),
             BorderColor::all(theme::colors::INPUT_BORDER),
             Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
-                scroll_area.spawn(exercise_groups_node(groups, selected_exercise_id, window));
+                scroll_area.spawn(activity_groups_node(groups, selected_activity_id, window));
             })),
         ));
     }
-    spawn_exercise_selection_footer(parent, back_label, has_exercises, window);
+    spawn_activity_selection_footer(parent, back_label, has_activities, window);
 }
 
-fn spawn_exercise_selection_footer(
+fn spawn_activity_selection_footer(
     parent: &mut ChildSpawner,
     back_label: String,
-    has_exercises: bool,
+    has_activities: bool,
     window: Entity,
 ) {
     parent.spawn((
@@ -296,16 +296,16 @@ fn spawn_exercise_selection_footer(
                 ),
                 BackToLessonGridButton,
             ));
-            if !has_exercises {
+            if !has_activities {
                 back.insert(AutoFocus);
             }
         })),
     ));
 }
 
-fn exercise_groups_node(
-    groups: Vec<ExerciseGroupData>,
-    selected_exercise_id: Option<String>,
+fn activity_groups_node(
+    groups: Vec<ActivityGroupData>,
+    selected_activity_id: Option<String>,
     window: Entity,
 ) -> impl Bundle + use<> {
     (
@@ -313,30 +313,23 @@ fn exercise_groups_node(
             width: percent(100.0),
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
-            row_gap: theme::scaled(theme::spacing::SMALL),
+            row_gap: theme::scaled(theme::spacing::MEDIUM),
             padding: theme::scaled(theme::spacing::MEDIUM).all(),
             ..default()
         },
         Children::spawn(SpawnWith(move |list: &mut ChildSpawner| {
             for (index, group) in groups.into_iter().enumerate() {
-                let selected_exercise_id = selected_exercise_id.clone();
-                let selected_in_group = selected_exercise_id.as_ref().is_some_and(|selected_id| {
-                    group
-                        .exercises
-                        .iter()
-                        .any(|exercise| exercise.id == *selected_id)
-                });
-                let expanded = selected_in_group;
-                let autofocus_group = selected_exercise_id.is_none() && index == 0;
-                let autofocus_exercise_id = selected_exercise_id.clone();
-                spawn_exercise_group(
+                let selected_activity_id = selected_activity_id.clone();
+                let autofocus_group = selected_activity_id.is_none() && index == 0;
+                let autofocus_activity_id = selected_activity_id.clone();
+                spawn_activity_group(
                     list,
-                    ExerciseGroupView {
+                    ActivityGroupView {
                         group,
-                        expanded,
+                        expanded: true,
                         autofocus_group,
-                        selected_exercise_id,
-                        autofocus_exercise_id,
+                        selected_activity_id,
+                        autofocus_activity_id,
                     },
                     window,
                 );
@@ -345,37 +338,49 @@ fn exercise_groups_node(
     )
 }
 
-fn spawn_exercise_group(parent: &mut ChildSpawner, view: ExerciseGroupView, window: Entity) {
-    let ExerciseGroupView {
+fn spawn_activity_group(parent: &mut ChildSpawner, view: ActivityGroupView, window: Entity) {
+    let ActivityGroupView {
         group,
         expanded,
         autofocus_group,
-        selected_exercise_id,
-        autofocus_exercise_id,
+        selected_activity_id,
+        autofocus_activity_id,
     } = view;
-    let exercise_type = group.exercise_type;
+    let activity_type = group.activity_type;
     let label = group.label;
-    let exercise_count = group.exercise_count;
-    let exercises = group.exercises;
+    let activity_count = group.activity_count;
+    let activities = group.activities;
     parent.spawn((
         Node {
             width: percent(100.0),
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
+            border: px(1.0).all(),
+            border_radius: BorderRadius::all(theme::scaled(theme::sizes::CARD_BORDER_RADIUS)),
             ..default()
         },
+        BackgroundColor(theme::colors::CARD_BG),
+        BorderColor::all(Color::srgba(0.30, 0.55, 0.84, 0.42)),
         Children::spawn(SpawnWith(move |section: &mut ChildSpawner| {
             let mut toggle = section.spawn((
-                button_base(theme::button_styles::DISCLOSURE),
-                ExerciseGroupToggle(exercise_type),
+                button_base(theme::button_styles::ACTIVITY_CATEGORY),
+                ActivityGroupToggle(activity_type),
                 Node {
                     width: percent(100.0),
-                    min_height: theme::scaled(40.0),
-                    margin: theme::scaled(theme::spacing::MEDIUM).top(),
-                    padding: UiRect::bottom(theme::scaled(theme::spacing::SMALL)),
+                    min_height: theme::scaled(56.0),
+                    padding: UiRect::axes(
+                        theme::scaled(theme::spacing::MEDIUM),
+                        theme::scaled(theme::spacing::SMALL),
+                    ),
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     column_gap: theme::scaled(theme::spacing::SMALL),
+                    border_radius: BorderRadius::new(
+                        theme::scaled(theme::sizes::CARD_BORDER_RADIUS),
+                        theme::scaled(theme::sizes::CARD_BORDER_RADIUS),
+                        px(0.0),
+                        px(0.0),
+                    ),
                     border: px(1.0).bottom(),
                     ..default()
                 },
@@ -383,50 +388,43 @@ fn spawn_exercise_group(parent: &mut ChildSpawner, view: ExerciseGroupView, wind
                 Children::spawn(SpawnWith(move |header: &mut ChildSpawner| {
                     header.spawn((
                         disclosure_chevron(expanded, theme::colors::PRIMARY, window),
-                        ExerciseGroupChevron(exercise_type),
+                        ActivityGroupChevron(activity_type),
                     ));
                     header.spawn((
                         Text::new(label),
                         theme::typography::text(theme::fonts::BODY, window),
-                        TextColor(theme::colors::PRIMARY),
+                        TextColor(theme::colors::TEXT_DARK),
                         Node {
                             flex_grow: 1.0,
+                            min_width: px(0.0),
                             ..default()
                         },
                     ));
-                    header.spawn((
-                        Text::new(exercise_count),
-                        theme::typography::text(theme::fonts::SMALL, window),
-                        TextColor(theme::colors::TEXT_MUTED),
-                    ));
+                    header.spawn(activity_count_badge(activity_count, window));
                 })),
             ));
             if autofocus_group {
                 toggle.insert(AutoFocus);
             }
             section.spawn((
-                ExerciseGroupPanel(exercise_type),
+                ActivityGroupPanel(activity_type),
                 Node {
                     display: disclosure_display(expanded),
                     flex_direction: FlexDirection::Column,
                     row_gap: theme::scaled(theme::spacing::SMALL),
-                    padding: UiRect {
-                        left: theme::scaled(theme::spacing::MEDIUM),
-                        top: theme::scaled(theme::spacing::SMALL),
-                        ..default()
-                    },
+                    padding: theme::scaled(theme::spacing::MEDIUM).all(),
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |items: &mut ChildSpawner| {
-                    for exercise in exercises {
-                        let selected = selected_exercise_id.as_deref() == Some(&exercise.id);
+                    for activity in activities {
+                        let selected = selected_activity_id.as_deref() == Some(&activity.id);
                         let mut button = items.spawn((
-                            exercise_button(&exercise.label, selected, window),
-                            ExerciseButton(exercise.id.clone()),
+                            activity_button(&activity.label, selected, window),
+                            ActivityButton(activity.id.clone()),
                         ));
                         if selected {
-                            button.insert((AutoFocus, ScrollToSelectedExercise));
-                        } else if autofocus_exercise_id.as_deref() == Some(&exercise.id) {
+                            button.insert((AutoFocus, ScrollToSelectedActivity));
+                        } else if autofocus_activity_id.as_deref() == Some(&activity.id) {
                             button.insert(AutoFocus);
                         }
                     }
@@ -436,18 +434,38 @@ fn spawn_exercise_group(parent: &mut ChildSpawner, view: ExerciseGroupView, wind
     ));
 }
 
-fn exercise_button(label: &str, selected: bool, window: Entity) -> impl Bundle + use<> {
+fn activity_count_badge(label: String, window: Entity) -> impl Bundle + use<> {
+    (
+        Node {
+            min_height: theme::scaled(32.0),
+            flex_shrink: 0.0,
+            padding: UiRect::axes(theme::scaled(theme::spacing::SMALL), theme::scaled(4.0)),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border_radius: BorderRadius::all(theme::scaled(16.0)),
+            ..default()
+        },
+        BackgroundColor(theme::colors::ACTIVITY_BADGE),
+        children![(
+            Text::new(label),
+            theme::typography::text(theme::fonts::SMALL, window),
+            TextColor(theme::colors::TEXT_DARK),
+        )],
+    )
+}
+
+fn activity_button(label: &str, selected: bool, window: Entity) -> impl Bundle + use<> {
     let palette = if selected {
-        theme::button_styles::EXERCISE_ITEM_SELECTED
+        theme::button_styles::ACTIVITY_ITEM_SELECTED
     } else {
-        theme::button_styles::EXERCISE_ITEM
+        theme::button_styles::ACTIVITY_ITEM
     };
     let border = palette.border.map_or(Color::NONE, |states| states.normal);
     (
         button_base(palette),
         Node {
             width: percent(100.0),
-            min_height: theme::scaled(64.0),
+            min_height: theme::scaled(72.0),
             padding: UiRect::axes(
                 theme::scaled(theme::spacing::MEDIUM),
                 theme::scaled(theme::spacing::SMALL),
@@ -468,20 +486,20 @@ fn exercise_button(label: &str, selected: bool, window: Entity) -> impl Bundle +
     )
 }
 
-fn group_exercises<T>(
-    exercises: impl IntoIterator<Item = (QuestionType, T)>,
-) -> Vec<ExerciseGroup<T>> {
-    let mut groups: Vec<ExerciseGroup<T>> = Vec::new();
-    for (exercise_type, exercise) in exercises {
+fn group_activities<T>(
+    activities: impl IntoIterator<Item = (QuestionType, T)>,
+) -> Vec<ActivityGroup<T>> {
+    let mut groups: Vec<ActivityGroup<T>> = Vec::new();
+    for (activity_type, activity) in activities {
         if let Some(group) = groups
             .iter_mut()
-            .find(|group| group.exercise_type == exercise_type)
+            .find(|group| group.activity_type == activity_type)
         {
-            group.exercises.push(exercise);
+            group.activities.push(activity);
         } else {
-            groups.push(ExerciseGroup {
-                exercise_type,
-                exercises: vec![exercise],
+            groups.push(ActivityGroup {
+                activity_type,
+                activities: vec![activity],
             });
         }
     }
@@ -496,23 +514,23 @@ const fn disclosure_display(expanded: bool) -> Display {
     }
 }
 
-fn handle_exercise_group_disclosure(
+fn handle_activity_group_disclosure(
     mut activations: MessageReader<ButtonActivated>,
-    toggles: Query<&ExerciseGroupToggle>,
-    mut panels: Query<(&ExerciseGroupPanel, &mut Node)>,
-    mut chevrons: Query<(&ExerciseGroupChevron, &mut UiTransform)>,
+    toggles: Query<&ActivityGroupToggle>,
+    mut panels: Query<(&ActivityGroupPanel, &mut Node)>,
+    mut chevrons: Query<(&ActivityGroupChevron, &mut UiTransform)>,
 ) {
     for event in activations.read() {
         let Ok(toggle) = toggles.get(event.0) else {
             continue;
         };
-        let exercise_type = toggle.0;
+        let activity_type = toggle.0;
         for (panel, mut node) in &mut panels {
-            if panel.0 == exercise_type {
+            if panel.0 == activity_type {
                 let expanded = node.display == Display::None;
                 node.display = disclosure_display(expanded);
                 for (chevron, mut transform) in &mut chevrons {
-                    if chevron.0 == exercise_type {
+                    if chevron.0 == activity_type {
                         *transform = disclosure_chevron_transform(expanded);
                     }
                 }
@@ -521,31 +539,31 @@ fn handle_exercise_group_disclosure(
     }
 }
 
-fn scroll_selected_exercise_into_view(
+fn scroll_selected_activity_into_view(
     mut commands: Commands,
-    selected: Query<Entity, With<ScrollToSelectedExercise>>,
+    selected: Query<Entity, With<ScrollToSelectedActivity>>,
     laid_out: Query<(), (With<ComputedNode>, With<UiGlobalTransform>)>,
 ) {
     for entity in &selected {
         if laid_out.contains(entity) {
             commands.trigger(ScrollIntoView { entity });
-            commands.entity(entity).remove::<ScrollToSelectedExercise>();
+            commands.entity(entity).remove::<ScrollToSelectedActivity>();
         }
     }
 }
 
-fn handle_exercise_selection(
+fn handle_activity_selection(
     mut activations: MessageReader<ButtonActivated>,
-    exercise_buttons: Query<&ExerciseButton>,
+    activity_buttons: Query<&ActivityButton>,
     back_buttons: Query<(), With<BackToLessonGridButton>>,
     mut commands: Commands,
     mut next_app_state: ResMut<NextState<AppState>>,
     mut next_exploration_view: ResMut<NextState<ExplorationView>>,
 ) {
     for activation in activations.read() {
-        if let Ok(button) = exercise_buttons.get(activation.0) {
-            commands.insert_resource(LessonLaunchSelection::SingleExercise {
-                exercise_id: button.0.clone(),
+        if let Ok(button) = activity_buttons.get(activation.0) {
+            commands.insert_resource(LessonLaunchSelection::SingleActivity {
+                activity_id: button.0.clone(),
             });
             next_app_state.set(AppState::LessonPlay);
         } else if back_buttons.contains(activation.0) {

@@ -14,7 +14,7 @@ use crate::plugins::teacher::{
     TeacherScreenParam, TeacherView, TeacherViewOverlay, TeacherWindow, TeacherWindowParam,
     TeacherWindowState, tab_header, teacher_stats_view_active, teacher_window_exists,
 };
-use crate::screens::teacher_shared::exercise_type_label;
+use crate::screens::activity_categories::activity_category_label;
 use crate::states::{AppState, cleanup_root};
 use crate::ui::components::{
     ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, TeacherListLevel,
@@ -335,7 +335,7 @@ fn spawn_stats_title_row(parent: &mut ChildSpawner, title_text: &str, window: En
 /// Pre-computed data for a single exercise score row.
 #[derive(Clone)]
 struct ExerciseScoreRow {
-    exercise_label: String,
+    catalog_label: String,
     score_text: String,
     score_color: Color,
     lesson_id: String,
@@ -457,7 +457,7 @@ fn score_row(
     });
     let (score_text, score_color) = totals.display();
     ExerciseScoreRow {
-        exercise_label: exercise_label(lesson_id, exercise_id, content, language),
+        catalog_label: catalog_label(lesson_id, exercise_id, content, language),
         score_text,
         score_color,
         lesson_id: lesson_id.to_owned(),
@@ -495,7 +495,7 @@ fn exercise_type_for_id(lesson: &Lesson, exercise_id: &str) -> Option<QuestionTy
         .map(|exercise| exercise.definition.question_type())
 }
 
-fn exercise_label(
+fn catalog_label(
     lesson_id: &str,
     exercise_id: &str,
     content: &ContentLibrary,
@@ -514,7 +514,7 @@ fn exercise_label(
         })
         .map_or_else(
             || exercise_id.to_owned(),
-            |exercise| exercise.definition.prompt_label(language),
+            |exercise| exercise.catalog_label.get(language).to_owned(),
         )
 }
 
@@ -579,7 +579,7 @@ fn collect_lesson_type_rows(
             let mut exercises = exercise_rows.remove(&exercise_type).unwrap_or_default();
             exercises.sort_by(|left, right| left.exercise_id.cmp(&right.exercise_id));
             TypeScoreRow {
-                type_label: exercise_type_label(exercise_type, i18n),
+                type_label: activity_category_label(exercise_type, i18n),
                 score_text,
                 score_color,
                 lesson_id: lesson.id.clone(),
@@ -984,7 +984,7 @@ fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow
     parent.spawn((
         teacher_list_exercise_row(),
         Children::spawn(SpawnWith({
-            let label = exercise_row.exercise_label.clone();
+            let label = exercise_row.catalog_label.clone();
             let score = exercise_row.score_text.clone();
             let color = exercise_row.score_color;
             let lesson_id = exercise_row.lesson_id.clone();
@@ -1090,13 +1090,13 @@ fn handle_reset_click(
             StatsResetTarget::Type(lesson_id, exercise_type) => i18n
                 .t(&ProductionTranslationKey::ResetTypeStatsConfirm(
                     lesson_label(lesson_id, &content, &i18n),
-                    exercise_type_label(*exercise_type, &i18n),
+                    activity_category_label(*exercise_type, &i18n),
                 ))
                 .into_owned(),
             StatsResetTarget::Exercise(lesson_id, exercise_id) => i18n
                 .t(&ProductionTranslationKey::ResetExerciseStatsConfirm(
                     lesson_label(lesson_id, &content, &i18n),
-                    exercise_label(lesson_id, exercise_id, &content, i18n.language),
+                    catalog_label(lesson_id, exercise_id, &content, i18n.language),
                 ))
                 .into_owned(),
         };

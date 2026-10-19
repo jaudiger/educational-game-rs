@@ -176,12 +176,9 @@ fn load_content_library_from_documents(
                         ));
                     }
                 }
-                questions.extend(
-                    category
-                        .exercises
-                        .into_iter()
-                        .map(|exercise| QuestionEntry::new(exercise.id, exercise.definition)),
-                );
+                questions.extend(category.exercises.into_iter().map(|exercise| {
+                    QuestionEntry::new(exercise.id, exercise.catalog_label, exercise.definition)
+                }));
             }
 
             let lesson = Lesson {

@@ -18,6 +18,10 @@
           "exercises": [
             {
               "id": "fraction_name",
+              "catalog_label": {
+                "fr": "Retrouver une fraction à partir de son nom",
+                "en": "Find the fraction that matches its name"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "prompt_template": {
@@ -39,6 +43,10 @@
             },
             {
               "id": "fraction_addition",
+              "catalog_label": {
+                "fr": "Additionner des fractions de même dénominateur",
+                "en": "Add fractions with the same denominator"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "prompt_template": {
@@ -68,6 +76,10 @@
             },
             {
               "id": "fraction_value",
+              "catalog_label": {
+                "fr": "Trouver le nombre entier représenté par une fraction",
+                "en": "Find the whole number represented by a fraction"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "prompt_template": {
@@ -98,6 +110,10 @@
           "exercises": [
             {
               "id": "fraction_visualization",
+              "catalog_label": {
+                "fr": "Colorier une fraction",
+                "en": "Shade a fraction"
+              },
               "definition": {
                 "type": "FractionVisualizationTemplate",
                 "prompt_template": {
@@ -119,6 +135,10 @@
           "exercises": [
             {
               "id": "fraction_comparison_same_denominator",
+              "catalog_label": {
+                "fr": "Comparer des fractions de même dénominateur",
+                "en": "Compare fractions with the same denominator"
+              },
               "definition": {
                 "type": "FractionComparisonTemplate",
                 "prompt": {
@@ -138,6 +158,10 @@
             },
             {
               "id": "fraction_comparison_same_numerator",
+              "catalog_label": {
+                "fr": "Comparer des fractions avec le même numérateur",
+                "en": "Compare fractions with the same numerator"
+              },
               "definition": {
                 "type": "FractionComparisonTemplate",
                 "prompt": {
@@ -157,6 +181,10 @@
             },
             {
               "id": "fraction_comparison_multiple_denominators",
+              "catalog_label": {
+                "fr": "Comparer des fractions de dénominateurs différents",
+                "en": "Compare fractions with different denominators"
+              },
               "definition": {
                 "type": "FractionComparisonTemplate",
                 "prompt": {
@@ -181,6 +209,10 @@
           "exercises": [
             {
               "id": "fraction_identification",
+              "catalog_label": {
+                "fr": "Identifier la fraction coloriée",
+                "en": "Identify the shaded fraction"
+              },
               "definition": {
                 "type": "FractionIdentificationTemplate",
                 "numerator_range": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -203,6 +235,10 @@
           "exercises": [
             {
               "id": "multiplication_tables_even_mcq",
+              "catalog_label": {
+                "fr": "Tables de 2, 4, 6 et 8",
+                "en": "2, 4, 6 and 8 times tables"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "resolver": "Multiplication",
@@ -233,6 +269,10 @@
             },
             {
               "id": "multiplication_tables_odd_mcq",
+              "catalog_label": {
+                "fr": "Tables de 3, 5, 7 et 9",
+                "en": "3, 5, 7 and 9 times tables"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "resolver": "Multiplication",
@@ -268,6 +308,10 @@
           "exercises": [
             {
               "id": "multiplication_tables_even_numeric",
+              "catalog_label": {
+                "fr": "Tables de 2, 4, 6 et 8",
+                "en": "2, 4, 6 and 8 times tables"
+              },
               "definition": {
                 "type": "NumericInputTemplate",
                 "prompt_template": {
@@ -290,6 +334,10 @@
             },
             {
               "id": "multiplication_tables_odd_numeric",
+              "catalog_label": {
+                "fr": "Tables de 3, 5, 7 et 9",
+                "en": "3, 5, 7 and 9 times tables"
+              },
               "definition": {
                 "type": "NumericInputTemplate",
                 "prompt_template": {
@@ -326,6 +374,10 @@
           "exercises": [
             {
               "id": "multiply_powers_beginner_numeric",
+              "catalog_label": {
+                "fr": "Multiplier des dizaines entières par 10, 100 ou 1 000",
+                "en": "Multiply multiples of 10 by 10, 100 or 1,000"
+              },
               "definition": {
                 "type": "NumericInputTemplate",
                 "prompt_template": {
@@ -348,6 +400,10 @@
             },
             {
               "id": "multiply_powers_intermediate_numeric",
+              "catalog_label": {
+                "fr": "Multiplier par 10, 100 ou 1 000 les nombres terminés par 5",
+                "en": "Multiply numbers ending in 5 by 10, 100 or 1,000"
+              },
               "definition": {
                 "type": "NumericInputTemplate",
                 "prompt_template": {
@@ -370,6 +426,10 @@
             },
             {
               "id": "multiply_powers_advanced_numeric",
+              "catalog_label": {
+                "fr": "Multiplier des nombres par 10, 100 ou 1 000",
+                "en": "Multiply numbers by 10, 100 or 1,000"
+              },
               "definition": {
                 "type": "NumericInputTemplate",
                 "prompt_template": {
@@ -397,6 +457,10 @@
           "exercises": [
             {
               "id": "multiply_powers_beginner_mcq",
+              "catalog_label": {
+                "fr": "Multiplier des dizaines entières par 10, 100 ou 1 000",
+                "en": "Multiply multiples of 10 by 10, 100 or 1,000"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "prompt_template": {
@@ -426,6 +490,10 @@
             },
             {
               "id": "multiply_powers_intermediate_mcq",
+              "catalog_label": {
+                "fr": "Multiplier par 10, 100 ou 1 000 les nombres terminés par 5",
+                "en": "Multiply numbers ending in 5 by 10, 100 or 1,000"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "prompt_template": {
@@ -455,6 +523,10 @@
             },
             {
               "id": "multiply_powers_advanced_mcq",
+              "catalog_label": {
+                "fr": "Multiplier des nombres par 10, 100 ou 1 000",
+                "en": "Multiply numbers by 10, 100 or 1,000"
+              },
               "definition": {
                 "type": "McqTemplate",
                 "prompt_template": {

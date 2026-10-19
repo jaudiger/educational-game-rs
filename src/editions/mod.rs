@@ -54,7 +54,7 @@ impl Plugin for SharedGamePlugin {
             McqPlugin, NumericInputPlugin,
         };
         use crate::screens::{
-            ExerciseSelectionScreenPlugin, HomeScreenPlugin, LessonPlayScreenPlugin,
+            ActivitySelectionScreenPlugin, HomeScreenPlugin, LessonPlayScreenPlugin,
             SettingsScreenPlugin, ThemeExplorationScreenPlugin,
         };
         use crate::states::{ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase};
@@ -90,7 +90,7 @@ impl Plugin for SharedGamePlugin {
             .add_plugins((
                 HomeScreenPlugin,
                 ThemeExplorationScreenPlugin,
-                ExerciseSelectionScreenPlugin,
+                ActivitySelectionScreenPlugin,
                 LessonPlayScreenPlugin,
                 SettingsScreenPlugin,
             ));

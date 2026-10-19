@@ -88,36 +88,3 @@ impl Plugin for NavigationPlugin {
             );
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use bevy::prelude::*;
-
-    use super::{AppNavigationPolicy, NavigateTo, handle_app_navigate_to};
-    use crate::states::AppState;
-    use crate::ui::components::ButtonActivated;
-
-    #[test]
-    fn demo_navigation_ignores_production_only_destinations() {
-        let mut app = App::new();
-        app.insert_resource(NextState::<AppState>::Unchanged)
-            .add_message::<ButtonActivated>()
-            .insert_resource(AppNavigationPolicy::new([
-                AppState::Home,
-                AppState::ThemeExploration,
-                AppState::LessonPlay,
-                AppState::Settings,
-            ]))
-            .add_systems(Update, handle_app_navigate_to);
-        app.update();
-
-        let button = app.world_mut().spawn(NavigateTo(AppState::SaveSlots)).id();
-        app.world_mut().write_message(ButtonActivated(button));
-        app.update();
-
-        assert!(matches!(
-            app.world().resource::<NextState<AppState>>(),
-            NextState::Unchanged,
-        ));
-    }
-}

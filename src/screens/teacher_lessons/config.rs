@@ -6,7 +6,7 @@ use crate::data::content::{ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, Que
 use crate::data::{Language, LessonSessionConfig, PersistenceAction, PlayerSession, SaveDataMut};
 use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::plugins::teacher::{TeacherScreenParam, TeacherViewOverlay};
-use crate::screens::teacher_shared::exercise_type_label;
+use crate::screens::activity_categories::activity_category_label;
 use crate::states::AppState;
 use crate::ui::components::{
     ButtonActivated, ButtonVisualStyle, ConfirmationDialogAction, ConfirmationDialogActionEvent,
@@ -95,12 +95,13 @@ pub(super) struct VisualToggleButton {
 }
 
 #[derive(Component, Reflect)]
-pub(super) struct ExerciseLabel(String);
+pub(super) struct CatalogLabel(String);
 
 #[derive(Clone)]
 pub(super) struct ExerciseConfigData {
     id: String,
     exercise_type: QuestionType,
+    catalog_label: String,
     full_prompt: String,
     count: usize,
     has_visual: bool,
@@ -133,6 +134,7 @@ pub(super) fn build_exercise_configs(
             ExerciseConfigData {
                 id: entry.id.clone(),
                 exercise_type: definition.question_type(),
+                catalog_label: entry.catalog_label.get(language).to_owned(),
                 full_prompt: definition.prompt_label(language),
                 count: existing_config
                     .and_then(|config| config.counts.get(&entry.id).copied())
@@ -161,6 +163,7 @@ pub(super) fn build_exercise_groups(
             .push(ExerciseConfigData {
                 id: exercise.id.clone(),
                 exercise_type: exercise.exercise_type,
+                catalog_label: exercise.catalog_label.clone(),
                 full_prompt: exercise.full_prompt.clone(),
                 count: exercise.count,
                 has_visual: exercise.has_visual,
@@ -175,9 +178,9 @@ pub(super) fn build_exercise_groups(
         .map(|(exercise_type, exercises)| ExerciseGroupData {
             lesson_id: lesson_id.to_owned(),
             exercise_type,
-            label: exercise_type_label(exercise_type, i18n),
+            label: activity_category_label(exercise_type, i18n),
             count_label: i18n
-                .t(&TranslationKey::ExerciseCount(exercises.len()))
+                .t(&TranslationKey::ActivityCount(exercises.len()))
                 .into_owned(),
             expanded: disclosures.is_expanded(lesson_id, exercise_type),
             exercises,
@@ -335,9 +338,10 @@ fn spawn_exercise_counter_row(
     window: Entity,
 ) {
     let exercise = exercise.clone();
+    let catalog_label = exercise.catalog_label.clone();
     let full_prompt = exercise.full_prompt.clone();
     let tooltip = HoverTooltip {
-        message: full_prompt.clone(),
+        message: full_prompt,
         window,
     };
     let lesson_id = lesson_id.to_owned();
@@ -348,7 +352,7 @@ fn spawn_exercise_counter_row(
         Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
             row.spawn((
                 teacher_list_label(
-                    format!("\u{2022} {full_prompt}"),
+                    format!("\u{2022} {catalog_label}"),
                     TeacherListLevel::Exercise,
                     theme::colors::TEXT_DARK,
                     window,
@@ -359,7 +363,7 @@ fn spawn_exercise_counter_row(
                     overflow: Overflow::clip(),
                     ..default()
                 },
-                ExerciseLabel(full_prompt),
+                CatalogLabel(catalog_label),
             ));
             spawn_counter_controls(row, &lesson_id, &exercise, window);
         })),
@@ -785,8 +789,8 @@ fn remove_lesson_configs<'a>(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
-pub(super) fn update_exercise_labels(
-    mut query: Query<(&mut Text, &ComputedNode, &TextFont, &ExerciseLabel)>,
+pub(super) fn update_catalog_labels(
+    mut query: Query<(&mut Text, &ComputedNode, &TextFont, &CatalogLabel)>,
 ) {
     const CHAR_WIDTH_FACTOR: f32 = 0.6;
     const BULLET: &str = "\u{2022} ";

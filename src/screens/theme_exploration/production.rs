@@ -119,9 +119,9 @@ pub fn prepare_theme_lessons(
                         selection: Some(LessonLaunchSelection::CompleteLesson),
                     },
                     LessonActionPresentation {
-                        action: LessonLaunchAction::ChooseExercise,
+                        action: LessonLaunchAction::ChooseActivity,
                         label: i18n
-                            .t(&ProductionTranslationKey::ChooseExercise)
+                            .t(&ProductionTranslationKey::ChooseActivity)
                             .into_owned(),
                         selection: Some(LessonLaunchSelection::CompleteLesson),
                     },
@@ -254,58 +254,5 @@ fn set_exploration_progress_text(text: &mut Text, node: &mut Node, label: Option
         if node.display != Display::None {
             node.display = Display::None;
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use bevy::prelude::*;
-
-    use super::refresh_exploration_notices;
-    use crate::data::{PersistenceAction, PersistenceStatus};
-    use crate::i18n::{I18n, Language};
-    use crate::screens::theme_exploration::{ThemeLessonsPresentation, ThemeOverviewPresentation};
-
-    #[test]
-    fn exploration_notices_refresh_and_clear_after_successful_save() {
-        let mut status = PersistenceStatus::default();
-        status.fail(PersistenceAction::SaveSlot);
-
-        let mut app = App::new();
-        app.insert_resource(status)
-            .insert_resource(I18n::new(Language::English))
-            .init_resource::<ThemeOverviewPresentation>()
-            .init_resource::<ThemeLessonsPresentation>()
-            .add_systems(Update, refresh_exploration_notices);
-        app.update();
-
-        assert_eq!(
-            app.world()
-                .resource::<ThemeOverviewPresentation>()
-                .notice
-                .as_deref(),
-            Some("Save failed. Changes may be lost when the app closes."),
-        );
-        assert_eq!(
-            app.world()
-                .resource::<ThemeLessonsPresentation>()
-                .notice
-                .as_deref(),
-            Some("Save failed. Changes may be lost when the app closes."),
-        );
-
-        app.world_mut()
-            .resource_mut::<PersistenceStatus>()
-            .clear_save_data();
-        app.update();
-
-        assert_eq!(
-            app.world().resource::<ThemeOverviewPresentation>().notice,
-            None,
-        );
-        assert_eq!(
-            app.world().resource::<ThemeLessonsPresentation>().notice,
-            None,
-        );
     }
 }

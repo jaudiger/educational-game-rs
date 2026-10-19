@@ -341,13 +341,19 @@ pub struct Lesson {
 #[serde(deny_unknown_fields)]
 pub struct QuestionEntry {
     pub id: String,
+    pub catalog_label: LocalizedText,
     pub definition: QuestionDefinition,
 }
 
 impl QuestionEntry {
-    pub fn new(id: impl Into<String>, definition: QuestionDefinition) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        catalog_label: LocalizedText,
+        definition: QuestionDefinition,
+    ) -> Self {
         Self {
             id: id.into(),
+            catalog_label,
             definition,
         }
     }
@@ -368,6 +374,23 @@ impl Lesson {
         for entry in &self.questions {
             if entry.id.is_empty() || !ids.insert(entry.id.as_str()) {
                 issues.push(format!("Invalid or duplicate exercise ID: {}", entry.id));
+            }
+            for (language, label) in [
+                ("French", entry.catalog_label.fr.as_ref()),
+                ("English", entry.catalog_label.en.as_ref()),
+            ] {
+                if label.trim().is_empty() {
+                    issues.push(format!(
+                        "Exercise {} has an empty {language} catalog label",
+                        entry.id
+                    ));
+                }
+                if !scan_placeholder_names(label).is_empty() {
+                    issues.push(format!(
+                        "Exercise {} has placeholders in its {language} catalog label",
+                        entry.id
+                    ));
+                }
             }
             issues.extend(
                 entry
@@ -645,8 +668,8 @@ impl QuestionDefinition {
         }
     }
 
-    /// Returns a human-readable label for this question, resolved to the given language.
-    /// Used in the teacher config UI to display individual questions.
+    /// Returns the detailed label used by teacher tools.
+    #[allow(dead_code)]
     pub fn prompt_label(&self, language: Language) -> String {
         match self {
             Self::Mcq(d) => d.prompt.get(language).to_owned(),
@@ -1386,6 +1409,7 @@ pub enum Difficulty {
 }
 
 /// Returns a human-readable difficulty label for the given language.
+#[allow(dead_code)]
 const fn difficulty_label(difficulty: Difficulty, language: Language) -> &'static str {
     match (difficulty, language) {
         (Difficulty::Beginner, Language::French) => "débutant",

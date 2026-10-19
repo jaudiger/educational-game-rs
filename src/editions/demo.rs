@@ -61,9 +61,9 @@ fn validate_demo_lesson_launch(
     commands.insert_resource(LessonPlanningInput::default());
     if !matches!(
         selection.as_deref(),
-        Some(crate::data::LessonLaunchSelection::SingleExercise { .. })
+        Some(crate::data::LessonLaunchSelection::SingleActivity { .. })
     ) {
-        bevy::log::error!("Demo requires a single-exercise launch");
+        bevy::log::error!("Demo requires a single-activity launch");
         commands.insert_resource(RejectedLessonLaunch);
         next_state.set(AppState::ThemeExploration);
     }
@@ -133,7 +133,7 @@ fn prepare_demo_theme_lessons(
                 best_percent_text: None,
                 track_progress: false,
                 actions: vec![LessonActionPresentation {
-                    action: LessonLaunchAction::ChooseExercise,
+                    action: LessonLaunchAction::ChooseActivity,
                     label: String::new(),
                     selection: None,
                 }],
@@ -145,7 +145,7 @@ fn prepare_demo_theme_lessons(
 fn prepare_demo_feedback(i18n: Res<I18n>, mut presentation: ResMut<FeedbackPresentation>) {
     *presentation = FeedbackPresentation {
         next_button_label: i18n
-            .t(&crate::i18n::TranslationKey::ReturnToExerciseList)
+            .t(&crate::i18n::TranslationKey::ReturnToActivityList)
             .into_owned(),
         return_to_catalogue: true,
         save_notice: None,

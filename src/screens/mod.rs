@@ -1,4 +1,5 @@
-pub mod exercise_selection;
+pub mod activity_categories;
+pub mod activity_selection;
 pub mod home;
 pub mod lesson_play;
 #[cfg(not(feature = "demo"))]
@@ -12,11 +13,10 @@ pub mod theme_exploration;
 pub mod teacher_lessons;
 #[cfg(not(feature = "demo"))]
 pub mod teacher_roster;
-pub mod teacher_shared;
 #[cfg(not(feature = "demo"))]
 pub mod teacher_stats;
 
-pub use exercise_selection::ExerciseSelectionScreenPlugin;
+pub use activity_selection::ActivitySelectionScreenPlugin;
 pub use home::HomeScreenPlugin;
 pub use lesson_play::LessonPlayScreenPlugin;
 #[cfg(not(feature = "demo"))]

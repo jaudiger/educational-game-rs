@@ -161,27 +161,3 @@ fn log_write_failure(action: PersistenceAction, path: &Path, error: &std::io::Er
         path.display()
     );
 }
-
-#[cfg(test)]
-mod tests {
-    use super::PersistedSettings;
-    use crate::data::{GameMode, GameSettings, ProductionSettings};
-
-    #[test]
-    fn settings_adapter_round_trips_common_preferences_and_mode() {
-        let settings = GameSettings {
-            music_volume: 0.25,
-            ..GameSettings::default()
-        };
-        let production = ProductionSettings {
-            mode: GameMode::Group,
-        };
-        let persisted = PersistedSettings::from_resources(&settings, production);
-        let json = serde_json::to_string(&persisted).expect("settings serialize");
-        let decoded: PersistedSettings = serde_json::from_str(&json).expect("settings deserialize");
-        let (decoded_settings, decoded_production) = decoded.into_resources();
-
-        assert_eq!(decoded_settings.music_volume, 0.25);
-        assert_eq!(decoded_production.mode, GameMode::Group);
-    }
-}

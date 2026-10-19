@@ -172,6 +172,7 @@ pub mod colors {
     pub const BACKGROUND: Color = Color::srgb(0.95, 0.95, 0.97);
     pub const CARD_BG: Color = Color::srgb(1.0, 1.0, 1.0);
     pub const LIST_SURFACE: Color = Color::srgb(0.9686, 0.9804, 0.9922);
+    pub const ACTIVITY_BADGE: Color = Color::srgb(0.84, 0.91, 0.98);
     pub const TEXT_DARK: Color = Color::srgb(0.15, 0.15, 0.2);
     pub const NAVIGATION_INK: Color = Color::srgb(0.0588, 0.0902, 0.1647);
     pub const TEXT_LIGHT: Color = Color::srgb(1.0, 1.0, 1.0);
@@ -295,7 +296,7 @@ pub mod button_styles {
         ),
         colors::TEXT_DARK,
     );
-    pub const EXERCISE_ITEM: ButtonPalette = ButtonPalette::with_border(
+    pub const ACTIVITY_ITEM: ButtonPalette = ButtonPalette::with_border(
         ButtonColorStates::new(
             Color::srgb(0.8980, 0.9333, 0.9686),
             Color::srgb(0.6902, 0.8039, 0.9137),
@@ -308,7 +309,7 @@ pub mod button_styles {
             Color::srgb(0.2039, 0.3529, 0.4863),
         ),
     );
-    pub const EXERCISE_ITEM_SELECTED: ButtonPalette = ButtonPalette::with_border(
+    pub const ACTIVITY_ITEM_SELECTED: ButtonPalette = ButtonPalette::with_border(
         ACTION_PRIMARY.background,
         colors::TEXT_DARK,
         ButtonColorStates::new(
@@ -317,6 +318,15 @@ pub mod button_styles {
             Color::srgb(0.1569, 0.2706, 0.3725),
         ),
     );
+    pub const ACTIVITY_CATEGORY: ButtonPalette = ButtonPalette::new(
+        ButtonColorStates::new(
+            Color::srgb(0.88, 0.93, 0.99),
+            Color::srgb(0.82, 0.90, 0.98),
+            Color::srgb(0.76, 0.86, 0.97),
+        ),
+        colors::TEXT_DARK,
+    );
+    #[allow(dead_code)]
     pub const DISCLOSURE: ButtonPalette =
         ButtonPalette::new(ButtonColorStates::flat(Color::NONE), colors::TEXT_DARK);
     pub const UNAVAILABLE: ButtonPalette = ButtonPalette::new(
