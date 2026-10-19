@@ -27,6 +27,9 @@ impl Plugin for UiAnimationPlugin {
 #[derive(Component, Reflect, Default, Clone)]
 pub struct AnimatedButton;
 
+#[derive(Component, Reflect, Default, Clone)]
+pub struct ButtonScaleAnimationDisabled;
+
 /// One-shot scale animation via `UiTransform`.
 /// Self-removes when complete.
 #[derive(Component)]
@@ -144,7 +147,7 @@ type AnimatedButtonQuery<'w, 's> = Query<
         &'static UiTransform,
         Option<&'static AnimateScale>,
     ),
-    With<AnimatedButton>,
+    (With<AnimatedButton>, Without<ButtonScaleAnimationDisabled>),
 >;
 
 fn animate_button_hover(mut commands: Commands, query: AnimatedButtonQuery<'_, '_>) {

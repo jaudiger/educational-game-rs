@@ -18,6 +18,7 @@ use bevy::window::{
 
 use crate::data::{GameMode, ProductionPlayerContext, ProductionSettings};
 use crate::i18n::{I18n, ProductionTranslationKey};
+use crate::screens::teacher_lists::update_teacher_list_truncated_labels;
 use crate::states::{AppState, InLessonFlow, LESSON_FLOW_STATES};
 use crate::ui::animation::AnimatedButton;
 use crate::ui::components::ButtonVisualStyle;
@@ -116,6 +117,7 @@ impl Plugin for TeacherPlugin {
                 reset_tab_on_keyboard_reselection,
                 update_teacher_tab_styles,
                 cleanup_teacher_view_overlays,
+                update_teacher_list_truncated_labels,
             )
                 .run_if(in_state(InLessonFlow))
                 .run_if(teacher_window_exists),

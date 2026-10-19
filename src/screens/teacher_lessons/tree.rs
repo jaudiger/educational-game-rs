@@ -6,11 +6,13 @@ use crate::data::content::{Lesson, LocalizedText, Theme};
 use crate::data::save::LessonSessionConfig;
 use crate::data::{Language, PlayerSession, SaveData};
 use crate::i18n::{I18n, TranslationKey};
+use crate::screens::teacher_lists::{
+    TeacherListLevel, teacher_list_content_node, teacher_list_frame, teacher_list_header_border,
+    teacher_list_header_button_node, teacher_list_header_node, teacher_list_indent,
+    teacher_list_label,
+};
 use crate::ui::components::{
-    ButtonActivated, TeacherListLevel, button_base, disclosure_chevron,
-    disclosure_chevron_transform, icon_button, teacher_list_content_node, teacher_list_frame,
-    teacher_list_header_border, teacher_list_header_button_node, teacher_list_header_node,
-    teacher_list_indent, teacher_list_label,
+    ButtonActivated, button_base, disclosure_chevron, disclosure_chevron_transform, icon_button,
 };
 use crate::ui::theme;
 

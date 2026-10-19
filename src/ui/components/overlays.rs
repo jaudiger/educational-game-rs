@@ -45,7 +45,7 @@ pub fn spawn_tooltip_popover(
             card_border,
             GlobalZIndex(100),
             OverrideClip,
-            Visibility::Hidden,
+            Visibility::Visible,
             TooltipPopover,
             children![(
                 Text::new(message_owned),

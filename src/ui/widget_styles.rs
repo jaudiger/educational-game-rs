@@ -79,29 +79,46 @@ pub fn dismiss_tooltip_timer(
 }
 
 /// Spawns/despawns tooltips on hover for entities with `HoverTooltip`.
+#[allow(clippy::type_complexity)]
 pub fn handle_hover_tooltips(
     mut commands: Commands,
-    query: Query<(Entity, &Hovered, &HoverTooltip), Changed<Hovered>>,
-    existing: Query<Entity, With<HoverTooltipPopover>>,
+    query: Query<(Entity, &Hovered, &HoverTooltip), Or<(Changed<Hovered>, Added<HoverTooltip>)>>,
+    mut removed_tooltips: RemovedComponents<HoverTooltip>,
+    existing: Query<(Entity, &ChildOf), With<HoverTooltipPopover>>,
 ) {
+    for anchor in removed_tooltips.read() {
+        for (popover, parent) in &existing {
+            if parent.parent() == anchor {
+                commands.entity(popover).try_despawn();
+            }
+        }
+    }
+
     for (entity, hovered, hover_tooltip) in &query {
         if hovered.get() {
-            for e in &existing {
-                commands.entity(e).try_despawn();
+            let already_visible = existing.iter().any(|(_, parent)| parent.parent() == entity);
+            for (popover, parent) in &existing {
+                if parent.parent() != entity {
+                    commands.entity(popover).try_despawn();
+                }
             }
-            let tooltip = spawn_tooltip_popover(
-                &mut commands,
-                entity,
-                &hover_tooltip.message,
-                hover_tooltip.window,
-            );
-            commands
-                .entity(tooltip)
-                .insert(HoverTooltipPopover)
-                .remove::<TooltipLifetime>();
+            if !already_visible {
+                let tooltip = spawn_tooltip_popover(
+                    &mut commands,
+                    entity,
+                    &hover_tooltip.message,
+                    hover_tooltip.window,
+                );
+                commands
+                    .entity(tooltip)
+                    .insert(HoverTooltipPopover)
+                    .remove::<TooltipLifetime>();
+            }
         } else {
-            for e in &existing {
-                commands.entity(e).try_despawn();
+            for (popover, parent) in &existing {
+                if parent.parent() == entity {
+                    commands.entity(popover).try_despawn();
+                }
             }
         }
     }

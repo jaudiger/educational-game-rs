@@ -7,12 +7,16 @@ use crate::data::{Language, LessonSessionConfig, PersistenceAction, PlayerSessio
 use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::plugins::teacher::{TeacherScreenParam, TeacherViewOverlay};
 use crate::screens::activity_categories::activity_category_label;
+use crate::screens::teacher_lists::{
+    TeacherListLevel, teacher_list_exercise_row, teacher_list_header_border,
+    teacher_list_header_node, teacher_list_label, teacher_list_separator_gap,
+    teacher_list_truncated_label,
+};
 use crate::states::AppState;
 use crate::ui::components::{
     ButtonActivated, ButtonVisualStyle, ConfirmationDialogAction, ConfirmationDialogActionEvent,
-    HoverTooltip, TeacherListLevel, button_base, disclosure_chevron, disclosure_chevron_transform,
-    icon_button, spawn_confirmation_modal, teacher_list_exercise_row, teacher_list_header_border,
-    teacher_list_header_node, teacher_list_label, teacher_list_separator_gap,
+    button_base, disclosure_chevron, disclosure_chevron_transform, icon_button,
+    spawn_confirmation_modal,
 };
 use crate::ui::theme;
 
@@ -94,15 +98,11 @@ pub(super) struct VisualToggleButton {
     default_show_visual: bool,
 }
 
-#[derive(Component, Reflect)]
-pub(super) struct CatalogLabel(String);
-
 #[derive(Clone)]
 pub(super) struct ExerciseConfigData {
     id: String,
     exercise_type: QuestionType,
     catalog_label: String,
-    full_prompt: String,
     count: usize,
     has_visual: bool,
     show_visual: bool,
@@ -135,7 +135,6 @@ pub(super) fn build_exercise_configs(
                 id: entry.id.clone(),
                 exercise_type: definition.question_type(),
                 catalog_label: entry.catalog_label.get(language).to_owned(),
-                full_prompt: definition.prompt_label(language),
                 count: existing_config
                     .and_then(|config| config.counts.get(&entry.id).copied())
                     .unwrap_or(1),
@@ -164,7 +163,6 @@ pub(super) fn build_exercise_groups(
                 id: exercise.id.clone(),
                 exercise_type: exercise.exercise_type,
                 catalog_label: exercise.catalog_label.clone(),
-                full_prompt: exercise.full_prompt.clone(),
                 count: exercise.count,
                 has_visual: exercise.has_visual,
                 show_visual: exercise.show_visual,
@@ -339,31 +337,17 @@ fn spawn_exercise_counter_row(
 ) {
     let exercise = exercise.clone();
     let catalog_label = exercise.catalog_label.clone();
-    let full_prompt = exercise.full_prompt.clone();
-    let tooltip = HoverTooltip {
-        message: full_prompt,
-        window,
-    };
     let lesson_id = lesson_id.to_owned();
 
     parent.spawn((
         teacher_list_exercise_row(),
-        tooltip,
         Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
-            row.spawn((
-                teacher_list_label(
-                    format!("\u{2022} {catalog_label}"),
-                    TeacherListLevel::Exercise,
-                    theme::colors::TEXT_DARK,
-                    window,
-                ),
-                Node {
-                    flex_shrink: 1.0,
-                    flex_grow: 1.0,
-                    overflow: Overflow::clip(),
-                    ..default()
-                },
-                CatalogLabel(catalog_label),
+            row.spawn(teacher_list_truncated_label(
+                catalog_label,
+                "\u{2022} ",
+                TeacherListLevel::Exercise,
+                theme::colors::TEXT_DARK,
+                window,
             ));
             spawn_counter_controls(row, &lesson_id, &exercise, window);
         })),
@@ -781,48 +765,5 @@ fn remove_lesson_configs<'a>(
 ) {
     for lesson_id in lesson_ids {
         lesson_configs.remove(lesson_id);
-    }
-}
-
-#[allow(
-    clippy::cast_precision_loss,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
-)]
-pub(super) fn update_catalog_labels(
-    mut query: Query<(&mut Text, &ComputedNode, &TextFont, &CatalogLabel)>,
-) {
-    const CHAR_WIDTH_FACTOR: f32 = 0.6;
-    const BULLET: &str = "\u{2022} ";
-    const ELLIPSIS: &str = "...";
-    const ELLIPSIS_WIDTH_FACTOR: f32 = 1.5;
-
-    for (mut text, computed, font, label) in &mut query {
-        let FontSize::Px(font_size) = font.font_size else {
-            continue;
-        };
-        let available = computed.size().x * computed.inverse_scale_factor;
-        if available <= 0.0 {
-            continue;
-        }
-        let char_width = font_size * CHAR_WIDTH_FACTOR;
-        let ellipsis_width = font_size * ELLIPSIS_WIDTH_FACTOR;
-        let bullet_width = BULLET.chars().count() as f32 * char_width;
-        let full = &label.0;
-        let full_with_bullet = format!("{BULLET}{full}");
-        let full_width_est = full_with_bullet.chars().count() as f32 * char_width;
-        let desired = if full_width_est <= available {
-            full_with_bullet
-        } else {
-            let max_chars = ((available - bullet_width - ellipsis_width) / char_width)
-                .max(0.0)
-                .floor() as usize;
-            let truncated: String = full.chars().take(max_chars).collect();
-            format!("{BULLET}{truncated}{ELLIPSIS}")
-        };
-
-        if **text != *desired {
-            desired.clone_into(&mut *text);
-        }
     }
 }

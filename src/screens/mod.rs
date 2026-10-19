@@ -12,6 +12,8 @@ pub mod theme_exploration;
 #[cfg(not(feature = "demo"))]
 pub mod teacher_lessons;
 #[cfg(not(feature = "demo"))]
+pub mod teacher_lists;
+#[cfg(not(feature = "demo"))]
 pub mod teacher_roster;
 #[cfg(not(feature = "demo"))]
 pub mod teacher_stats;

@@ -1,7 +1,5 @@
 mod buttons;
 mod forms;
-#[cfg(not(feature = "demo"))]
-mod lists;
 mod menu_background;
 mod overlays;
 #[cfg(not(feature = "demo"))]
@@ -9,8 +7,6 @@ mod production;
 
 pub use buttons::*;
 pub use forms::*;
-#[cfg(not(feature = "demo"))]
-pub use lists::*;
 pub use menu_background::*;
 pub use overlays::*;
 #[cfg(not(feature = "demo"))]

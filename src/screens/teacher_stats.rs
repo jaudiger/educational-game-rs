@@ -15,14 +15,18 @@ use crate::plugins::teacher::{
     TeacherWindowState, tab_header, teacher_stats_view_active, teacher_window_exists,
 };
 use crate::screens::activity_categories::activity_category_label;
-use crate::states::{AppState, cleanup_root};
-use crate::ui::components::{
-    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, TeacherListLevel,
-    button_base, disclosure_chevron, disclosure_chevron_transform, icon_button,
-    persistence_message, save_write_failure_notice, spawn_confirmation_modal, standard_button,
-    teacher_list_content_node, teacher_list_exercise_row, teacher_list_frame,
+use crate::screens::teacher_lists::{
+    TeacherListLevel, teacher_list_content_node, teacher_list_exercise_row, teacher_list_frame,
     teacher_list_header_border, teacher_list_header_button_node, teacher_list_header_node,
     teacher_list_indent, teacher_list_label, teacher_list_separator_gap,
+    teacher_list_truncated_label,
+};
+use crate::states::{AppState, cleanup_root};
+use crate::ui::animation::ButtonScaleAnimationDisabled;
+use crate::ui::components::{
+    ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, button_base,
+    disclosure_chevron, disclosure_chevron_transform, icon_button, persistence_message,
+    save_write_failure_notice, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::theme;
 
@@ -917,6 +921,7 @@ fn stats_disclosure_button(data: StatsDisclosureRowData, window: Entity) -> impl
     let chevron_target = data.target.clone();
     (
         button_base(theme::button_styles::DISCLOSURE),
+        ButtonScaleAnimationDisabled,
         StatsDisclosureButton(data.target),
         teacher_list_header_button_node(),
         Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
@@ -924,23 +929,22 @@ fn stats_disclosure_button(data: StatsDisclosureRowData, window: Entity) -> impl
                 disclosure_chevron(data.expanded, theme::colors::TEXT_DARK, window),
                 StatsDisclosureChevron(chevron_target),
             ));
-            row.spawn((
-                teacher_list_label(
-                    data.label,
-                    data.label_level,
-                    theme::colors::TEXT_DARK,
-                    window,
-                ),
-                Node {
-                    flex_grow: 1.0,
-                    min_width: px(0.0),
-                    ..default()
-                },
+            row.spawn(teacher_list_truncated_label(
+                data.label,
+                "",
+                data.label_level,
+                theme::colors::TEXT_DARK,
+                window,
             ));
             row.spawn((
                 Text::new(data.score_text),
                 theme::typography::text(theme::fonts::SMALL, window),
                 TextColor(data.score_color),
+                TextLayout::no_wrap(),
+                Node {
+                    flex_shrink: 0.0,
+                    ..default()
+                },
             ));
         })),
     )
@@ -990,23 +994,20 @@ fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow
             let lesson_id = exercise_row.lesson_id.clone();
             let exercise_id = exercise_row.exercise_id.clone();
             move |row: &mut ChildSpawner| {
-                row.spawn((
-                    teacher_list_label(
-                        format!("\u{2022} {label}"),
-                        TeacherListLevel::Exercise,
-                        theme::colors::TEXT_DARK,
-                        window,
-                    ),
-                    Node {
-                        flex_grow: 1.0,
-                        ..default()
-                    },
+                row.spawn(teacher_list_truncated_label(
+                    label,
+                    "\u{2022} ",
+                    TeacherListLevel::Exercise,
+                    theme::colors::TEXT_DARK,
+                    window,
                 ));
                 row.spawn((
                     Text::new(score),
                     theme::typography::text(theme::fonts::SMALL, window),
                     TextColor(color),
+                    TextLayout::no_wrap(),
                     Node {
+                        flex_shrink: 0.0,
                         margin: UiRect::right(theme::scaled(theme::spacing::MEDIUM)),
                         ..default()
                     },
