@@ -1,5 +1,4 @@
 use bevy::input_focus::tab_navigation::TabIndex;
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::scene::{Scene, SceneComponent, bsn};
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
@@ -48,7 +47,6 @@ impl ActionButton {
     fn scene(props: ActionButtonProps) -> impl Scene {
         bsn! {
             Button
-            Hovered::default()
             BackgroundColor({props.palette.background.normal})
             ButtonVisualStyle({props.palette})
             AnimatedButton

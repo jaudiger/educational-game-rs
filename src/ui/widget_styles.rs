@@ -1,10 +1,10 @@
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::Checked;
 use bevy::ui_widgets::{Slider, SliderRange, SliderThumb, SliderValue};
 
 use super::components::{
-    HoverTooltip, HoverTooltipPopover, TooltipLifetime, TooltipPopover, spawn_tooltip_popover,
+    HoverTooltip, HoverTooltipPopover, PointerHovered, TooltipLifetime, TooltipPopover,
+    spawn_tooltip_popover,
 };
 use super::theme;
 
@@ -82,7 +82,10 @@ pub fn dismiss_tooltip_timer(
 #[allow(clippy::type_complexity)]
 pub fn handle_hover_tooltips(
     mut commands: Commands,
-    query: Query<(Entity, &Hovered, &HoverTooltip), Or<(Changed<Hovered>, Added<HoverTooltip>)>>,
+    query: Query<
+        (Entity, &PointerHovered, &HoverTooltip),
+        Or<(Changed<PointerHovered>, Added<HoverTooltip>)>,
+    >,
     mut removed_tooltips: RemovedComponents<HoverTooltip>,
     existing: Query<(Entity, &ChildOf), With<HoverTooltipPopover>>,
 ) {
@@ -95,7 +98,7 @@ pub fn handle_hover_tooltips(
     }
 
     for (entity, hovered, hover_tooltip) in &query {
-        if hovered.get() {
+        if hovered.0 {
             let already_visible = existing.iter().any(|(_, parent)| parent.parent() == entity);
             for (popover, parent) in &existing {
                 if parent.parent() != entity {

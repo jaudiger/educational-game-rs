@@ -2,7 +2,6 @@ use bevy::camera::RenderTarget;
 use bevy::ecs::system::SystemParam;
 use bevy::input_focus::InputFocus;
 use bevy::picking::events::PointerClick;
-use bevy::picking::hover::Hovered;
 use bevy::picking::pointer::PointerButton;
 use bevy::prelude::*;
 use bevy::ui::Selected;
@@ -298,7 +297,6 @@ fn tab_button(label: &str, active: bool, window: Entity) -> impl Bundle + use<> 
     // Keep pointer clicks bubbling to the TabList observer.
     (
         Tab,
-        Hovered::default(),
         AnimatedButton,
         AutoDirectionalNavigation::default(),
         Outline::new(

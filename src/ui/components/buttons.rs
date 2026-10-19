@@ -1,17 +1,18 @@
 use bevy::input_focus::tab_navigation::TabIndex;
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::Pressed;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 use bevy::ui_widgets::{Activate, Button};
 
 use crate::ui::animation::AnimatedButton;
+use crate::ui::components::PointerHovered;
 use crate::ui::theme::{self, ButtonPalette};
 
 #[derive(Message, Clone, Copy)]
 pub struct ButtonActivated(pub Entity);
 
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
+#[require(bevy::picking::hover::Hovered, PointerHovered)]
 pub struct ButtonVisualStyle(pub ButtonPalette);
 
 pub struct ButtonActivationPlugin;
@@ -31,7 +32,7 @@ fn forward_button_activation(event: On<Activate>, mut messages: MessageWriter<Bu
 #[allow(clippy::type_complexity)]
 fn update_button_visuals(
     mut buttons: Query<(
-        &Hovered,
+        &PointerHovered,
         Has<Pressed>,
         &ButtonVisualStyle,
         &mut BackgroundColor,
@@ -39,7 +40,7 @@ fn update_button_visuals(
     )>,
 ) {
     for (hovered, pressed, style, mut background, border) in &mut buttons {
-        let is_hovered = hovered.get();
+        let is_hovered = hovered.0;
         let background_color = style.0.background.resolve(is_hovered, pressed);
         if background.0 != background_color {
             background.0 = background_color;
@@ -64,7 +65,6 @@ fn update_button_visuals(
 pub fn button_base(palette: ButtonPalette) -> impl Bundle {
     (
         Button,
-        Hovered::default(),
         BackgroundColor(palette.background.normal),
         ButtonVisualStyle(palette),
         AnimatedButton,

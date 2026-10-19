@@ -1,8 +1,8 @@
 use super::theme;
 use crate::states::AppState;
+use crate::ui::components::PointerHovered;
 use bevy::curve::Curve;
 use bevy::curve::easing::{EaseFunction, EasingCurve};
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::Pressed;
 
@@ -142,7 +142,7 @@ type AnimatedButtonQuery<'w, 's> = Query<
     's,
     (
         Entity,
-        &'static Hovered,
+        &'static PointerHovered,
         Has<Pressed>,
         &'static UiTransform,
         Option<&'static AnimateScale>,
@@ -158,7 +158,7 @@ fn animate_button_hover(mut commands: Commands, query: AnimatedButtonQuery<'_, '
                 EaseFunction::CubicIn,
                 theme::animation::BUTTON_PRESS_DURATION,
             )
-        } else if hovered.get() {
+        } else if hovered.0 {
             (
                 theme::animation::BUTTON_HOVER_SCALE,
                 EaseFunction::CubicOut,

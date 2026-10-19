@@ -39,10 +39,10 @@ pub struct TooltipPopover;
 #[derive(Component, Reflect)]
 pub struct TooltipLifetime(pub Timer);
 
-/// Attach to any UI node to show a tooltip on hover.
-/// The entity must track pointer hover, which is added automatically.
+/// Attach to any UI node to show a tooltip while a pointer is over it.
+/// The entity tracks mouse and active touch pointers automatically.
 #[derive(Component, Reflect)]
-#[require(bevy::picking::hover::Hovered)]
+#[require(bevy::picking::hover::Hovered, PointerHovered)]
 pub struct HoverTooltip {
     pub message: String,
     pub window: Entity,
@@ -51,6 +51,10 @@ pub struct HoverTooltip {
 /// Marker for the tooltip entity spawned by the hover tooltip system.
 #[derive(Component, Reflect)]
 pub struct HoverTooltipPopover;
+
+/// Tracks hover state across mouse and active touch pointers.
+#[derive(Component, Reflect, Default, Clone, Copy, PartialEq, Eq)]
+pub struct PointerHovered(pub bool);
 
 /// Returns the standard full-screen root layout used by every screen.
 ///

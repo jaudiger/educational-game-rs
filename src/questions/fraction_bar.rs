@@ -2,7 +2,6 @@
 
 use bevy::input_focus::AutoFocus;
 use bevy::input_focus::tab_navigation::TabIndex;
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 use bevy::ui_widgets::Button;
@@ -93,7 +92,6 @@ pub fn fraction_bar(
 
                 if interactive {
                     cmd.insert((
-                        Hovered::default(),
                         FractionSlice {
                             colored: is_colored,
                         },

@@ -1,4 +1,4 @@
-use bevy::picking::events::PointerRelease;
+use bevy::picking::events::{PointerCancel, PointerRelease};
 use bevy::prelude::*;
 use bevy::ui::{Checked, Pressed};
 use bevy::ui_widgets::{
@@ -562,6 +562,7 @@ fn volume_section(
                 observe(slider_self_update),
                 observe(handle_volume_slider_change),
                 observe(persist_volume_on_pointer_release),
+                observe(persist_volume_on_pointer_cancel),
             ));
             let _ = slider.apply_scene(slider_scene(0.0, 1.0, volume, 0.05));
 
@@ -601,6 +602,10 @@ fn persist_volume_on_pointer_release(
     _event: On<PointerRelease>,
     mut settings: GameSettingsMut<'_>,
 ) {
+    settings.persist();
+}
+
+fn persist_volume_on_pointer_cancel(_event: On<PointerCancel>, mut settings: GameSettingsMut<'_>) {
     settings.persist();
 }
 
