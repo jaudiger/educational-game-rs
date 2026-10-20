@@ -1,4 +1,5 @@
 use bevy::input_focus::tab_navigation::TabIndex;
+use bevy::picking::events::PointerLeave;
 use bevy::prelude::*;
 use bevy::ui::Pressed;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
@@ -21,12 +22,23 @@ impl Plugin for ButtonActivationPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<ButtonActivated>()
             .add_observer(forward_button_activation)
+            .add_observer(cancel_button_press_on_pointer_leave)
             .add_systems(Update, update_button_visuals);
     }
 }
 
 fn forward_button_activation(event: On<Activate>, mut messages: MessageWriter<ButtonActivated>) {
     messages.write(ButtonActivated(event.entity));
+}
+
+fn cancel_button_press_on_pointer_leave(
+    event: On<PointerLeave>,
+    buttons: Query<(Entity, Has<Pressed>), With<Button>>,
+    mut commands: Commands,
+) {
+    if let Ok((button, true)) = buttons.get(event.entity) {
+        commands.entity(button).remove::<Pressed>();
+    }
 }
 
 #[allow(clippy::type_complexity)]
