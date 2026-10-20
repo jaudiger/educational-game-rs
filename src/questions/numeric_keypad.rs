@@ -132,7 +132,7 @@ fn bottom_row(window: Entity) -> impl Bundle {
                 KeypadDigitButton(0)
             ),
             (
-                key_button("OK", theme::button_styles::ACTION_PRIMARY, window),
+                key_button("OK", theme::button_styles::ANSWER, window),
                 KeypadValidateButton
             ),
         ],

@@ -62,7 +62,7 @@ fn spawn_fraction_vis_ui(
                 root.spawn(fraction_bar(
                     def.denominator,
                     0,
-                    theme::colors::PRIMARY,
+                    theme::colors::ANSWER,
                     true,
                     BAR_WIDTH,
                     BAR_HEIGHT,
