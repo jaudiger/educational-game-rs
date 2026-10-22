@@ -105,8 +105,8 @@ pub fn menu_background(style: MenuBackgroundStyle) -> impl Bundle + use<> {
             position_type: PositionType::Absolute,
             left: px(0.0),
             top: px(0.0),
-            width: percent(100.0),
-            height: percent(100.0),
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
             ..default()
         },
         Pickable::IGNORE,

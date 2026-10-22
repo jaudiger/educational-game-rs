@@ -97,15 +97,11 @@ pub fn spawn_text_block(
 
 fn text_block_node() -> Node {
     Node {
-        width: percent(TEXT_BLOCK_WIDTH_PERCENT),
-        margin: UiRect::horizontal(percent(TEXT_BLOCK_MARGIN_PERCENT)),
+        width: theme::layout::FILL_PARENT,
         flex_direction: FlexDirection::Column,
         ..default()
     }
 }
-
-const TEXT_BLOCK_WIDTH_PERCENT: f32 = 90.0;
-const TEXT_BLOCK_MARGIN_PERCENT: f32 = 5.0;
 
 /// Spawns a question text block with centered text.
 pub fn spawn_question_text(
@@ -183,7 +179,7 @@ fn spawn_rich_text(
             block.spawn((
                 Text::new(text),
                 Node {
-                    width: percent(100.0),
+                    width: theme::layout::FILL_PARENT,
                     ..default()
                 },
                 theme::typography::text(font_size, window),
@@ -199,7 +195,7 @@ fn spawn_rich_text(
     spawn_text_block(parent, |block| {
         block
             .spawn(Node {
-                width: percent(100.0),
+                width: theme::layout::FILL_PARENT,
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 justify_content: alignment.flex_justify(),

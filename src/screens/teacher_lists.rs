@@ -98,7 +98,7 @@ pub fn teacher_list_frame() -> impl Bundle + use<> {
     (
         ScrollArea,
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_grow: 1.0,
             flex_basis: px(0.0),
             min_height: px(0.0),
@@ -114,7 +114,7 @@ pub fn teacher_list_frame() -> impl Bundle + use<> {
 
 pub fn teacher_list_content_node() -> Node {
     Node {
-        width: percent(100.0),
+        width: theme::layout::FILL_PARENT,
         flex_direction: FlexDirection::Column,
         flex_shrink: 0.0,
         row_gap: theme::scaled(theme::spacing::MEDIUM),
@@ -158,7 +158,7 @@ pub fn teacher_list_truncated_label(
             teacher_list_label(String::new(), level, color, window),
             TextLayout::no_wrap(),
             Node {
-                width: percent(100.0),
+                width: theme::layout::FILL_PARENT,
                 ..default()
             },
             TeacherListTruncatedLabelText,

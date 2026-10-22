@@ -37,7 +37,7 @@ pub(super) fn spawn_explanation_text(
     spawn_text_block(parent, |block| {
         block
             .spawn(Node {
-                width: percent(100.0),
+                width: theme::layout::FILL_PARENT,
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::FlexStart,

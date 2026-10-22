@@ -159,6 +159,12 @@ fn scale_fonts_on_window_resize(
     }
 }
 
+pub mod layout {
+    use bevy::prelude::Val;
+
+    pub const FILL_PARENT: Val = Val::Percent(100.0);
+}
+
 pub mod colors {
     use bevy::prelude::Color;
 

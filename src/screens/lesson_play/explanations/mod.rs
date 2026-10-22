@@ -121,7 +121,7 @@ fn spawn_feedback_content(
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 row_gap: theme::scaled(theme::spacing::LARGE),
-                width: percent(100.0),
+                width: theme::layout::FILL_PARENT,
                 max_width: theme::scaled(960.0),
                 margin: UiRect::vertical(Val::Auto),
                 ..default()
@@ -160,7 +160,7 @@ fn spawn_explanation_section(
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             row_gap: theme::scaled(theme::spacing::MEDIUM),
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             ..default()
         })
         .with_children(|section| {

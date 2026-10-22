@@ -159,8 +159,8 @@ fn spawn_lesson_tree_root(commands: &mut Commands, data: LessonTreeRootData) {
     );
     commands.spawn((
         Node {
-            width: percent(100.0),
-            height: percent(100.0),
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             padding: theme::scaled(theme::spacing::LARGE).all(),
             row_gap: theme::scaled(theme::spacing::MEDIUM),

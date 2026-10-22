@@ -59,7 +59,7 @@ impl StyledSlider {
             }
             Children [
                 Node {
-                    width: percent(100.0),
+                    width: theme::layout::FILL_PARENT,
                     height: theme::scaled(theme::sizes::SLIDER_TRACK_HEIGHT),
                     border_radius: BorderRadius::all(theme::scaled(
                         theme::sizes::SLIDER_TRACK_HEIGHT / 2.0

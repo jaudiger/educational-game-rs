@@ -181,7 +181,7 @@ fn spawn_fraction_comparison_visual(
         .spawn(Node {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             row_gap: theme::scaled(theme::spacing::MEDIUM),
             ..default()
         })
@@ -274,7 +274,7 @@ fn spawn_fraction_comparison_conversion_visual(
         .spawn(Node {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             row_gap: theme::scaled(theme::spacing::MEDIUM),
             ..default()
         })
@@ -312,7 +312,7 @@ fn spawn_conversion_row(
             flex_wrap: FlexWrap::Wrap,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             column_gap: theme::scaled(theme::spacing::SMALL),
             row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
@@ -328,7 +328,7 @@ fn spawn_conversion_row(
                 flex_wrap: FlexWrap::Wrap,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                max_width: percent(100.0),
+                max_width: theme::layout::FILL_PARENT,
                 column_gap: theme::scaled(theme::spacing::SMALL),
                 row_gap: theme::scaled(theme::spacing::SMALL),
                 ..default()

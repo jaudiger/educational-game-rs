@@ -94,7 +94,7 @@ fn spawn_character_row(
         .spawn(Node {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
         })
@@ -154,7 +154,7 @@ fn comparison_button(label: &str, answer: ComparisonAnswer, window: Entity) -> i
         wrapping_standard_button(
             label,
             theme::button_styles::ANSWER,
-            theme::scaled(180.0),
+            theme::layout::FILL_PARENT,
             window,
         ),
         ComparisonChoice { answer },

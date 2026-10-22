@@ -36,7 +36,7 @@ pub fn question_root_node() -> Node {
         flex_direction: FlexDirection::Column,
         align_items: AlignItems::Center,
         row_gap: theme::scaled(theme::spacing::LARGE),
-        width: percent(100.0),
+        width: theme::layout::FILL_PARENT,
         min_width: px(0.0),
         max_width: theme::scaled(960.0),
         margin: UiRect::vertical(Val::Auto),
@@ -92,7 +92,7 @@ fn layout_card(row_gap: Val) -> impl Bundle + use<> {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             row_gap,
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             min_width: px(0.0),
             max_width: theme::scaled(960.0),
             padding: theme::scaled(theme::sizes::CARD_PADDING).all(),
@@ -114,8 +114,8 @@ struct ResponsiveGridLayout {
 fn responsive_grid_layout(max_columns: usize, gap_design: f32) -> ResponsiveGridLayout {
     match max_columns.clamp(1, MAX_VISUAL_COLUMNS) {
         1 => ResponsiveGridLayout {
-            cell_basis: percent(100.0),
-            max_width: percent(100.0),
+            cell_basis: theme::layout::FILL_PARENT,
+            max_width: theme::layout::FILL_PARENT,
         },
         2 => ResponsiveGridLayout {
             cell_basis: theme::scaled(TWO_COLUMN_CELL_BASIS),
@@ -197,7 +197,7 @@ fn spawn_responsive_grid(
             align_items: AlignItems::Center,
             column_gap: gap,
             row_gap: gap,
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             max_width: layout.max_width,
             ..default()
         })
@@ -252,6 +252,7 @@ pub fn spawn_indexed_choices<F, B>(
                 Node {
                     min_width: theme::scaled(theme::sizes::BUTTON_WIDTH),
                     height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
+                    width: theme::layout::FILL_PARENT,
                     padding: UiRect::axes(
                         theme::scaled(theme::sizes::BUTTON_PADDING),
                         theme::scaled(0.0),
@@ -284,7 +285,7 @@ pub fn spawn_indexed_choices<F, B>(
                 wrapping_standard_button(
                     choice_text,
                     theme::button_styles::ANSWER,
-                    theme::scaled(theme::sizes::BUTTON_WIDTH),
+                    theme::layout::FILL_PARENT,
                     window,
                 ),
                 make_marker(index),

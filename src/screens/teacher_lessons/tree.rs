@@ -220,7 +220,7 @@ fn spawn_theme_section(
     let i18n = I18n::new(i18n.language);
     parent.spawn((
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
             ..default()
@@ -284,7 +284,7 @@ fn theme_section_header(
     let chevron_theme_id = theme_id.clone();
     (
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             ..teacher_list_header_node()
         },
         teacher_list_header_border(),
@@ -367,7 +367,7 @@ fn spawn_lesson_tree_row(
 
     parent.spawn((
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             row_gap: theme::scaled(theme::spacing::SMALL),
             flex_shrink: 0.0,

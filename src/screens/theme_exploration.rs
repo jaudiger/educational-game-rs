@@ -715,7 +715,7 @@ fn spawn_lesson_button(
         contents
             .spawn((
                 Node {
-                    width: percent(100.0),
+                    width: theme::layout::FILL_PARENT,
                     flex_direction: FlexDirection::Column,
                     row_gap: theme::scaled(theme::spacing::SMALL),
                     padding: if card_style.is_some() {
@@ -802,7 +802,7 @@ fn spawn_lesson_action(
     let mut button = parent.spawn((
         button_base(palette),
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             min_height: theme::scaled(40.0),
             padding: UiRect::axes(theme::scaled(theme::spacing::SMALL), theme::scaled(4.0)),
             justify_content: JustifyContent::Center,

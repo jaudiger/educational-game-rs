@@ -37,7 +37,6 @@ pub fn numeric_keypad(current_value: &str, window: Entity) -> impl Bundle {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             row_gap: theme::scaled(KEY_GAP),
-            margin: theme::scaled(theme::spacing::LARGE).top(),
             ..default()
         },
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {

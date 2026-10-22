@@ -157,7 +157,7 @@ pub fn wrapping_standard_button(
             width: preferred_width,
             height: Val::Auto,
             min_width: px(0.0),
-            max_width: percent(100.0),
+            max_width: theme::layout::FILL_PARENT,
             min_height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
             padding: UiRect::axes(
                 theme::scaled(theme::sizes::BUTTON_PADDING),
@@ -171,7 +171,7 @@ pub fn wrapping_standard_button(
         children![(
             standard_button_label(label, palette.foreground, window),
             Node {
-                width: percent(100.0),
+                width: theme::layout::FILL_PARENT,
                 min_width: px(0.0),
                 ..default()
             }

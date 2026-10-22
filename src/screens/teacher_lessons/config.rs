@@ -203,7 +203,7 @@ pub(super) fn spawn_lesson_config_panel(
 ) {
     parent.spawn((
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
@@ -228,7 +228,7 @@ fn exercise_group_bundle(group: ExerciseGroupData, window: Entity) -> impl Bundl
     let chevron_lesson_id = lesson_id.clone();
     (
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
             ..default()
@@ -241,7 +241,7 @@ fn exercise_group_bundle(group: ExerciseGroupData, window: Entity) -> impl Bundl
                     exercise_type,
                 },
                 Node {
-                    width: percent(100.0),
+                    width: theme::layout::FILL_PARENT,
                     ..teacher_list_header_node()
                 },
                 teacher_list_header_border(),

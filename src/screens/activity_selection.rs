@@ -186,8 +186,8 @@ fn spawn_activity_selection_screen(
         })),
     ));
     root.insert(Node {
-        width: percent(100.0),
-        height: percent(100.0),
+        width: theme::layout::FILL_PARENT,
+        height: theme::layout::FILL_PARENT,
         padding: theme::scaled(theme::spacing::MEDIUM).all(),
         justify_content: JustifyContent::FlexStart,
         align_items: AlignItems::Center,
@@ -310,7 +310,7 @@ fn activity_groups_node(
 ) -> impl Bundle + use<> {
     (
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
             row_gap: theme::scaled(theme::spacing::MEDIUM),
@@ -352,7 +352,7 @@ fn spawn_activity_group(parent: &mut ChildSpawner, view: ActivityGroupView, wind
     let activities = group.activities;
     parent.spawn((
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
             border: px(1.0).all(),
@@ -366,7 +366,7 @@ fn spawn_activity_group(parent: &mut ChildSpawner, view: ActivityGroupView, wind
                 button_base(theme::button_styles::ACTIVITY_CATEGORY),
                 ActivityGroupToggle(activity_type),
                 Node {
-                    width: percent(100.0),
+                    width: theme::layout::FILL_PARENT,
                     min_height: theme::scaled(56.0),
                     padding: UiRect::axes(
                         theme::scaled(theme::spacing::MEDIUM),
@@ -464,7 +464,7 @@ fn activity_button(label: &str, selected: bool, window: Entity) -> impl Bundle +
     (
         button_base(palette),
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             min_height: theme::scaled(72.0),
             padding: UiRect::axes(
                 theme::scaled(theme::spacing::MEDIUM),

@@ -165,7 +165,7 @@ fn spawn_settings_ui(
     let scroll = (
         ScrollArea,
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_grow: 1.0,
             flex_basis: px(0.0),
             min_height: px(0.0),

@@ -366,8 +366,8 @@ fn spawn_creation_form(commands: &mut Commands, slot_index: usize, i18n: &I18n, 
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
-            width: percent(100.0),
-            height: percent(100.0),
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
             ..default()

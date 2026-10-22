@@ -71,8 +71,8 @@ pub struct PointerHovered(pub bool);
 pub fn screen_root() -> impl Bundle {
     (
         Node {
-            width: percent(100.0),
-            height: percent(100.0),
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
             flex_direction: FlexDirection::Column,

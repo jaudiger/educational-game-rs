@@ -98,8 +98,8 @@ pub fn setup_lesson_play(
     commands
         .spawn((
             Node {
-                width: percent(100.0),
-                height: percent(100.0),
+                width: theme::layout::FILL_PARENT,
+                height: theme::layout::FILL_PARENT,
                 min_width: px(0.0),
                 min_height: px(0.0),
                 flex_direction: FlexDirection::Column,
@@ -129,7 +129,7 @@ pub fn setup_lesson_play(
 fn spawn_top_bar(parent: &mut ChildSpawnerCommands, progress: &str, window: Entity) {
     parent
         .spawn(Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Row,
             justify_content: JustifyContent::SpaceBetween,
             align_items: AlignItems::Center,
@@ -183,9 +183,8 @@ fn spawn_question_container(parent: &mut ChildSpawnerCommands) {
             flex_basis: px(0.0),
             min_width: px(0.0),
             min_height: px(0.0),
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             row_gap: theme::scaled(theme::spacing::LARGE),
-            padding: theme::scaled(theme::spacing::LARGE).all(),
             ..default()
         },
         QuestionContainer,

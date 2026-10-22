@@ -260,8 +260,8 @@ fn spawn_stats_root(
 ) {
     commands.spawn((
         Node {
-            width: percent(100.0),
-            height: percent(100.0),
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             padding: theme::scaled(theme::spacing::LARGE).all(),
             row_gap: theme::scaled(theme::spacing::MEDIUM),
@@ -731,7 +731,7 @@ fn spawn_theme_section(parent: &mut ChildSpawner, data: ThemeStatsData, window: 
     };
     parent.spawn((
         Node {
-            width: percent(100.0),
+            width: theme::layout::FILL_PARENT,
             flex_direction: FlexDirection::Column,
             row_gap: theme::scaled(theme::spacing::SMALL),
             ..default()
