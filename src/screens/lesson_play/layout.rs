@@ -21,6 +21,32 @@ pub struct RejectedLessonLaunch;
 #[derive(Resource, Default)]
 pub struct LessonPlanningInput(pub Option<LessonPlanningConfig>);
 
+pub(super) fn fit_feedback_to_available_height(
+    containers: Query<&ComputedNode, With<QuestionContainer>>,
+    mut feedbacks: Query<(&ComputedNode, &mut UiTransform), With<super::FeedbackRoot>>,
+) {
+    let Ok(container) = containers.single() else {
+        return;
+    };
+    let Ok((feedback, mut transform)) = feedbacks.single_mut() else {
+        return;
+    };
+
+    let content_inset = container.content_inset();
+    let available_height =
+        (container.size().y - content_inset.min_inset.y - content_inset.max_inset.y).max(0.0);
+    let feedback_height = feedback.size().y;
+    let scale = if feedback_height > 0.0 {
+        (available_height / feedback_height).min(1.0)
+    } else {
+        1.0
+    };
+    let scale = Vec2::splat(scale);
+    if transform.scale != scale {
+        transform.scale = scale;
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn setup_lesson_play(
     mut commands: Commands,
@@ -74,6 +100,7 @@ pub fn setup_lesson_play(
             Node {
                 width: percent(100.0),
                 height: percent(100.0),
+                min_width: px(0.0),
                 min_height: px(0.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
@@ -154,16 +181,13 @@ fn spawn_question_container(parent: &mut ChildSpawnerCommands) {
             justify_content: JustifyContent::Center,
             flex_grow: 1.0,
             flex_basis: px(0.0),
+            min_width: px(0.0),
             min_height: px(0.0),
             width: percent(100.0),
             row_gap: theme::scaled(theme::spacing::LARGE),
             padding: theme::scaled(theme::spacing::LARGE).all(),
-            border: UiRect::all(px(1.0)),
-            border_radius: BorderRadius::all(theme::scaled(theme::sizes::CARD_BORDER_RADIUS)),
             ..default()
         },
-        BackgroundColor(theme::colors::CARD_OVERLAY),
-        BorderColor::all(theme::colors::CARD_BORDER),
         QuestionContainer,
     ));
 }

@@ -179,7 +179,7 @@ pub mod colors {
     pub const TEXT_MUTED: Color = Color::srgb(0.5, 0.5, 0.55);
     pub const INPUT_BORDER: Color = Color::srgb(0.7, 0.7, 0.75);
     pub const TOGGLE_INACTIVE: Color = Color::srgb(0.8, 0.8, 0.85);
-    pub const CARD_OVERLAY: Color = Color::srgba(1.0, 1.0, 1.0, 0.65);
+    pub const CARD_OVERLAY: Color = Color::srgba(1.0, 1.0, 1.0, 0.75);
     pub const CARD_BORDER: Color = Color::srgba(0.0, 0.0, 0.0, 0.18);
     pub const FOCUS_RING: Color = Color::srgb(1.0, 0.85, 0.0);
     pub const PASTEL_BLUE: Color = Color::srgb(0.54, 0.77, 0.93);

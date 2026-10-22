@@ -8,14 +8,16 @@ use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use super::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, fraction_bar};
+use super::fraction_bar::{BAR_HEIGHT, fraction_bar};
 use super::registry::{QuestionRoot, register_question_systems};
 use crate::data::content::ComparisonAnswer;
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
-use crate::ui::components::standard_button;
+use crate::ui::components::wrapping_standard_button;
 use crate::ui::rich_text::spawn_question_text;
 use crate::ui::theme;
+
+const COMPARISON_BAR_WIDTH: f32 = 400.0;
 
 /// Handles fraction comparison question UI and answer submission.
 pub struct FractionComparisonPlugin;
@@ -61,39 +63,20 @@ fn spawn_comparison_ui(
         parent
             .spawn((FractionComparisonRoot, QuestionRoot))
             .with_children(|root| {
-                super::spawn_question_prompt(root, def.prompt.get(i18n.language), window);
+                super::spawn_question_card(root, |card| {
+                    super::spawn_question_prompt(card, def.prompt.get(i18n.language), window);
 
-                // Character rows grouped with tighter spacing
-                root.spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    width: percent(100.0),
-                    row_gap: theme::scaled(theme::spacing::MEDIUM),
-                    ..default()
-                })
-                .with_children(|group| {
-                    spawn_character_row(
-                        group,
-                        &i18n,
-                        &def.character_a,
-                        def.fraction_a,
-                        theme::colors::PRIMARY,
-                        show_bar,
-                        window,
-                    );
-                    spawn_character_row(
-                        group,
-                        &i18n,
-                        &def.character_b,
-                        def.fraction_b,
-                        theme::colors::SECONDARY,
-                        show_bar,
-                        window,
-                    );
+                    super::spawn_question_visuals(card, 2, 2, |visual, index| {
+                        let (name, fraction, color) = match index {
+                            0 => (&def.character_a, def.fraction_a, theme::colors::PRIMARY),
+                            _ => (&def.character_b, def.fraction_b, theme::colors::SECONDARY),
+                        };
+                        spawn_character_row(visual, &i18n, name, fraction, color, show_bar, window);
+                    });
                 });
-
-                // Choice buttons
-                spawn_choice_buttons(root, &def.character_a, &def.character_b, &i18n, window);
+                super::spawn_controls_card(root, |card| {
+                    spawn_choice_buttons(card, &def.character_a, &def.character_b, &i18n, window);
+                });
             });
     });
 }
@@ -132,7 +115,12 @@ fn spawn_character_row(
             // Pre-coloured bar (hidden when teacher disables the visual)
             if show_bar {
                 row.spawn(fraction_bar(
-                    fraction.1, fraction.0, bar_color, false, BAR_WIDTH, BAR_HEIGHT,
+                    fraction.1,
+                    fraction.0,
+                    bar_color,
+                    false,
+                    COMPARISON_BAR_WIDTH,
+                    BAR_HEIGHT,
                 ));
             }
         });
@@ -145,34 +133,25 @@ fn spawn_choice_buttons(
     i18n: &I18n,
     window: Entity,
 ) {
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            width: percent(100.0),
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            row_gap: theme::scaled(theme::spacing::MEDIUM),
-            margin: theme::scaled(theme::spacing::LARGE).top(),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn((
-                comparison_button(name_a, ComparisonAnswer::A, window),
-                AutoFocus,
-            ));
-            row.spawn(comparison_button(name_b, ComparisonAnswer::B, window));
-            row.spawn(comparison_button(
-                &i18n.t(&TranslationKey::EqualAmount),
+    super::spawn_choice_grid(parent, 3, |cell, index| {
+        let (label, answer) = match index {
+            0 => (name_a.to_owned(), ComparisonAnswer::A),
+            1 => (name_b.to_owned(), ComparisonAnswer::B),
+            _ => (
+                i18n.t(&TranslationKey::EqualAmount).into_owned(),
                 ComparisonAnswer::Equal,
-                window,
-            ));
-        });
+            ),
+        };
+        let mut command = cell.spawn(comparison_button(&label, answer, window));
+        if index == 0 {
+            command.insert(AutoFocus);
+        }
+    });
 }
 
 fn comparison_button(label: &str, answer: ComparisonAnswer, window: Entity) -> impl Bundle + use<> {
     (
-        standard_button(
+        wrapping_standard_button(
             label,
             theme::button_styles::ANSWER,
             theme::scaled(180.0),

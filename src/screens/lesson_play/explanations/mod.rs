@@ -6,9 +6,10 @@ use crate::data::{
     AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, QuestionContainer,
 };
 use crate::i18n::{I18n, TranslationKey};
+use crate::questions::{spawn_controls_card, spawn_question_card};
 use crate::states::LessonPhase;
 use crate::ui::animation::AnimateScale;
-use crate::ui::components::standard_button;
+use crate::ui::components::wrapping_standard_button;
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -115,25 +116,32 @@ fn spawn_feedback_content(
         .spawn((
             FeedbackRoot,
             DespawnOnEnter(LessonPhase::ShowQuestion),
+            UiTransform::default(),
             Node {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
-                row_gap: theme::scaled(theme::spacing::MEDIUM),
+                row_gap: theme::scaled(theme::spacing::LARGE),
                 width: percent(100.0),
+                max_width: theme::scaled(960.0),
+                margin: UiRect::vertical(Val::Auto),
                 ..default()
             },
         ))
         .with_children(|feedback| {
-            spawn_result_text(feedback, i18n, is_correct, window);
-            if let Some(notice) = &presentation.save_notice {
-                feedback.spawn((
-                    Text::new(notice.clone()),
-                    theme::typography::text(theme::fonts::SMALL, window),
-                    TextColor(theme::colors::ERROR),
-                ));
-            }
-            spawn_explanation_section(feedback, i18n, explanation, window);
-            spawn_next_button(feedback, presentation, window);
+            spawn_question_card(feedback, |card| {
+                spawn_result_text(card, i18n, is_correct, window);
+                spawn_explanation_section(card, i18n, explanation, window);
+            });
+            spawn_controls_card(feedback, |card| {
+                if let Some(notice) = &presentation.save_notice {
+                    card.spawn((
+                        Text::new(notice.clone()),
+                        theme::typography::text(theme::fonts::SMALL, window),
+                        TextColor(theme::colors::ERROR),
+                    ));
+                }
+                spawn_next_button(card, presentation, window);
+            });
         });
 }
 
@@ -153,7 +161,6 @@ fn spawn_explanation_section(
             align_items: AlignItems::Center,
             row_gap: theme::scaled(theme::spacing::MEDIUM),
             width: percent(100.0),
-            margin: UiRect::axes(Val::ZERO, theme::scaled(theme::spacing::XLARGE)),
             ..default()
         })
         .with_children(|section| {
@@ -203,7 +210,7 @@ fn spawn_next_button(
     window: Entity,
 ) {
     parent.spawn((
-        standard_button(
+        wrapping_standard_button(
             &presentation.next_button_label,
             if presentation.return_to_catalogue {
                 theme::button_styles::BACK

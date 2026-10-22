@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui::UiSystems;
 
 use crate::data::{LastAnswer, LessonLaunchSelection, LessonSession, SelectedLesson};
 use crate::i18n::{I18n, TranslationKey};
@@ -47,6 +48,13 @@ impl Plugin for LessonPlayScreenPlugin {
                     .chain(),
             )
             .add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
+            .add_systems(
+                PostUpdate,
+                layout::fit_feedback_to_available_height
+                    .run_if(in_state(AppState::LessonPlay))
+                    .run_if(in_state(LessonPhase::ShowFeedback))
+                    .after(UiSystems::Layout),
+            )
             .add_systems(
                 Update,
                 assess_question_responses

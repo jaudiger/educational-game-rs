@@ -54,28 +54,31 @@ fn spawn_identification_ui(
         parent
             .spawn((FractionIdentificationRoot, QuestionRoot))
             .with_children(|root| {
-                super::spawn_question_prompt(
-                    root,
-                    &i18n.t(&TranslationKey::WhatFractionColored),
-                    window,
-                );
-
-                // Pre-coloured bar
-                root.spawn(fraction_bar(
-                    def.denominator,
-                    def.numerator,
-                    theme::colors::PRIMARY,
-                    false,
-                    BAR_WIDTH,
-                    BAR_HEIGHT,
-                ));
-
-                super::spawn_indexed_choices(
-                    root,
-                    &def.choices,
-                    |i| IdentificationChoice { index: i },
-                    window,
-                );
+                super::spawn_question_card(root, |card| {
+                    super::spawn_question_prompt(
+                        card,
+                        &i18n.t(&TranslationKey::WhatFractionColored),
+                        window,
+                    );
+                    super::spawn_question_visuals(card, 1, 1, |visual, _| {
+                        visual.spawn(fraction_bar(
+                            def.denominator,
+                            def.numerator,
+                            theme::colors::PRIMARY,
+                            false,
+                            BAR_WIDTH,
+                            BAR_HEIGHT,
+                        ));
+                    });
+                });
+                super::spawn_controls_card(root, |card| {
+                    super::spawn_indexed_choices(
+                        card,
+                        &def.choices,
+                        |i| IdentificationChoice { index: i },
+                        window,
+                    );
+                });
             });
     });
 }

@@ -2,12 +2,11 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use super::fraction_bar::fraction_bar;
-use super::multiplication_grid::spawn_prompt_and_grid;
+use super::multiplication_grid::spawn_multiplication_grid;
 use super::registry::{QuestionRoot, register_question_systems};
 use crate::data::content::QuestionVisual;
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::I18n;
-use crate::ui::components::operator_visual_group;
 use crate::ui::theme;
 
 /// Handles multiple-choice question UI and answer submission.
@@ -52,91 +51,49 @@ fn spawn_mcq_ui(
     let show_grid = !hide_visual;
 
     commands.entity(*container).with_children(|parent| {
-        parent
-            .spawn((McqRoot, QuestionRoot))
-            .with_children(|mcq_root| {
+        parent.spawn((McqRoot, QuestionRoot)).with_children(|root| {
+            super::spawn_question_card(root, |card| {
+                super::spawn_question_prompt(card, mcq.prompt.get(i18n.language), window);
                 if show_grid {
                     match &mcq.question_visual {
                         Some(QuestionVisual::MultiplicationGrid { rows, cols }) => {
-                            spawn_prompt_and_grid(
-                                mcq_root,
-                                mcq.prompt.get(i18n.language),
-                                *rows,
-                                *cols,
-                                window,
-                            );
-                            super::spawn_indexed_choices(
-                                mcq_root,
-                                &mcq.choices,
-                                |i| McqChoice { index: i },
-                                window,
-                            );
-                            return;
+                            super::spawn_question_visuals(card, 1, 1, |visual, _| {
+                                spawn_multiplication_grid(visual, *rows, *cols);
+                            });
                         }
                         Some(QuestionVisual::FractionAddition { a, b, c }) => {
-                            spawn_prompt_and_fraction_bars(
-                                mcq_root,
-                                mcq.prompt.get(i18n.language),
-                                *a,
-                                *b,
-                                *c,
-                                window,
-                            );
-                            super::spawn_indexed_choices(
-                                mcq_root,
-                                &mcq.choices,
-                                |i| McqChoice { index: i },
-                                window,
-                            );
-                            return;
+                            spawn_fraction_addition_visuals(card, *a, *b, *c, window);
                         }
                         None => {}
                     }
                 }
-                // Default: text prompt only.
-                super::spawn_question_prompt(mcq_root, mcq.prompt.get(i18n.language), window);
+            });
+            super::spawn_controls_card(root, |card| {
                 super::spawn_indexed_choices(
-                    mcq_root,
+                    card,
                     &mcq.choices,
                     |i| McqChoice { index: i },
                     window,
                 );
             });
+        });
     });
 }
 
-/// Spawn the text prompt followed by two fraction bars (`a/b` blue + `c/b` orange).
-/// No result bar; the student must calculate the answer.
-fn spawn_prompt_and_fraction_bars(
+/// Spawns the fraction-addition bars and plus sign as separate visual cells.
+fn spawn_fraction_addition_visuals(
     parent: &mut ChildSpawnerCommands,
-    prompt_text: &str,
     a: u32,
     b: u32,
     c: u32,
     window: Entity,
 ) {
-    /// Width of each mini-bar in the fraction addition visual.
     const MINI_BAR_WIDTH: f32 = 200.0;
-    /// Height of each mini-bar in the fraction addition visual.
     const MINI_BAR_HEIGHT: f32 = 40.0;
 
-    // Prompt text
-    super::spawn_question_prompt(parent, prompt_text, window);
-
-    // Fraction bars row: a/b (blue) + "+" + c/b (orange)
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            margin: theme::scaled(theme::spacing::MEDIUM).top(),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn(fraction_bar(
+    super::spawn_question_visuals(parent, 3, 3, |visual, index| match index {
+        0 => {
+            visual.spawn(fraction_bar(
                 b,
                 a,
                 theme::colors::PRIMARY,
@@ -144,21 +101,25 @@ fn spawn_prompt_and_fraction_bars(
                 MINI_BAR_WIDTH,
                 MINI_BAR_HEIGHT,
             ));
-            row.spawn(operator_visual_group(
-                "+",
-                theme::fonts::HEADING,
-                theme::colors::TEXT_DARK,
-                window,
-                fraction_bar(
-                    b,
-                    c,
-                    theme::colors::SECONDARY,
-                    false,
-                    MINI_BAR_WIDTH,
-                    MINI_BAR_HEIGHT,
-                ),
+        }
+        1 => {
+            visual.spawn((
+                Text::new("+"),
+                theme::typography::text(theme::fonts::HEADING, window),
+                TextColor(theme::colors::TEXT_DARK),
             ));
-        });
+        }
+        _ => {
+            visual.spawn(fraction_bar(
+                b,
+                c,
+                theme::colors::SECONDARY,
+                false,
+                MINI_BAR_WIDTH,
+                MINI_BAR_HEIGHT,
+            ));
+        }
+    });
 }
 
 mod interaction;

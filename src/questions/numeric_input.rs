@@ -6,7 +6,7 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use super::multiplication_grid::spawn_prompt_and_grid;
+use super::multiplication_grid::spawn_multiplication_grid;
 use super::numeric_keypad::numeric_keypad;
 use super::registry::{QuestionRoot, register_question_systems};
 use crate::data::content::QuestionVisual;
@@ -66,18 +66,20 @@ fn spawn_numeric_input_ui(
                 QuestionRoot,
             ))
             .with_children(|root| {
-                // If the question has a grid visual and it's not hidden, show prompt + grid.
-                if !hide_visual
-                    && let Some(QuestionVisual::MultiplicationGrid { rows, cols }) =
-                        &question_visual
-                {
-                    spawn_prompt_and_grid(root, &prompt_text, *rows, *cols, window);
-                    root.spawn(numeric_keypad("", window));
-                    return;
-                }
-                // Default: text prompt only + keypad.
-                super::spawn_question_prompt(root, &prompt_text, window);
-                root.spawn(numeric_keypad("", window));
+                super::spawn_question_card(root, |card| {
+                    super::spawn_question_prompt(card, &prompt_text, window);
+                    if !hide_visual
+                        && let Some(QuestionVisual::MultiplicationGrid { rows, cols }) =
+                            &question_visual
+                    {
+                        super::spawn_question_visuals(card, 1, 1, |visual, _| {
+                            spawn_multiplication_grid(visual, *rows, *cols);
+                        });
+                    }
+                });
+                super::spawn_controls_card(root, |card| {
+                    card.spawn(numeric_keypad("", window));
+                });
             });
     });
 }

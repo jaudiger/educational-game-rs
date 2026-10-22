@@ -58,35 +58,36 @@ fn spawn_fraction_vis_ui(
         parent
             .spawn((FractionVisualizationRoot, QuestionRoot))
             .with_children(|root| {
-                super::spawn_question_prompt(root, def.prompt.get(i18n.language), window);
-                root.spawn(fraction_bar(
-                    def.denominator,
-                    0,
-                    theme::colors::ANSWER,
-                    true,
-                    BAR_WIDTH,
-                    BAR_HEIGHT,
-                ));
-                spawn_validate_button(root, &i18n, window);
+                super::spawn_question_card(root, |card| {
+                    super::spawn_question_prompt(card, def.prompt.get(i18n.language), window);
+                    super::spawn_question_visuals(card, 1, 1, |visual, _| {
+                        visual.spawn(fraction_bar(
+                            def.denominator,
+                            0,
+                            theme::colors::PRIMARY,
+                            true,
+                            BAR_WIDTH,
+                            BAR_HEIGHT,
+                        ));
+                    });
+                });
+                super::spawn_controls_card(root, |card| {
+                    spawn_validate_button(card, &i18n, window);
+                });
             });
     });
 }
 
 fn spawn_validate_button(parent: &mut ChildSpawnerCommands, i18n: &I18n, window: Entity) {
-    parent
-        .spawn(Node {
-            margin: theme::scaled(theme::spacing::LARGE).top(),
-            ..default()
-        })
-        .with_child((
-            standard_button(
-                &i18n.t(&TranslationKey::Validate),
-                theme::button_styles::ACTION_PRIMARY,
-                theme::scaled(theme::sizes::BUTTON_WIDTH),
-                window,
-            ),
-            ValidateButton,
-        ));
+    parent.spawn((
+        standard_button(
+            &i18n.t(&TranslationKey::Validate),
+            theme::button_styles::ACTION_PRIMARY,
+            theme::scaled(theme::sizes::BUTTON_WIDTH),
+            window,
+        ),
+        ValidateButton,
+    ));
 }
 
 mod interaction;

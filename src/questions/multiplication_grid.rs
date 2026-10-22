@@ -64,32 +64,7 @@ fn multiplication_grid_visual(rows: u32, cols: u32) -> impl Bundle {
     )
 }
 
-/// Spawns a prompt + grid side by side in a row layout.
-/// Used by MCQ and numeric-input plugins when a grid visual is present.
-pub fn spawn_prompt_and_grid(
-    parent: &mut ChildSpawnerCommands,
-    prompt_text: &str,
-    rows: u32,
-    cols: u32,
-    window: Entity,
-) {
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            width: percent(100.0),
-            column_gap: theme::scaled(theme::spacing::LARGE),
-            row_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn((
-                Text::new(prompt_text),
-                theme::typography::text(theme::fonts::HEADING, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ));
-            row.spawn(multiplication_grid_visual(rows, cols));
-        });
+/// Spawns a multiplication grid as a question visual.
+pub fn spawn_multiplication_grid(parent: &mut ChildSpawnerCommands, rows: u32, cols: u32) {
+    parent.spawn(multiplication_grid_visual(rows, cols));
 }

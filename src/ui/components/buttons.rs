@@ -140,15 +140,53 @@ pub fn standard_button(
             border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
             ..default()
         },
+        children![standard_button_label(label, palette.foreground, window)],
+    )
+}
+
+/// Returns a button with a preferred width that wraps long labels within its parent.
+pub fn wrapping_standard_button(
+    label: &str,
+    palette: ButtonPalette,
+    preferred_width: Val,
+    window: Entity,
+) -> impl Bundle + use<> {
+    (
+        button_base(palette),
+        Node {
+            width: preferred_width,
+            height: Val::Auto,
+            min_width: px(0.0),
+            max_width: percent(100.0),
+            min_height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
+            padding: UiRect::axes(
+                theme::scaled(theme::sizes::BUTTON_PADDING),
+                theme::scaled(0.0),
+            ),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
+            ..default()
+        },
         children![(
-            Text::new(label),
-            theme::typography::text(theme::fonts::BUTTON, window),
-            TextColor(palette.foreground),
-            TextLayout::justify(Justify::Center),
+            standard_button_label(label, palette.foreground, window),
+            Node {
+                width: percent(100.0),
+                min_width: px(0.0),
+                ..default()
+            }
         )],
     )
 }
 
+fn standard_button_label(label: &str, foreground: Color, window: Entity) -> impl Bundle + use<> {
+    (
+        Text::new(label),
+        theme::typography::text(theme::fonts::BUTTON, window),
+        TextColor(foreground),
+        TextLayout::justify(Justify::Center),
+    )
+}
 #[cfg(not(feature = "demo"))]
 pub mod production;
 #[cfg(not(feature = "demo"))]
