@@ -216,6 +216,19 @@ fn spawn_settings_ui(
     ));
 }
 
+fn settings_row() -> Node {
+    Node {
+        width: theme::layout::FILL_PARENT,
+        min_width: px(0.0),
+        flex_direction: FlexDirection::Row,
+        flex_wrap: FlexWrap::Wrap,
+        align_items: AlignItems::Center,
+        column_gap: theme::scaled(theme::spacing::MEDIUM),
+        row_gap: theme::scaled(theme::spacing::SMALL),
+        ..default()
+    }
+}
+
 fn mode_section(mode: &ModePresentation, window: Entity) -> impl Bundle + use<> {
     let individual_checked = !mode.group_selected;
     let class_checked = mode.group_selected;
@@ -224,12 +237,7 @@ fn mode_section(mode: &ModePresentation, window: Entity) -> impl Bundle + use<> 
     let mode_label = mode.label.clone();
 
     (
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        },
+        settings_row(),
         children![
             (
                 Text::new(mode_label),
@@ -290,12 +298,7 @@ fn language_section(
     let english_label = i18n.t(&TranslationKey::LanguageEnglish).into_owned();
 
     (
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        },
+        settings_row(),
         children![
             (
                 Text::new(label),
@@ -387,12 +390,7 @@ fn exploration_theme_section(
     let coming_soon = i18n.t(&TranslationKey::ComingSoon).into_owned();
 
     (
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        },
+        settings_row(),
         children![
             (
                 Text::new(label),
@@ -485,12 +483,7 @@ fn bool_setting_section(
     let checkbox_label = i18n.t(&checkbox_key);
 
     (
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        },
+        settings_row(),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn((
                 Text::new(label),
@@ -543,12 +536,7 @@ fn volume_section(
     let percent = ((volume.clamp(0.0, 1.0) * 100.0).round()) as u32;
 
     (
-        Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        },
+        settings_row(),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
             parent.spawn((
                 Text::new(label),

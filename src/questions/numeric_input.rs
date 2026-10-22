@@ -72,9 +72,14 @@ fn spawn_numeric_input_ui(
                         && let Some(QuestionVisual::MultiplicationGrid { rows, cols }) =
                             &question_visual
                     {
-                        super::spawn_question_visuals(card, 1, 1, |visual, _| {
-                            spawn_multiplication_grid(visual, *rows, *cols);
-                        });
+                        super::spawn_question_visuals(
+                            card,
+                            super::QuestionVisualLayout::Grid { max_columns: 1 },
+                            &[super::QuestionVisualSizing::Preferred],
+                            |visual, _| {
+                                spawn_multiplication_grid(visual, *rows, *cols);
+                            },
+                        );
                     }
                 });
                 super::spawn_controls_card(root, |card| {

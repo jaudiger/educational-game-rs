@@ -9,7 +9,7 @@ use crate::i18n::{I18n, TranslationKey};
 use crate::questions::{spawn_controls_card, spawn_question_card};
 use crate::states::LessonPhase;
 use crate::ui::animation::AnimateScale;
-use crate::ui::components::wrapping_standard_button;
+use crate::ui::components::standard_button;
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -210,14 +210,14 @@ fn spawn_next_button(
     window: Entity,
 ) {
     parent.spawn((
-        wrapping_standard_button(
+        standard_button(
             &presentation.next_button_label,
             if presentation.return_to_catalogue {
                 theme::button_styles::BACK
             } else {
                 theme::button_styles::ACTION_PRIMARY
             },
-            theme::scaled(theme::sizes::BUTTON_WIDTH),
+            Val::Auto,
             window,
         ),
         NavigateTo(LessonPhase::Transitioning),

@@ -168,8 +168,11 @@ pub fn radio_group() -> impl Bundle {
         RadioGroup,
         Node {
             flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
             align_items: AlignItems::Center,
             column_gap: theme::scaled(theme::spacing::MEDIUM),
+            row_gap: theme::scaled(theme::spacing::SMALL),
+            max_width: theme::layout::FILL_PARENT,
             ..default()
         },
     )

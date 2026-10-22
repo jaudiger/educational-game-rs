@@ -155,7 +155,11 @@ fn spawn_save_slots_ui(
             parent
                 .spawn((Node {
                     flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
+                    width: theme::layout::FILL_PARENT,
+                    min_width: px(0.0),
                     column_gap: theme::scaled(theme::spacing::LARGE),
+                    row_gap: theme::scaled(theme::spacing::LARGE),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     ..default()
@@ -232,8 +236,15 @@ fn spawn_slot_card(
             // Filled slot: show name + delete button
             card.spawn((
                 Text::new(slot_name),
+                Node {
+                    width: theme::layout::FILL_PARENT,
+                    min_width: px(0.0),
+                    padding: UiRect::right(theme::scaled(32.0)),
+                    ..default()
+                },
                 theme::typography::text(theme::fonts::HEADING, window),
                 TextColor(theme::colors::TEXT_DARK),
+                TextLayout::justify(Justify::Center),
             ));
 
             card.spawn((

@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
-use crate::data::content::place_value_table_fits;
 use crate::data::{ExplanationVisual, Language};
 use crate::questions::fraction_bar::{self as fraction_bar_mod, fraction_bar};
+use crate::questions::{QuestionVisualLayout, QuestionVisualSizing, spawn_question_visuals};
 use crate::ui::components::{operator_visual_group, stacked_fraction};
 use crate::ui::theme;
 
@@ -82,54 +82,65 @@ fn spawn_fraction_addition_visual(
     /// Height of each mini-bar in the addition visual.
     const MINI_BAR_HEIGHT: f32 = 40.0;
 
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn(fraction_bar(
-                b,
-                a,
-                theme::colors::PRIMARY,
-                false,
-                MINI_BAR_WIDTH,
-                MINI_BAR_HEIGHT,
-            ));
-            row.spawn(operator_visual_group(
-                "+",
-                theme::fonts::HEADING,
-                theme::colors::TEXT_DARK,
-                window,
-                fraction_bar(
+    spawn_question_visuals(
+        parent,
+        QuestionVisualLayout::SingleRowOrColumn {
+            max_row_occupancy: 1.0,
+        },
+        &[
+            QuestionVisualSizing::Intrinsic,
+            QuestionVisualSizing::Intrinsic,
+            QuestionVisualSizing::Intrinsic,
+            QuestionVisualSizing::Intrinsic,
+            QuestionVisualSizing::Intrinsic,
+        ],
+        |cell, index| match index {
+            0 => {
+                cell.spawn(fraction_bar(
+                    b,
+                    a,
+                    theme::colors::PRIMARY,
+                    false,
+                    MINI_BAR_WIDTH,
+                    MINI_BAR_HEIGHT,
+                ));
+            }
+            1 => {
+                cell.spawn((
+                    Text::new("+"),
+                    theme::typography::text(theme::fonts::HEADING, window),
+                    TextColor(theme::colors::TEXT_DARK),
+                ));
+            }
+            2 => {
+                cell.spawn(fraction_bar(
                     b,
                     c,
                     theme::colors::SECONDARY,
                     false,
                     MINI_BAR_WIDTH,
                     MINI_BAR_HEIGHT,
-                ),
-            ));
-            row.spawn(operator_visual_group(
-                "=",
-                theme::fonts::HEADING,
-                theme::colors::TEXT_DARK,
-                window,
-                fraction_bar(
+                ));
+            }
+            3 => {
+                cell.spawn((
+                    Text::new("="),
+                    theme::typography::text(theme::fonts::HEADING, window),
+                    TextColor(theme::colors::TEXT_DARK),
+                ));
+            }
+            _ => {
+                cell.spawn(fraction_bar(
                     b,
                     a + c,
                     theme::colors::SUCCESS,
                     false,
                     MINI_BAR_WIDTH,
                     MINI_BAR_HEIGHT,
-                ),
-            ));
-        });
+                ));
+            }
+        },
+    );
 }
 
 /// Renders `count` fully-coloured fraction bars side by side, each with
@@ -406,9 +417,9 @@ fn spawn_multiplication_grid_visual(
                     for _ in 0..items {
                         group.spawn((
                             Node {
-                                width: px(CELL_SIZE),
-                                height: px(CELL_SIZE),
-                                border_radius: BorderRadius::all(px(3.0)),
+                                width: theme::scaled(CELL_SIZE),
+                                height: theme::scaled(CELL_SIZE),
+                                border_radius: BorderRadius::all(theme::scaled(3.0)),
                                 ..default()
                             },
                             BackgroundColor(CELL_COLOR),
@@ -419,9 +430,9 @@ fn spawn_multiplication_grid_visual(
                     Node {
                         flex_direction: FlexDirection::Row,
                         flex_wrap: FlexWrap::Wrap,
-                        column_gap: px(CELL_GAP),
-                        row_gap: px(CELL_GAP),
-                        max_width: px(CELL_SIZE.mul_add(6.0, CELL_GAP * 5.0)),
+                        column_gap: theme::scaled(CELL_GAP),
+                        row_gap: theme::scaled(CELL_GAP),
+                        max_width: theme::scaled(CELL_SIZE.mul_add(6.0, CELL_GAP * 5.0)),
                         ..default()
                     },
                     cells,
@@ -478,11 +489,12 @@ fn spawn_place_value_table_visual(
     language: Language,
     window: Entity,
 ) {
-    if !place_value_table_fits(number, multiplier) {
+    if multiplier == 0 {
         warn!("Skipping invalid place-value visual");
         return;
     }
     let Some(result) = number.checked_mul(multiplier) else {
+        warn!("Skipping invalid place-value visual");
         return;
     };
     let zeros_added = count_trailing_zeros(multiplier);

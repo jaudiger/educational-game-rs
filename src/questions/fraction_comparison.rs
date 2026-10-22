@@ -66,13 +66,23 @@ fn spawn_comparison_ui(
                 super::spawn_question_card(root, |card| {
                     super::spawn_question_prompt(card, def.prompt.get(i18n.language), window);
 
-                    super::spawn_question_visuals(card, 2, 2, |visual, index| {
-                        let (name, fraction, color) = match index {
-                            0 => (&def.character_a, def.fraction_a, theme::colors::PRIMARY),
-                            _ => (&def.character_b, def.fraction_b, theme::colors::SECONDARY),
-                        };
-                        spawn_character_row(visual, &i18n, name, fraction, color, show_bar, window);
-                    });
+                    super::spawn_question_visuals(
+                        card,
+                        super::QuestionVisualLayout::Grid { max_columns: 2 },
+                        &[
+                            super::QuestionVisualSizing::Preferred,
+                            super::QuestionVisualSizing::Preferred,
+                        ],
+                        |visual, index| {
+                            let (name, fraction, color) = match index {
+                                0 => (&def.character_a, def.fraction_a, theme::colors::PRIMARY),
+                                _ => (&def.character_b, def.fraction_b, theme::colors::SECONDARY),
+                            };
+                            spawn_character_row(
+                                visual, &i18n, name, fraction, color, show_bar, window,
+                            );
+                        },
+                    );
                 });
                 super::spawn_controls_card(root, |card| {
                     spawn_choice_buttons(card, &def.character_a, &def.character_b, &i18n, window);

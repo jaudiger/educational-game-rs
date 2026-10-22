@@ -60,16 +60,21 @@ fn spawn_identification_ui(
                         &i18n.t(&TranslationKey::WhatFractionColored),
                         window,
                     );
-                    super::spawn_question_visuals(card, 1, 1, |visual, _| {
-                        visual.spawn(fraction_bar(
-                            def.denominator,
-                            def.numerator,
-                            theme::colors::PRIMARY,
-                            false,
-                            BAR_WIDTH,
-                            BAR_HEIGHT,
-                        ));
-                    });
+                    super::spawn_question_visuals(
+                        card,
+                        super::QuestionVisualLayout::Grid { max_columns: 1 },
+                        &[super::QuestionVisualSizing::Preferred],
+                        |visual, _| {
+                            visual.spawn(fraction_bar(
+                                def.denominator,
+                                def.numerator,
+                                theme::colors::PRIMARY,
+                                false,
+                                BAR_WIDTH,
+                                BAR_HEIGHT,
+                            ));
+                        },
+                    );
                 });
                 super::spawn_controls_card(root, |card| {
                     super::spawn_indexed_choices(

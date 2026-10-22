@@ -539,16 +539,21 @@ fn handle_activity_group_disclosure(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn scroll_selected_activity_into_view(
     mut commands: Commands,
-    selected: Query<Entity, With<ScrollToSelectedActivity>>,
-    laid_out: Query<(), (With<ComputedNode>, With<UiGlobalTransform>)>,
+    selected: Query<
+        Entity,
+        (
+            With<ScrollToSelectedActivity>,
+            With<ComputedNode>,
+            With<UiGlobalTransform>,
+        ),
+    >,
 ) {
     for entity in &selected {
-        if laid_out.contains(entity) {
-            commands.trigger(ScrollIntoView { entity });
-            commands.entity(entity).remove::<ScrollToSelectedActivity>();
-        }
+        commands.trigger(ScrollIntoView { entity });
+        commands.entity(entity).remove::<ScrollToSelectedActivity>();
     }
 }
 

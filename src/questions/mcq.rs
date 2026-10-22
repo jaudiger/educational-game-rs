@@ -12,6 +12,8 @@ use crate::ui::theme;
 /// Handles multiple-choice question UI and answer submission.
 pub struct McqPlugin;
 
+const FRACTION_ADDITION_ROW_OCCUPANCY: f32 = 0.75;
+
 impl Plugin for McqPlugin {
     fn build(&self, app: &mut App) {
         register_question_systems(
@@ -57,9 +59,14 @@ fn spawn_mcq_ui(
                 if show_grid {
                     match &mcq.question_visual {
                         Some(QuestionVisual::MultiplicationGrid { rows, cols }) => {
-                            super::spawn_question_visuals(card, 1, 1, |visual, _| {
-                                spawn_multiplication_grid(visual, *rows, *cols);
-                            });
+                            super::spawn_question_visuals(
+                                card,
+                                super::QuestionVisualLayout::Grid { max_columns: 1 },
+                                &[super::QuestionVisualSizing::Preferred],
+                                |visual, _| {
+                                    spawn_multiplication_grid(visual, *rows, *cols);
+                                },
+                            );
                         }
                         Some(QuestionVisual::FractionAddition { a, b, c }) => {
                             spawn_fraction_addition_visuals(card, *a, *b, *c, window);
@@ -91,35 +98,46 @@ fn spawn_fraction_addition_visuals(
     const MINI_BAR_WIDTH: f32 = 200.0;
     const MINI_BAR_HEIGHT: f32 = 40.0;
 
-    super::spawn_question_visuals(parent, 3, 3, |visual, index| match index {
-        0 => {
-            visual.spawn(fraction_bar(
-                b,
-                a,
-                theme::colors::PRIMARY,
-                false,
-                MINI_BAR_WIDTH,
-                MINI_BAR_HEIGHT,
-            ));
-        }
-        1 => {
-            visual.spawn((
-                Text::new("+"),
-                theme::typography::text(theme::fonts::HEADING, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ));
-        }
-        _ => {
-            visual.spawn(fraction_bar(
-                b,
-                c,
-                theme::colors::SECONDARY,
-                false,
-                MINI_BAR_WIDTH,
-                MINI_BAR_HEIGHT,
-            ));
-        }
-    });
+    super::spawn_question_visuals(
+        parent,
+        super::QuestionVisualLayout::SingleRowOrColumn {
+            max_row_occupancy: FRACTION_ADDITION_ROW_OCCUPANCY,
+        },
+        &[
+            super::QuestionVisualSizing::Intrinsic,
+            super::QuestionVisualSizing::Intrinsic,
+            super::QuestionVisualSizing::Intrinsic,
+        ],
+        |visual, index| match index {
+            0 => {
+                visual.spawn(fraction_bar(
+                    b,
+                    a,
+                    theme::colors::PRIMARY,
+                    false,
+                    MINI_BAR_WIDTH,
+                    MINI_BAR_HEIGHT,
+                ));
+            }
+            1 => {
+                visual.spawn((
+                    Text::new("+"),
+                    theme::typography::text(theme::fonts::HEADING, window),
+                    TextColor(theme::colors::TEXT_DARK),
+                ));
+            }
+            _ => {
+                visual.spawn(fraction_bar(
+                    b,
+                    c,
+                    theme::colors::SECONDARY,
+                    false,
+                    MINI_BAR_WIDTH,
+                    MINI_BAR_HEIGHT,
+                ));
+            }
+        },
+    );
 }
 
 mod interaction;
