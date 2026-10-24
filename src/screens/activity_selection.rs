@@ -3,12 +3,13 @@ use bevy::prelude::*;
 use bevy::ui_widgets::{ScrollArea, ScrollIntoView};
 use bevy::window::PrimaryWindow;
 
-use crate::data::content::QuestionType;
+use crate::data::content::{QuestionType, SchoolLevel};
 use crate::data::{
     ActiveTheme, ContentLibrary, ExplorationTheme, LessonLaunchSelection, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::screens::activity_categories::activity_category_label;
+use crate::screens::activity_level::activity_level_badge;
 use crate::states::{AppState, ExplorationView};
 use crate::ui::animation::FloatingCard;
 use crate::ui::components::{
@@ -67,6 +68,7 @@ struct ActivityGroup<T> {
 struct ActivityButtonData {
     id: String,
     label: String,
+    school_level: SchoolLevel,
 }
 
 #[derive(Clone)]
@@ -159,6 +161,7 @@ fn localized_activity_groups(
             .map(|activity| ActivityButtonData {
                 id: activity.id.clone(),
                 label: activity.catalog_label.get(i18n.language).to_owned(),
+                school_level: activity.school_level,
             })
             .collect(),
     })
@@ -418,7 +421,12 @@ fn spawn_activity_group(parent: &mut ChildSpawner, view: ActivityGroupView, wind
                     for activity in activities {
                         let selected = selected_activity_id.as_deref() == Some(&activity.id);
                         let mut button = items.spawn((
-                            activity_button(&activity.label, selected, window),
+                            activity_button(
+                                &activity.label,
+                                activity.school_level,
+                                selected,
+                                window,
+                            ),
                             ActivityButton(activity.id.clone()),
                         ));
                         if selected {
@@ -453,7 +461,12 @@ fn activity_count_badge(label: String, window: Entity) -> impl Bundle + use<> {
     )
 }
 
-fn activity_button(label: &str, selected: bool, window: Entity) -> impl Bundle + use<> {
+fn activity_button(
+    label: &str,
+    school_level: SchoolLevel,
+    selected: bool,
+    window: Entity,
+) -> impl Bundle + use<> {
     let palette = if selected {
         theme::button_styles::ACTIVITY_ITEM_SELECTED
     } else {
@@ -476,12 +489,20 @@ fn activity_button(label: &str, selected: bool, window: Entity) -> impl Bundle +
             ..default()
         },
         BorderColor::all(border),
-        children![(
-            Text::new(label.to_owned()),
-            theme::typography::text(theme::fonts::BODY, window),
-            TextColor(palette.foreground),
-            TextLayout::justify(Justify::Left),
-        )],
+        children![
+            (
+                Text::new(label.to_owned()),
+                theme::typography::text(theme::fonts::BODY, window),
+                TextColor(palette.foreground),
+                TextLayout::justify(Justify::Left),
+                Node {
+                    flex_grow: 1.0,
+                    min_width: px(0.0),
+                    ..default()
+                },
+            ),
+            activity_level_badge(school_level, window),
+        ],
     )
 }
 

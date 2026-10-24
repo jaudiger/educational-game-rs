@@ -328,6 +328,29 @@ impl Theme {
     }
 }
 
+/// The French school level targeted by an activity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Reflect, Deserialize, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum SchoolLevel {
+    Cp,
+    Ce1,
+    Ce2,
+    Cm1,
+    Cm2,
+}
+
+impl SchoolLevel {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Cp => "CP",
+            Self::Ce1 => "CE1",
+            Self::Ce2 => "CE2",
+            Self::Cm1 => "CM1",
+            Self::Cm2 => "CM2",
+        }
+    }
+}
+
 /// A single lesson within a theme, containing question pools.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -342,6 +365,7 @@ pub struct Lesson {
 pub struct QuestionEntry {
     pub id: String,
     pub catalog_label: LocalizedText,
+    pub school_level: SchoolLevel,
     pub definition: QuestionDefinition,
 }
 
@@ -349,11 +373,13 @@ impl QuestionEntry {
     pub fn new(
         id: impl Into<String>,
         catalog_label: LocalizedText,
+        school_level: SchoolLevel,
         definition: QuestionDefinition,
     ) -> Self {
         Self {
             id: id.into(),
             catalog_label,
+            school_level,
             definition,
         }
     }

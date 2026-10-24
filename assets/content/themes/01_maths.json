@@ -18,6 +18,7 @@
           "exercises": [
             {
               "id": "fraction_name",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Retrouver une fraction à partir de son nom",
                 "en": "Find the fraction that matches its name"
@@ -43,6 +44,7 @@
             },
             {
               "id": "fraction_addition",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Additionner des fractions de même dénominateur",
                 "en": "Add fractions with the same denominator"
@@ -76,6 +78,7 @@
             },
             {
               "id": "fraction_value",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Trouver le nombre entier représenté par une fraction",
                 "en": "Find the whole number represented by a fraction"
@@ -110,6 +113,7 @@
           "exercises": [
             {
               "id": "fraction_visualization",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Colorier une fraction",
                 "en": "Shade a fraction"
@@ -135,6 +139,7 @@
           "exercises": [
             {
               "id": "fraction_comparison_same_denominator",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Comparer des fractions de même dénominateur",
                 "en": "Compare fractions with the same denominator"
@@ -158,6 +163,7 @@
             },
             {
               "id": "fraction_comparison_same_numerator",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Comparer des fractions avec le même numérateur",
                 "en": "Compare fractions with the same numerator"
@@ -181,6 +187,7 @@
             },
             {
               "id": "fraction_comparison_multiple_denominators",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Comparer des fractions de dénominateurs différents",
                 "en": "Compare fractions with different denominators"
@@ -209,6 +216,7 @@
           "exercises": [
             {
               "id": "fraction_identification",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Identifier la fraction coloriée",
                 "en": "Identify the shaded fraction"
@@ -235,6 +243,7 @@
           "exercises": [
             {
               "id": "multiplication_tables_even_mcq",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Tables de 2, 4, 6 et 8",
                 "en": "2, 4, 6 and 8 times tables"
@@ -269,6 +278,7 @@
             },
             {
               "id": "multiplication_tables_odd_mcq",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Tables de 3, 5, 7 et 9",
                 "en": "3, 5, 7 and 9 times tables"
@@ -308,6 +318,7 @@
           "exercises": [
             {
               "id": "multiplication_tables_even_numeric",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Tables de 2, 4, 6 et 8",
                 "en": "2, 4, 6 and 8 times tables"
@@ -333,6 +344,7 @@
             },
             {
               "id": "multiplication_tables_odd_numeric",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Tables de 3, 5, 7 et 9",
                 "en": "3, 5, 7 and 9 times tables"
@@ -372,6 +384,7 @@
           "exercises": [
             {
               "id": "multiply_powers_beginner_numeric",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Multiplier des dizaines entières par 10, 100 ou 1 000",
                 "en": "Multiply multiples of 10 by 10, 100 or 1,000"
@@ -397,6 +410,7 @@
             },
             {
               "id": "multiply_powers_intermediate_numeric",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Multiplier par 10, 100 ou 1 000 les nombres terminés par 5",
                 "en": "Multiply numbers ending in 5 by 10, 100 or 1,000"
@@ -422,6 +436,7 @@
             },
             {
               "id": "multiply_powers_advanced_numeric",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Multiplier des nombres par 10, 100 ou 1 000",
                 "en": "Multiply numbers by 10, 100 or 1,000"
@@ -452,6 +467,7 @@
           "exercises": [
             {
               "id": "multiply_powers_beginner_mcq",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Multiplier des dizaines entières par 10, 100 ou 1 000",
                 "en": "Multiply multiples of 10 by 10, 100 or 1,000"
@@ -485,6 +501,7 @@
             },
             {
               "id": "multiply_powers_intermediate_mcq",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Multiplier par 10, 100 ou 1 000 les nombres terminés par 5",
                 "en": "Multiply numbers ending in 5 by 10, 100 or 1,000"
@@ -518,6 +535,7 @@
             },
             {
               "id": "multiply_powers_advanced_mcq",
+              "school_level": "CE2",
               "catalog_label": {
                 "fr": "Multiplier des nombres par 10, 100 ou 1 000",
                 "en": "Multiply numbers by 10, 100 or 1,000"

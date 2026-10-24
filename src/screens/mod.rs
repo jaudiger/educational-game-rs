@@ -1,4 +1,5 @@
 pub mod activity_categories;
+pub mod activity_level;
 pub mod activity_selection;
 pub mod home;
 pub mod lesson_play;

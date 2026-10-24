@@ -2,11 +2,14 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 
-use crate::data::content::{ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, QuestionType};
+use crate::data::content::{
+    ContentLibrary, Lesson, MAX_QUESTION_REPETITIONS, QuestionType, SchoolLevel,
+};
 use crate::data::{Language, LessonSessionConfig, PersistenceAction, PlayerSession, SaveDataMut};
 use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::plugins::teacher::{TeacherScreenParam, TeacherViewOverlay};
 use crate::screens::activity_categories::activity_category_label;
+use crate::screens::activity_level::activity_level_badge;
 use crate::screens::teacher_lists::{
     TeacherListLevel, teacher_list_exercise_row, teacher_list_header_border,
     teacher_list_header_node, teacher_list_label, teacher_list_separator_gap,
@@ -103,6 +106,7 @@ pub(super) struct ExerciseConfigData {
     id: String,
     exercise_type: QuestionType,
     catalog_label: String,
+    school_level: SchoolLevel,
     count: usize,
     has_visual: bool,
     show_visual: bool,
@@ -135,6 +139,7 @@ pub(super) fn build_exercise_configs(
                 id: entry.id.clone(),
                 exercise_type: definition.question_type(),
                 catalog_label: entry.catalog_label.get(language).to_owned(),
+                school_level: entry.school_level,
                 count: existing_config
                     .and_then(|config| config.counts.get(&entry.id).copied())
                     .unwrap_or(1),
@@ -163,6 +168,7 @@ pub(super) fn build_exercise_groups(
                 id: exercise.id.clone(),
                 exercise_type: exercise.exercise_type,
                 catalog_label: exercise.catalog_label.clone(),
+                school_level: exercise.school_level,
                 count: exercise.count,
                 has_visual: exercise.has_visual,
                 show_visual: exercise.show_visual,
@@ -337,6 +343,7 @@ fn spawn_exercise_counter_row(
 ) {
     let exercise = exercise.clone();
     let catalog_label = exercise.catalog_label.clone();
+    let school_level = exercise.school_level;
     let lesson_id = lesson_id.to_owned();
 
     parent.spawn((
@@ -349,6 +356,7 @@ fn spawn_exercise_counter_row(
                 theme::colors::TEXT_DARK,
                 window,
             ));
+            row.spawn(activity_level_badge(school_level, window));
             spawn_counter_controls(row, &lesson_id, &exercise, window);
         })),
     ));

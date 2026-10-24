@@ -177,7 +177,12 @@ fn load_content_library_from_documents(
                     }
                 }
                 questions.extend(category.exercises.into_iter().map(|exercise| {
-                    QuestionEntry::new(exercise.id, exercise.catalog_label, exercise.definition)
+                    QuestionEntry::new(
+                        exercise.id,
+                        exercise.catalog_label,
+                        exercise.school_level,
+                        exercise.definition,
+                    )
                 }));
             }
 

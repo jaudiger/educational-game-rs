@@ -148,6 +148,20 @@ fn spawn_settings_ui(
         parent.spawn(music_controls);
         parent.spawn(sfx_controls);
     }));
+    let settings_content = (
+        Node {
+            width: theme::layout::FILL_PARENT,
+            min_width: px(0.0),
+            min_height: percent(100.0),
+            flex_shrink: 0.0,
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            row_gap: theme::scaled(theme::spacing::LARGE),
+            ..default()
+        },
+        controls,
+    );
     let title = (
         Text::new(i18n.t(&TranslationKey::Settings)),
         theme::typography::text(theme::fonts::TITLE, window),
@@ -171,12 +185,33 @@ fn spawn_settings_ui(
             min_height: px(0.0),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            row_gap: theme::scaled(theme::spacing::LARGE),
             overflow: Overflow::scroll_y(),
             ..default()
         },
-        controls,
+        children![settings_content],
     );
+    let card = settings_card(title, scroll, notice, back, window);
+
+    commands.spawn((
+        screen_root(),
+        DespawnOnExit(AppState::Settings),
+        SettingsRoot,
+        children![menu_background(MenuBackgroundStyle::new(0.18)), card],
+    ));
+}
+
+fn settings_card<TTitle, TScroll, TBack>(
+    title: TTitle,
+    scroll: TScroll,
+    notice: Option<String>,
+    back: TBack,
+    window: Entity,
+) -> impl Bundle + use<TTitle, TScroll, TBack>
+where
+    TTitle: Bundle,
+    TScroll: Bundle,
+    TBack: Bundle,
+{
     let card_children = Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
         parent.spawn(title);
         parent.spawn(scroll);
@@ -189,10 +224,12 @@ fn spawn_settings_ui(
         }
         parent.spawn(back);
     }));
-    let card = (
+
+    (
         Node {
             width: percent(92.0),
             height: percent(94.0),
+            min_width: px(0.0),
             min_height: px(0.0),
             border: px(1.0).all(),
             border_radius: BorderRadius::all(theme::scaled(28.0)),
@@ -206,23 +243,17 @@ fn spawn_settings_ui(
         BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.88)),
         BorderColor::all(theme::colors::CARD_BORDER),
         card_children,
-    );
-
-    commands.spawn((
-        screen_root(),
-        DespawnOnExit(AppState::Settings),
-        SettingsRoot,
-        children![menu_background(MenuBackgroundStyle::new(0.18)), card],
-    ));
+    )
 }
 
 fn settings_row() -> Node {
     Node {
-        width: theme::layout::FILL_PARENT,
+        max_width: percent(100.0),
         min_width: px(0.0),
         flex_direction: FlexDirection::Row,
         flex_wrap: FlexWrap::Wrap,
         align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
         column_gap: theme::scaled(theme::spacing::MEDIUM),
         row_gap: theme::scaled(theme::spacing::SMALL),
         ..default()

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 
-use crate::data::content::{Lesson, QuestionType};
+use crate::data::content::{Lesson, QuestionType, SchoolLevel};
 use crate::data::save::score_percentage;
 use crate::data::{
     ContentLibrary, GameMode, Language, LessonProgress, PersistenceAction, PersistenceStatus,
@@ -15,6 +15,7 @@ use crate::plugins::teacher::{
     TeacherWindowState, tab_header, teacher_stats_view_active, teacher_window_exists,
 };
 use crate::screens::activity_categories::activity_category_label;
+use crate::screens::activity_level::activity_level_badge;
 use crate::screens::teacher_lists::{
     TeacherListLevel, teacher_list_content_node, teacher_list_exercise_row, teacher_list_frame,
     teacher_list_header_border, teacher_list_header_button_node, teacher_list_header_node,
@@ -340,6 +341,7 @@ fn spawn_stats_title_row(parent: &mut ChildSpawner, title_text: &str, window: En
 #[derive(Clone)]
 struct ExerciseScoreRow {
     catalog_label: String,
+    school_level: Option<SchoolLevel>,
     score_text: String,
     score_color: Color,
     lesson_id: String,
@@ -462,6 +464,7 @@ fn score_row(
     let (score_text, score_color) = totals.display();
     ExerciseScoreRow {
         catalog_label: catalog_label(lesson_id, exercise_id, content, language),
+        school_level: school_level(lesson_id, exercise_id, content),
         score_text,
         score_color,
         lesson_id: lesson_id.to_owned(),
@@ -520,6 +523,25 @@ fn catalog_label(
             || exercise_id.to_owned(),
             |exercise| exercise.catalog_label.get(language).to_owned(),
         )
+}
+
+fn school_level(
+    lesson_id: &str,
+    exercise_id: &str,
+    content: &ContentLibrary,
+) -> Option<SchoolLevel> {
+    content
+        .themes
+        .iter()
+        .flat_map(|theme| &theme.lessons)
+        .find(|lesson| lesson.id == lesson_id)
+        .and_then(|lesson| {
+            lesson
+                .questions
+                .iter()
+                .find(|exercise| exercise.id == exercise_id)
+        })
+        .map(|exercise| exercise.school_level)
 }
 
 fn lesson_label(lesson_id: &str, content: &ContentLibrary, i18n: &I18n) -> String {
@@ -990,6 +1012,7 @@ fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow
         Children::spawn(SpawnWith({
             let label = exercise_row.catalog_label.clone();
             let score = exercise_row.score_text.clone();
+            let school_level = exercise_row.school_level;
             let color = exercise_row.score_color;
             let lesson_id = exercise_row.lesson_id.clone();
             let exercise_id = exercise_row.exercise_id.clone();
@@ -1001,6 +1024,9 @@ fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow
                     theme::colors::TEXT_DARK,
                     window,
                 ));
+                if let Some(school_level) = school_level {
+                    row.spawn(activity_level_badge(school_level, window));
+                }
                 row.spawn((
                     Text::new(score),
                     theme::typography::text(theme::fonts::SMALL, window),
