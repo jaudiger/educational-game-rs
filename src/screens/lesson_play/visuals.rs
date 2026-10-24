@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 
 use crate::data::{ExplanationVisual, Language};
-use crate::questions::fraction_bar::{self as fraction_bar_mod, fraction_bar};
+use crate::questions::fraction_bar::fraction_bar;
+use crate::questions::fraction_shape::spawn_fraction_representation;
 use crate::questions::{QuestionVisualLayout, QuestionVisualSizing, spawn_question_visuals};
 use crate::ui::components::{operator_visual_group, stacked_fraction};
 use crate::ui::theme;
@@ -12,20 +13,15 @@ pub fn spawn_explanation_visual(
     visual: &ExplanationVisual,
     window: Entity,
     language: Language,
+    images: &mut Assets<Image>,
 ) {
     match visual {
-        ExplanationVisual::FractionBar {
+        ExplanationVisual::FractionRepresentation {
             numerator,
             denominator,
+            mode,
         } => {
-            parent.spawn(fraction_bar(
-                *denominator,
-                *numerator,
-                theme::colors::PRIMARY,
-                false,
-                fraction_bar_mod::BAR_WIDTH,
-                fraction_bar_mod::BAR_HEIGHT,
-            ));
+            spawn_fraction_representation(parent, images, *numerator, *denominator, *mode);
         }
         ExplanationVisual::FractionAddition { a, b, c } => {
             spawn_fraction_addition_visual(parent, *a, *b, *c, window);

@@ -45,6 +45,7 @@ pub(super) fn setup_feedback_ui(
     settings: Res<GameSettings>,
     i18n: Res<I18n>,
     presentation: Res<FeedbackPresentation>,
+    mut images: ResMut<Assets<Image>>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
     let window = *primary_window;
@@ -63,6 +64,7 @@ pub(super) fn setup_feedback_ui(
             &presentation,
             &explanation,
             window,
+            &mut images,
         );
     });
 }
@@ -98,9 +100,9 @@ fn explanation_visual(definition: &QuestionInstance) -> Option<ExplanationVisual
     match definition {
         QuestionInstance::Mcq(d) => d.explanation_visual.clone(),
         QuestionInstance::FractionComparison(d) => d.explanation_visual.clone(),
-        QuestionInstance::FractionIdentification(d) => d.explanation_visual.clone(),
+        QuestionInstance::FractionIdentification(d) => Some(d.explanation_visual()),
+        QuestionInstance::FractionVisualization(d) => Some(d.explanation_visual()),
         QuestionInstance::NumericInput(d) => d.explanation_visual.clone(),
-        QuestionInstance::FractionVisualization(_) => None,
     }
 }
 
@@ -111,6 +113,7 @@ fn spawn_feedback_content(
     presentation: &FeedbackPresentation,
     explanation: &FeedbackExplanation,
     window: Entity,
+    images: &mut Assets<Image>,
 ) {
     parent
         .spawn((
@@ -130,7 +133,7 @@ fn spawn_feedback_content(
         .with_children(|feedback| {
             spawn_question_card(feedback, |card| {
                 spawn_result_text(card, i18n, is_correct, window);
-                spawn_explanation_section(card, i18n, explanation, window);
+                spawn_explanation_section(card, i18n, explanation, window, images);
             });
             spawn_controls_card(feedback, |card| {
                 if let Some(notice) = &presentation.save_notice {
@@ -150,6 +153,7 @@ fn spawn_explanation_section(
     i18n: &I18n,
     explanation: &FeedbackExplanation,
     window: Entity,
+    images: &mut Assets<Image>,
 ) {
     let FeedbackExplanation::Visible { text, visual } = explanation else {
         return;
@@ -166,7 +170,7 @@ fn spawn_explanation_section(
         .with_children(|section| {
             spawn_explanation_text(section, text, i18n.language, theme::fonts::HEADING, window);
             if let Some(visual) = visual {
-                spawn_explanation_visual(section, visual, window, i18n.language);
+                spawn_explanation_visual(section, visual, window, i18n.language, images);
             }
         });
 }

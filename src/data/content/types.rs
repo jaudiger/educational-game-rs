@@ -494,6 +494,7 @@ impl QuestionInstance {
                 definition.prompt.hash(&mut hasher);
                 definition.numerator.hash(&mut hasher);
                 definition.denominator.hash(&mut hasher);
+                definition.shape.hash(&mut hasher);
             }
             Self::FractionComparison(definition) => {
                 definition.prompt.hash(&mut hasher);
@@ -504,6 +505,7 @@ impl QuestionInstance {
             Self::FractionIdentification(definition) => {
                 definition.numerator.hash(&mut hasher);
                 definition.denominator.hash(&mut hasher);
+                definition.mode.hash(&mut hasher);
                 definition
                     .choices
                     .get(definition.correct_index)?
@@ -637,7 +639,6 @@ impl QuestionDefinition {
                     &mut issues,
                 );
                 validate_choices(&definition.choices, definition.correct_index, &mut issues);
-                validate_explanation_visual(definition.explanation_visual.as_ref(), &mut issues);
                 issues.extend(definition.explanation.validation_issues());
             }
             Self::FractionIdentificationTemplate(template) => {
@@ -933,9 +934,10 @@ fn validate_grid(rows: u32, cols: u32, issues: &mut Vec<String>) {
 
 fn validate_explanation_visual(visual: Option<&ExplanationVisual>, issues: &mut Vec<String>) {
     match visual {
-        Some(ExplanationVisual::FractionBar {
+        Some(ExplanationVisual::FractionRepresentation {
             numerator,
             denominator,
+            ..
         }) => {
             validate_fraction(*numerator, *denominator, true, issues);
         }
@@ -1319,8 +1321,12 @@ pub struct ComparisonSideWithConversion {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub enum ExplanationVisual {
-    /// A fraction bar with `numerator` coloured slices out of `denominator`.
-    FractionBar { numerator: u32, denominator: u32 },
+    /// A fraction representation with a concrete display mode.
+    FractionRepresentation {
+        numerator: u32,
+        denominator: u32,
+        mode: FractionShape,
+    },
     /// Two fraction bars (`a/b` + `c/b`) and the result bar (`(a+c)/b`).
     FractionAddition { a: u32, b: u32, c: u32 },
     /// `count` fully-coloured fraction bars of `denominator` slices each,
@@ -1377,14 +1383,26 @@ pub struct McqDefinition {
     pub question_visual: Option<QuestionVisual>,
 }
 
-/// A resolved fraction-bar colouring question.
+/// A resolved fraction-colouring question with a concrete shape.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FractionVisualizationDefinition {
     pub prompt: LocalizedText,
     pub numerator: u32,
     pub denominator: u32,
+    #[serde(default)]
+    pub shape: FractionShape,
     pub explanation: LocalizedExplanation,
+}
+
+impl FractionVisualizationDefinition {
+    pub const fn explanation_visual(&self) -> ExplanationVisual {
+        ExplanationVisual::FractionRepresentation {
+            numerator: self.numerator,
+            denominator: self.denominator,
+            mode: self.shape,
+        }
+    }
 }
 
 /// A resolved fraction comparison question pairing two characters.
@@ -1432,16 +1450,37 @@ pub struct NumericInputDefinition {
     pub question_visual: Option<QuestionVisual>,
 }
 
-/// A resolved fraction identification MCQ: given a bar, pick the fraction.
+/// A concrete geometric representation of a fraction.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Reflect, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub enum FractionShape {
+    #[default]
+    Line,
+    Square,
+    Circle,
+}
+
+/// A resolved fraction identification MCQ: given a shape, pick the fraction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FractionIdentificationDefinition {
     pub numerator: u32,
     pub denominator: u32,
+    #[serde(default)]
+    pub mode: FractionShape,
     pub choices: Vec<String>,
     pub correct_index: usize,
     pub explanation: LocalizedExplanation,
-    pub explanation_visual: Option<ExplanationVisual>,
+}
+
+impl FractionIdentificationDefinition {
+    pub const fn explanation_visual(&self) -> ExplanationVisual {
+        ExplanationVisual::FractionRepresentation {
+            numerator: self.numerator,
+            denominator: self.denominator,
+            mode: self.mode,
+        }
+    }
 }
 
 /// Parameterized MCQ template resolved at runtime via an `McqResolver`.
@@ -1483,7 +1522,7 @@ pub enum McqResolver {
     MultiplyByPowerOf10,
 }
 
-/// Template that generates fraction-bar colouring questions from ranges.
+/// Template that generates fraction-colouring questions from ranges.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FractionVisualizationTemplate {

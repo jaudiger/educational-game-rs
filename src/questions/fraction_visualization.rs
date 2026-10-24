@@ -1,20 +1,20 @@
 //! Fraction-visualisation question type.
 //!
-//! Displays a horizontal bar divided into N equal parts. The student clicks
-//! parts to colour them, then validates when they think the correct fraction
-//! is represented.
+//! Displays a fraction split into equal parts. The student colours parts,
+//! then validates when they think the correct fraction is represented.
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use super::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, fraction_bar};
+use super::fraction_shape::interactive_fraction_shape;
 use super::registry::{QuestionRoot, register_question_systems};
-use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
+use crate::data::{FractionShape, LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
 use crate::ui::components::standard_button;
 use crate::ui::theme;
 
-/// Handles fraction-bar colouring question UI and answer validation.
+/// Handles fraction colouring question UI and answer validation.
 pub struct FractionVisualizationPlugin;
 
 impl Plugin for FractionVisualizationPlugin {
@@ -29,6 +29,7 @@ impl Plugin for FractionVisualizationPlugin {
             )
                 .chain(),
         );
+        app.add_observer(interaction::record_fraction_shape_click);
     }
 }
 
@@ -44,6 +45,7 @@ fn spawn_fraction_vis_ui(
     container: Single<Entity, With<QuestionContainer>>,
     session: Res<LessonSession>,
     i18n: Res<I18n>,
+    mut images: ResMut<Assets<Image>>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
     let window = *primary_window;
@@ -64,15 +66,25 @@ fn spawn_fraction_vis_ui(
                         card,
                         super::QuestionVisualLayout::Grid { max_columns: 1 },
                         &[super::QuestionVisualSizing::Preferred],
-                        |visual, _| {
-                            visual.spawn(fraction_bar(
-                                def.denominator,
-                                0,
-                                theme::colors::PRIMARY,
-                                true,
-                                BAR_WIDTH,
-                                BAR_HEIGHT,
-                            ));
+                        |visual, _| match def.shape {
+                            FractionShape::Line => {
+                                visual.spawn(fraction_bar(
+                                    def.denominator,
+                                    0,
+                                    theme::colors::PRIMARY,
+                                    true,
+                                    BAR_WIDTH,
+                                    BAR_HEIGHT,
+                                ));
+                            }
+                            shape => {
+                                visual.spawn(interactive_fraction_shape(
+                                    &mut images,
+                                    shape,
+                                    def.denominator,
+                                    theme::colors::PRIMARY,
+                                ));
+                            }
                         },
                     );
                 });

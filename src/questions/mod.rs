@@ -1,6 +1,7 @@
 pub mod fraction_bar;
 pub mod fraction_comparison;
 pub mod fraction_identification;
+pub mod fraction_shape;
 pub mod fraction_visualization;
 pub mod mcq;
 pub mod multiplication_grid;

@@ -1,16 +1,15 @@
 //! Fraction-identification question type.
 //!
-//! Displays a pre-coloured fraction bar and MCQ-style choice buttons. The
-//! student identifies which fraction the bar represents.
+//! Displays a pre-coloured fraction shape and MCQ-style choice buttons. The
+//! student identifies which fraction the shape represents.
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-use super::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, fraction_bar};
+use super::fraction_shape::spawn_fraction_representation;
 use super::registry::{QuestionRoot, register_question_systems};
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
-use crate::ui::theme;
 
 /// Handles fraction identification question UI and answer submission.
 pub struct FractionIdentificationPlugin;
@@ -40,6 +39,7 @@ fn spawn_identification_ui(
     container: Single<Entity, With<QuestionContainer>>,
     session: Res<LessonSession>,
     i18n: Res<I18n>,
+    mut images: ResMut<Assets<Image>>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
     let window = *primary_window;
@@ -65,14 +65,13 @@ fn spawn_identification_ui(
                         super::QuestionVisualLayout::Grid { max_columns: 1 },
                         &[super::QuestionVisualSizing::Preferred],
                         |visual, _| {
-                            visual.spawn(fraction_bar(
-                                def.denominator,
+                            spawn_fraction_representation(
+                                visual,
+                                &mut images,
                                 def.numerator,
-                                theme::colors::PRIMARY,
-                                false,
-                                BAR_WIDTH,
-                                BAR_HEIGHT,
-                            ));
+                                def.denominator,
+                                def.mode,
+                            );
                         },
                     );
                 });

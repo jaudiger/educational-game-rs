@@ -8,9 +8,9 @@ use super::types::{
     ComparisonAnswer, ComparisonMode, ComparisonSide, ComparisonSideWithConversion,
     ExplanationColorRole, ExplanationPlaceholder, ExplanationValue, ExplanationVisual,
     FractionComparisonDefinition, FractionComparisonTemplate, FractionIdentificationDefinition,
-    FractionIdentificationTemplate, FractionVisualizationDefinition, FractionVisualizationTemplate,
-    LocalizedExplanation, LocalizedText, McqDefinition, McqResolver, McqTemplate,
-    NumericInputDefinition, NumericInputTemplate, ParameterRange, QuestionVisual,
+    FractionIdentificationTemplate, FractionShape, FractionVisualizationDefinition,
+    FractionVisualizationTemplate, LocalizedExplanation, LocalizedText, McqDefinition, McqResolver,
+    McqTemplate, NumericInputDefinition, NumericInputTemplate, ParameterRange, QuestionVisual,
     fraction_value_pair_is_safe,
 };
 
@@ -272,7 +272,8 @@ impl McqTemplate {
             correct_index,
             explanation,
             #[allow(clippy::cast_sign_loss)]
-            explanation_visual: Some(ExplanationVisual::FractionBar {
+            explanation_visual: Some(ExplanationVisual::FractionRepresentation {
+                mode: FractionShape::Line,
                 numerator: 1,
                 denominator: d as u32,
             }),
@@ -380,9 +381,19 @@ const fn fraction_name(denominator: i32) -> (&'static str, &'static str) {
     }
 }
 
+fn random_fraction_shape(rng: &mut impl Rng) -> FractionShape {
+    [
+        FractionShape::Line,
+        FractionShape::Square,
+        FractionShape::Circle,
+    ]
+    .choose(rng)
+    .copied()
+    .expect("fraction shapes are available")
+}
+
 impl FractionVisualizationTemplate {
-    /// Pick a random numerator/denominator pair from the configured ranges and
-    /// produce a `FractionVisualizationDefinition`.
+    /// Pick a random numerator/denominator pair and shape from the configured ranges.
     pub fn resolve(&self, rng: &mut impl Rng) -> FractionVisualizationDefinition {
         let &denominator = self
             .denominator_range
@@ -427,6 +438,7 @@ impl FractionVisualizationTemplate {
             prompt,
             numerator,
             denominator,
+            shape: random_fraction_shape(rng),
             explanation,
         }
     }
@@ -686,7 +698,7 @@ impl FractionIdentificationTemplate {
             .choose(rng)
             .expect("validated fraction-visualization denominator has a numerator");
 
-        generate_fraction_identification(numerator, denominator, rng)
+        generate_fraction_identification(numerator, denominator, random_fraction_shape(rng), rng)
     }
 }
 
@@ -842,6 +854,7 @@ fn generate_multiplication_distractors(a: u32, b: u32, rng: &mut impl Rng) -> (V
 fn generate_fraction_identification(
     numerator: u32,
     denominator: u32,
+    mode: FractionShape,
     rng: &mut impl Rng,
 ) -> FractionIdentificationDefinition {
     let correct = format!("{numerator}/{denominator}");
@@ -873,6 +886,7 @@ fn generate_fraction_identification(
     FractionIdentificationDefinition {
         numerator,
         denominator,
+        mode,
         choices,
         correct_index,
         explanation: LocalizedExplanation::new(
@@ -892,10 +906,6 @@ fn generate_fraction_identification(
                 ),
             ],
         ),
-        explanation_visual: Some(ExplanationVisual::FractionBar {
-            numerator,
-            denominator,
-        }),
     }
 }
 
