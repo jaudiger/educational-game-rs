@@ -5,7 +5,7 @@ use rand::seq::{IndexedRandom, SliceRandom};
 use rand::{Rng, RngExt};
 
 use super::types::{
-    ComparisonAnswer, ComparisonDifficulty, ComparisonSide, ComparisonSideWithConversion,
+    ComparisonAnswer, ComparisonMode, ComparisonSide, ComparisonSideWithConversion,
     ExplanationColorRole, ExplanationPlaceholder, ExplanationValue, ExplanationVisual,
     FractionComparisonDefinition, FractionComparisonTemplate, FractionIdentificationDefinition,
     FractionIdentificationTemplate, FractionVisualizationDefinition, FractionVisualizationTemplate,
@@ -433,8 +433,7 @@ impl FractionVisualizationTemplate {
 }
 
 impl FractionComparisonTemplate {
-    /// Generate two fractions according to the difficulty tier and determine
-    /// which side is larger.
+    /// Generate fractions for the configured comparison mode.
     #[allow(clippy::literal_string_with_formatting_args)]
     pub fn resolve(&self, rng: &mut impl Rng) -> FractionComparisonDefinition {
         let (fraction_a, fraction_b) = self.select_fractions(rng);
@@ -458,7 +457,7 @@ impl FractionComparisonTemplate {
             &self.character_b,
         );
         let explanation_text =
-            comparison_explanation_text(self.difficulty, answer, &self.explanation_template);
+            comparison_explanation_text(self.mode, answer, &self.explanation_template);
         let explanation = LocalizedExplanation::new(explanation_text, explanation_placeholders);
 
         let explanation_visual = Some(self.build_visual(fraction_a, fraction_b));
@@ -470,15 +469,15 @@ impl FractionComparisonTemplate {
             character_b: self.character_b.clone(),
             fraction_b,
             answer,
-            difficulty: self.difficulty,
+            mode: self.mode,
             explanation,
             explanation_visual,
         }
     }
 
     fn select_fractions(&self, rng: &mut impl Rng) -> ((u32, u32), (u32, u32)) {
-        match self.difficulty {
-            ComparisonDifficulty::SameDenominator => {
+        match self.mode {
+            ComparisonMode::SameDenominator => {
                 let &denominator = self
                     .denominator_range
                     .choose(rng)
@@ -494,7 +493,7 @@ impl FractionComparisonTemplate {
                 let nb = numerators[1];
                 ((na, denominator), (nb, denominator))
             }
-            ComparisonDifficulty::MultipleDenominator => {
+            ComparisonMode::MultipleDenominator => {
                 let eligible_denominators: Vec<u32> = self
                     .denominator_range
                     .iter()
@@ -534,7 +533,7 @@ impl FractionComparisonTemplate {
                     .expect("validated second denominator has a numerator");
                 ((na, da), (nb, db))
             }
-            ComparisonDifficulty::SameNumerator => {
+            ComparisonMode::SameNumerator => {
                 let &numerator = self
                     .numerator_range
                     .choose(rng)
@@ -554,8 +553,8 @@ impl FractionComparisonTemplate {
     }
 
     fn build_visual(&self, fraction_a: (u32, u32), fraction_b: (u32, u32)) -> ExplanationVisual {
-        match self.difficulty {
-            ComparisonDifficulty::SameDenominator | ComparisonDifficulty::SameNumerator => {
+        match self.mode {
+            ComparisonMode::SameDenominator | ComparisonMode::SameNumerator => {
                 ExplanationVisual::FractionComparison {
                     a: ComparisonSide {
                         character: self.character_a.clone(),
@@ -567,7 +566,7 @@ impl FractionComparisonTemplate {
                     },
                 }
             }
-            ComparisonDifficulty::MultipleDenominator => {
+            ComparisonMode::MultipleDenominator => {
                 let common_d = fraction_a.1.max(fraction_b.1);
                 ExplanationVisual::FractionComparisonWithConversion {
                     a: ComparisonSideWithConversion {
@@ -587,7 +586,7 @@ impl FractionComparisonTemplate {
 }
 
 fn comparison_explanation_text(
-    difficulty: ComparisonDifficulty,
+    mode: ComparisonMode,
     answer: ComparisonAnswer,
     template: &LocalizedText,
 ) -> LocalizedText {
@@ -595,16 +594,16 @@ fn comparison_explanation_text(
         return template.clone();
     }
 
-    match difficulty {
-        ComparisonDifficulty::SameDenominator => LocalizedText::new(
+    match mode {
+        ComparisonMode::SameDenominator => LocalizedText::new(
             "Les deux fractions ont le même numérateur et le même dénominateur. Elles sont donc égales.",
             "The two fractions have the same numerator and denominator. They are therefore equal.",
         ),
-        ComparisonDifficulty::SameNumerator => LocalizedText::new(
+        ComparisonMode::SameNumerator => LocalizedText::new(
             "Ils mangent le même nombre de parts et les parts ont la même taille. Les fractions sont donc égales.",
             "They eat the same number of slices, and the slices are the same size. The fractions are therefore equal.",
         ),
-        ComparisonDifficulty::MultipleDenominator => LocalizedText::new(
+        ComparisonMode::MultipleDenominator => LocalizedText::new(
             "Après conversion en parts de même taille, les deux fractions sont égales.",
             "After converting to slices of the same size, the two fractions are equal.",
         ),
