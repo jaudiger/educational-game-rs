@@ -18,17 +18,15 @@ pub use registry::{AnswerSubmitted, QuestionRoot};
 
 use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
 
 use crate::ui::components::{button_base, stacked_fraction, wrapping_standard_button};
+use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::rich_text::{TextSegment, parse_fraction_segments, spawn_question_text};
 use crate::ui::theme;
 
 const TWO_COLUMN_CELL_BASIS: f32 = 400.0;
 const THREE_COLUMN_CELL_BASIS: f32 = 280.0;
 const MAX_VISUAL_COLUMNS: usize = 3;
-const GRID_ROUNDING_ALLOWANCE_DESIGN_PX: f32 = 1.0;
-const RESPONSIVE_ROW_HYSTERESIS: f32 = 0.02;
 
 /// Shared [`Node`] layout for all question root markers.
 ///
@@ -108,13 +106,6 @@ fn layout_card(row_gap: Val) -> impl Bundle + use<> {
     )
 }
 
-/// Marks a visual group that stays in one row or stacks as a whole.
-#[derive(Component, Reflect)]
-pub struct ResponsiveVisualGroup {
-    /// Maximum fraction of the parent content width used by the row.
-    max_row_occupancy: f32,
-}
-
 /// Selects how a question-visual group arranges its cells.
 #[derive(Clone, Copy)]
 pub enum QuestionVisualLayout {
@@ -148,7 +139,7 @@ fn responsive_grid_layout(max_columns: usize, gap_design: f32) -> ResponsiveGrid
         },
         2 => ResponsiveGridLayout {
             cell_basis: theme::scaled(TWO_COLUMN_CELL_BASIS),
-            max_width: theme::scaled(responsive_grid_max_width(
+            max_width: theme::scaled(layout::responsive_grid_max_width(
                 TWO_COLUMN_CELL_BASIS,
                 2,
                 gap_design,
@@ -156,20 +147,12 @@ fn responsive_grid_layout(max_columns: usize, gap_design: f32) -> ResponsiveGrid
         },
         _ => ResponsiveGridLayout {
             cell_basis: theme::scaled(THREE_COLUMN_CELL_BASIS),
-            max_width: theme::scaled(responsive_grid_max_width(
+            max_width: theme::scaled(layout::responsive_grid_max_width(
                 THREE_COLUMN_CELL_BASIS,
                 3,
                 gap_design,
             )),
         },
-    }
-}
-
-const fn responsive_grid_max_width(cell_basis: f32, columns: usize, gap: f32) -> f32 {
-    match columns {
-        1 => cell_basis,
-        2 => cell_basis * 2.0 + gap + GRID_ROUNDING_ALLOWANCE_DESIGN_PX,
-        _ => cell_basis * 3.0 + gap * 2.0 + GRID_ROUNDING_ALLOWANCE_DESIGN_PX,
     }
 }
 
@@ -180,14 +163,12 @@ pub fn spawn_choice_grid(
     spawn_choice: impl FnMut(&mut ChildSpawnerCommands, usize),
 ) {
     let gap_design = theme::spacing::MEDIUM;
-    let layout = responsive_grid_layout(2, gap_design);
-    spawn_responsive_grid(
+    let grid = responsive_grid_layout(2, gap_design);
+    layout::spawn_collection(
         parent,
         choice_count,
-        layout,
-        theme::scaled(gap_design),
-        |_| layout.cell_basis,
-        ResponsiveGridMode::ChoiceGrid,
+        CollectionLayout::grid(grid.max_width, theme::scaled(gap_design)),
+        |_| CollectionItemLayout::new(grid.cell_basis, 1.0, 1.0),
         spawn_choice,
     );
 }
@@ -203,159 +184,38 @@ pub fn spawn_question_visuals(
         return;
     }
     let gap_design = theme::spacing::MEDIUM;
-    let (layout, mode) = match visual_layout {
+    let (collection, grid, adaptive) = match visual_layout {
         QuestionVisualLayout::Grid { max_columns } => {
-            let max_columns = max_columns
-                .clamp(1, MAX_VISUAL_COLUMNS)
-                .min(cell_sizing.len());
+            let grid = responsive_grid_layout(max_columns.min(cell_sizing.len()), gap_design);
             (
-                responsive_grid_layout(max_columns, gap_design),
-                ResponsiveGridMode::QuestionVisualGrid,
+                CollectionLayout::grid(grid.max_width, theme::scaled(gap_design)),
+                Some(grid),
+                false,
             )
         }
         QuestionVisualLayout::SingleRowOrColumn { max_row_occupancy } => (
-            ResponsiveGridLayout {
-                cell_basis: Val::Auto,
-                max_width: theme::layout::FILL_PARENT,
-            },
-            ResponsiveGridMode::SingleRowOrColumn { max_row_occupancy },
+            CollectionLayout::adaptive(max_row_occupancy, theme::scaled(gap_design)),
+            None,
+            true,
         ),
     };
-    spawn_responsive_grid(
+    layout::spawn_collection(
         parent,
         cell_sizing.len(),
-        layout,
-        theme::scaled(gap_design),
-        |index| match cell_sizing[index] {
-            QuestionVisualSizing::Preferred => layout.cell_basis,
-            QuestionVisualSizing::Intrinsic => Val::Auto,
+        collection,
+        |index| {
+            let basis = match (grid, cell_sizing[index]) {
+                (Some(grid), QuestionVisualSizing::Preferred) => grid.cell_basis,
+                (Some(_), QuestionVisualSizing::Intrinsic) | (None, _) => Val::Auto,
+            };
+            if adaptive {
+                CollectionItemLayout::new(basis, 0.0, 0.0).with_layout_width()
+            } else {
+                CollectionItemLayout::new(basis, 1.0, 1.0)
+            }
         },
-        mode,
         spawn_visual,
     );
-}
-
-#[derive(Clone, Copy)]
-enum ResponsiveGridMode {
-    ChoiceGrid,
-    QuestionVisualGrid,
-    SingleRowOrColumn { max_row_occupancy: f32 },
-}
-
-fn spawn_responsive_grid(
-    parent: &mut ChildSpawnerCommands,
-    item_count: usize,
-    layout: ResponsiveGridLayout,
-    gap: Val,
-    cell_basis: impl Fn(usize) -> Val,
-    mode: ResponsiveGridMode,
-    mut spawn_item: impl FnMut(&mut ChildSpawnerCommands, usize),
-) {
-    let (flex_direction, flex_wrap) = match mode {
-        ResponsiveGridMode::ChoiceGrid | ResponsiveGridMode::QuestionVisualGrid => {
-            (FlexDirection::Row, FlexWrap::Wrap)
-        }
-        ResponsiveGridMode::SingleRowOrColumn { .. } => (FlexDirection::Column, FlexWrap::NoWrap),
-    };
-    let mut grid = parent.spawn(Node {
-        flex_direction,
-        flex_wrap,
-        justify_content: JustifyContent::Center,
-        align_items: AlignItems::Center,
-        column_gap: gap,
-        row_gap: gap,
-        width: theme::layout::FILL_PARENT,
-        max_width: layout.max_width,
-        ..default()
-    });
-    if let ResponsiveGridMode::SingleRowOrColumn { max_row_occupancy } = mode {
-        grid.insert(ResponsiveVisualGroup { max_row_occupancy });
-    }
-    grid.with_children(|grid| {
-        for index in 0..item_count {
-            let preferred_basis = cell_basis(index);
-            let mut node = Node {
-                flex_basis: preferred_basis,
-                flex_grow: if matches!(mode, ResponsiveGridMode::SingleRowOrColumn { .. }) {
-                    0.0
-                } else {
-                    1.0
-                },
-                min_width: px(0.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            };
-            if matches!(mode, ResponsiveGridMode::SingleRowOrColumn { .. }) {
-                node.flex_shrink = 0.0;
-            }
-            let mut cell = grid.spawn(node);
-            cell.with_children(|cell| spawn_item(cell, index));
-        }
-    });
-}
-
-/// Uses live cell sizes and parent content width to keep the layout stable.
-pub fn update_responsive_visual_groups(
-    primary_window: Single<&Window, With<PrimaryWindow>>,
-    layout_nodes: Query<&ComputedNode>,
-    mut groups: Query<(
-        &ResponsiveVisualGroup,
-        &ChildOf,
-        &Children,
-        &ComputedNode,
-        &mut Node,
-    )>,
-) {
-    for (group, child_of, children, computed, mut style) in &mut groups {
-        let Ok(parent_layout) = layout_nodes.get(child_of.parent()) else {
-            continue;
-        };
-        let parent_inset = parent_layout.content_inset();
-        let available_width =
-            (parent_layout.size().x - parent_inset.min_inset.x - parent_inset.max_inset.x).max(0.0);
-        if available_width <= 0.0 {
-            continue;
-        }
-
-        let gap = style
-            .column_gap
-            .resolve(
-                computed.inverse_scale_factor.recip(),
-                computed.size().x,
-                primary_window.physical_size().as_vec2(),
-                computed.em_size,
-                computed.rem_size,
-            )
-            .unwrap_or_default();
-        let Some((_, required_width)) =
-            children
-                .iter()
-                .try_fold((0_usize, 0.0_f32), |(count, total), child| {
-                    layout_nodes.get(child).ok().map(|cell| {
-                        let gap = if count == 0 { 0.0 } else { gap };
-                        (count + 1, total + gap + cell.size().x)
-                    })
-                })
-        else {
-            continue;
-        };
-
-        let max_row_width = available_width * group.max_row_occupancy;
-        let row_threshold = if style.flex_direction == FlexDirection::Column {
-            max_row_width * (1.0 - RESPONSIVE_ROW_HYSTERESIS)
-        } else {
-            max_row_width
-        };
-        let direction = if required_width <= row_threshold {
-            FlexDirection::Row
-        } else {
-            FlexDirection::Column
-        };
-        if style.flex_direction != direction {
-            style.flex_direction = direction;
-        }
-    }
 }
 
 /// Spawns a heading-size question prompt, supporting inline fraction notation.

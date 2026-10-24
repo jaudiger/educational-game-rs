@@ -10,7 +10,7 @@ use super::widget_styles;
 mod scaling;
 
 /// Reference design vmin for the default window.
-const REFERENCE_VMIN: f32 = 720.0;
+pub(super) const REFERENCE_VMIN: f32 = 720.0;
 
 pub(super) fn design_scale_factor(vmin: f32) -> f32 {
     if vmin.is_finite() && vmin > 0.0 {

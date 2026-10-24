@@ -5,6 +5,7 @@ use crate::questions::fraction_bar::fraction_bar;
 use crate::questions::fraction_shape::spawn_fraction_representation;
 use crate::questions::{QuestionVisualLayout, QuestionVisualSizing, spawn_question_visuals};
 use crate::ui::components::{operator_visual_group, stacked_fraction};
+use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::theme;
 
 /// Spawns the visual element for a given explanation type as a child of the parent node.
@@ -147,28 +148,25 @@ fn spawn_whole_fractions_visual(parent: &mut ChildSpawnerCommands, count: u32, d
     /// Height of each mini-bar in the whole-fractions visual.
     const MINI_BAR_HEIGHT: f32 = 40.0;
 
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        })
-        .with_children(|row| {
-            for _ in 0..count {
-                row.spawn(fraction_bar(
-                    denominator,
-                    denominator,
-                    theme::colors::PRIMARY,
-                    false,
-                    MINI_BAR_WIDTH,
-                    MINI_BAR_HEIGHT,
-                ));
-            }
-        });
+    layout::spawn_collection(
+        parent,
+        count as usize,
+        CollectionLayout::fluid(theme::scaled(theme::spacing::MEDIUM)).with_row_column_gaps(
+            theme::scaled(theme::spacing::SMALL),
+            theme::scaled(theme::spacing::MEDIUM),
+        ),
+        |_| CollectionItemLayout::new(Val::Auto, 0.0, 0.0),
+        |cell, _| {
+            cell.spawn(fraction_bar(
+                denominator,
+                denominator,
+                theme::colors::PRIMARY,
+                false,
+                MINI_BAR_WIDTH,
+                MINI_BAR_HEIGHT,
+            ));
+        },
+    );
 }
 
 /// Renders two labelled fraction bars (one per character) for comparison
@@ -313,64 +311,57 @@ fn spawn_conversion_row(
     height: f32,
     window: Entity,
 ) {
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            width: theme::layout::FILL_PARENT,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn((
-                Text::new(format!("{} :", entry.name)),
-                theme::typography::text(theme::fonts::BODY, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ));
-            row.spawn(Node {
-                flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                max_width: theme::layout::FILL_PARENT,
-                column_gap: theme::scaled(theme::spacing::SMALL),
-                row_gap: theme::scaled(theme::spacing::SMALL),
-                ..default()
-            })
-            .with_children(|conversion| {
-                conversion.spawn(fraction_bar(
-                    entry.fraction.1,
-                    entry.fraction.0,
-                    color,
-                    false,
-                    width,
-                    height,
-                ));
-                conversion.spawn(stacked_fraction(
-                    entry.fraction.0,
-                    entry.fraction.1,
-                    theme::fonts::BODY,
-                    color,
-                    theme::colors::TEXT_DARK,
-                    window,
-                ));
-                conversion.spawn((
-                    Text::new("=>"),
+    layout::spawn_collection(
+        parent,
+        5,
+        CollectionLayout::fluid(theme::scaled(theme::spacing::SMALL)),
+        |_| CollectionItemLayout::new(Val::Auto, 0.0, 0.0),
+        |cell, index| match index {
+            0 => {
+                cell.spawn((
+                    Text::new(format!("{} :", entry.name)),
                     theme::typography::text(theme::fonts::BODY, window),
-                    TextColor(theme::colors::TEXT_MUTED),
+                    TextColor(theme::colors::TEXT_DARK),
                 ));
-                conversion.spawn(stacked_fraction(
-                    entry.converted.0,
-                    entry.converted.1,
+            }
+            1 => {
+                cell.spawn(fraction_bar(
+                    entry.fraction.1,
+                    entry.fraction.0,
+                    color,
+                    false,
+                    width,
+                    height,
+                ));
+            }
+            2 => {
+                cell.spawn(stacked_fraction(
+                    entry.fraction.0,
+                    entry.fraction.1,
                     theme::fonts::BODY,
                     color,
                     theme::colors::TEXT_DARK,
                     window,
                 ));
-                conversion.spawn(fraction_bar(
+            }
+            3 => {
+                cell.spawn(operator_visual_group(
+                    "=>",
+                    theme::fonts::BODY,
+                    theme::colors::TEXT_MUTED,
+                    window,
+                    stacked_fraction(
+                        entry.converted.0,
+                        entry.converted.1,
+                        theme::fonts::BODY,
+                        color,
+                        theme::colors::TEXT_DARK,
+                        window,
+                    ),
+                ));
+            }
+            _ => {
+                cell.spawn(fraction_bar(
                     entry.converted.1,
                     entry.converted.0,
                     color,
@@ -378,8 +369,9 @@ fn spawn_conversion_row(
                     width,
                     height,
                 ));
-            });
-        });
+            }
+        },
+    );
 }
 
 /// Renders `groups` groups of `items_per_group` coloured cells separated by
@@ -397,55 +389,48 @@ fn spawn_multiplication_grid_visual(
     /// Cell colour.
     const CELL_COLOR: Color = Color::srgb(0.4, 0.7, 0.95);
 
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        })
-        .with_children(|row| {
-            for g in 0..groups {
-                let cells = Children::spawn(SpawnWith(move |group: &mut ChildSpawner| {
-                    for _ in 0..items {
-                        group.spawn((
-                            Node {
-                                width: theme::scaled(CELL_SIZE),
-                                height: theme::scaled(CELL_SIZE),
-                                border_radius: BorderRadius::all(theme::scaled(3.0)),
-                                ..default()
-                            },
-                            BackgroundColor(CELL_COLOR),
-                        ));
-                    }
-                }));
-                let grid = (
+    let group_gap = theme::scaled(theme::spacing::SMALL);
+    let grid_width = theme::scaled(CELL_SIZE.mul_add(6.0, CELL_GAP * 5.0));
+    let spawn_cells = |grid_parent: &mut ChildSpawnerCommands| {
+        layout::spawn_collection(
+            grid_parent,
+            items as usize,
+            CollectionLayout::grid(grid_width, theme::scaled(CELL_GAP)),
+            |_| CollectionItemLayout::new(theme::scaled(CELL_SIZE), 0.0, 0.0),
+            |cell, _| {
+                cell.spawn((
                     Node {
-                        flex_direction: FlexDirection::Row,
-                        flex_wrap: FlexWrap::Wrap,
-                        column_gap: theme::scaled(CELL_GAP),
-                        row_gap: theme::scaled(CELL_GAP),
-                        max_width: theme::scaled(CELL_SIZE.mul_add(6.0, CELL_GAP * 5.0)),
+                        width: theme::scaled(CELL_SIZE),
+                        height: theme::scaled(CELL_SIZE),
+                        border_radius: BorderRadius::all(theme::scaled(3.0)),
                         ..default()
                     },
-                    cells,
-                );
-                if g == 0 {
-                    row.spawn(grid);
-                } else {
-                    row.spawn(operator_visual_group(
-                        "+",
-                        theme::fonts::HEADING,
-                        theme::colors::TEXT_DARK,
-                        window,
-                        grid,
-                    ));
-                }
+                    BackgroundColor(CELL_COLOR),
+                ));
+            },
+        );
+    };
+    layout::spawn_collection(
+        parent,
+        groups as usize,
+        CollectionLayout::fluid(group_gap),
+        |_| CollectionItemLayout::new(Val::Auto, 0.0, 0.0),
+        |cell, group_index| {
+            if group_index == 0 {
+                spawn_cells(cell);
+            } else {
+                cell.spawn(layout::atomic_child_group(group_gap))
+                    .with_children(|group| {
+                        group.spawn((
+                            Text::new("+"),
+                            theme::typography::text(theme::fonts::HEADING, window),
+                            TextColor(theme::colors::TEXT_DARK),
+                        ));
+                        spawn_cells(group);
+                    });
             }
-        });
+        },
+    );
 }
 
 /// Column metadata for the place-value table: (abbreviation FR, abbreviation EN, color).
@@ -639,42 +624,41 @@ fn spawn_pv_legend_entries(
     ];
     const NAMES_EN: &[&str] = &["Ones", "Tens", "Hundreds", "Thousands", "Ten Th."];
 
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            justify_content: JustifyContent::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            row_gap: theme::scaled(2.0),
-            ..default()
-        })
-        .with_children(|row| {
-            let names = match language {
-                Language::French => NAMES_FR,
-                Language::English => NAMES_EN,
+    let names = match language {
+        Language::French => NAMES_FR,
+        Language::English => NAMES_EN,
+    };
+    layout::spawn_collection(
+        parent,
+        num_columns,
+        CollectionLayout::fluid(theme::scaled(theme::spacing::SMALL))
+            .with_row_column_gaps(theme::scaled(2.0), theme::scaled(theme::spacing::SMALL)),
+        |_| CollectionItemLayout::new(Val::Auto, 0.0, 0.0),
+        |cell, index| {
+            let i = num_columns - index - 1;
+            let (abbr_fr, abbr_en, color) = PV_COLUMNS[i];
+            let abbr = match language {
+                Language::French => abbr_fr,
+                Language::English => abbr_en,
             };
-            for i in (0..num_columns).rev() {
-                let (abbr_fr, abbr_en, color) = PV_COLUMNS[i];
-                let abbr = match language {
-                    Language::French => abbr_fr,
-                    Language::English => abbr_en,
-                };
-                let label = format!("{abbr} = {}", names[i]);
-                row.spawn((
-                    Text::new(label),
-                    theme::typography::text(theme::fonts::SMALL, window),
-                    TextColor(color),
-                ));
-                // Separator dot (except after the last entry).
-                if i > 0 {
-                    row.spawn((
-                        Text::new("\u{00B7}".to_owned()),
+            let label = format!("{abbr} = {}", names[i]);
+            cell.spawn(layout::atomic_child_group(theme::scaled(2.0)))
+                .with_children(|entry| {
+                    entry.spawn((
+                        Text::new(label),
                         theme::typography::text(theme::fonts::SMALL, window),
-                        TextColor(theme::colors::TEXT_MUTED),
+                        TextColor(color),
                     ));
-                }
-            }
-        });
+                    if i > 0 {
+                        entry.spawn((
+                            Text::new("\u{00B7}".to_owned()),
+                            theme::typography::text(theme::fonts::SMALL, window),
+                            TextColor(theme::colors::TEXT_MUTED),
+                        ));
+                    }
+                });
+        },
+    );
 }
 
 /// Returns the digits of `n` in least-significant-first order.

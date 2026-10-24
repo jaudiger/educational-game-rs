@@ -3,10 +3,10 @@ use bevy::ui::UiSystems;
 
 use crate::data::{LastAnswer, LessonLaunchSelection, LessonSession, SelectedLesson};
 use crate::i18n::{I18n, TranslationKey};
+use crate::questions::QuestionRoot;
 use crate::questions::registry::{
     QuestionInteractionSet, QuestionResponseSubmitted, assess_question_responses,
 };
-use crate::questions::{self, QuestionRoot};
 use crate::states::cleanup_root;
 use crate::states::{ActiveLesson, AppState, InLessonFlow, LessonPhase, StateScopedResourceExt};
 use crate::ui::components::ButtonActivated;
@@ -50,17 +50,11 @@ impl Plugin for LessonPlayScreenPlugin {
             .add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
             .add_systems(
                 PostUpdate,
-                questions::update_responsive_visual_groups
-                    .run_if(in_state(AppState::LessonPlay))
-                    .after(UiSystems::Layout),
-            )
-            .add_systems(
-                PostUpdate,
                 layout::fit_question_to_available_height
                     .run_if(in_state(AppState::LessonPlay))
                     .run_if(in_state(LessonPhase::ShowQuestion))
                     .after(UiSystems::Layout)
-                    .after(questions::update_responsive_visual_groups),
+                    .after(crate::ui::layout::ResponsiveLayoutSet),
             )
             .add_systems(
                 PostUpdate,

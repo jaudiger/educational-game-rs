@@ -7,6 +7,7 @@ use bevy::ui_widgets::{
     SliderThumb, SliderValue,
 };
 
+use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::theme;
 
 use super::{CheckboxMark, RadioMark};
@@ -160,22 +161,27 @@ impl StyledCheckbox {
     }
 }
 
-/// Returns a styled radio group bundle.
+/// Spawns radio options with the shared fluid collection policy.
 ///
-/// The caller adds radio-button scenes and a `ValueChange<Entity>` observer.
-pub fn radio_group() -> impl Bundle {
-    (
-        RadioGroup,
-        Node {
-            flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::MEDIUM),
-            row_gap: theme::scaled(theme::spacing::SMALL),
-            max_width: theme::layout::FILL_PARENT,
-            ..default()
-        },
-    )
+/// The caller adds radio-button scenes and observers to the returned group.
+pub fn spawn_radio_group<'a>(
+    parent: &'a mut ChildSpawnerCommands<'_>,
+    item_count: usize,
+    item_layout: impl Fn(usize) -> CollectionItemLayout,
+    spawn_item: impl FnMut(&mut ChildSpawnerCommands, usize),
+) -> EntityCommands<'a> {
+    let mut group = layout::spawn_collection(
+        parent,
+        item_count,
+        CollectionLayout::fluid(theme::scaled(theme::spacing::MEDIUM)).with_row_column_gaps(
+            theme::scaled(theme::spacing::SMALL),
+            theme::scaled(theme::spacing::MEDIUM),
+        ),
+        item_layout,
+        spawn_item,
+    );
+    group.insert(RadioGroup);
+    group
 }
 
 #[derive(SceneComponent, Default, Clone, Reflect)]

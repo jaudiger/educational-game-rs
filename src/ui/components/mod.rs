@@ -16,6 +16,7 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 
 use super::theme;
+use crate::ui::layout;
 
 /// Marks the inner check mark of a styled checkbox.
 #[derive(Component, Reflect, Clone, Default)]
@@ -139,13 +140,7 @@ pub fn operator_visual_group<B: Bundle>(
     visual: B,
 ) -> impl Bundle + use<B> {
     (
-        Node {
-            flex_direction: FlexDirection::Row,
-            flex_shrink: 0.0,
-            align_items: AlignItems::Center,
-            column_gap: theme::scaled(theme::spacing::SMALL),
-            ..default()
-        },
+        layout::atomic_child_group(theme::scaled(theme::spacing::SMALL)),
         children![
             (
                 Text::new(operator),

@@ -60,7 +60,7 @@ impl Plugin for SharedGamePlugin {
         use crate::states::{ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase};
         use crate::ui::{
             ButtonActivationPlugin, FocusNavigationPlugin, NavigationPlugin,
-            PointerInteractionPlugin, ThemePlugin, UiAnimationPlugin,
+            PointerInteractionPlugin, ResponsiveLayoutPlugin, ThemePlugin, UiAnimationPlugin,
         };
 
         app.init_state::<AppState>()
@@ -76,6 +76,7 @@ impl Plugin for SharedGamePlugin {
                 LessonMascotPlugin,
                 NavigationPlugin,
                 PointerInteractionPlugin,
+                ResponsiveLayoutPlugin,
                 SettingsPlugin,
                 SkyBackgroundPlugin,
                 ThemePlugin,

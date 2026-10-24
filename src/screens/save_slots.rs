@@ -17,6 +17,7 @@ use crate::ui::components::{
     action_button_scene, button_base, card_node, icon_button, menu_background, persistence_notice,
     screen_root, spawn_confirmation_modal, standard_button,
 };
+use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
 
@@ -137,11 +138,13 @@ fn spawn_save_slots_ui(
         })
         .collect();
 
-    commands.spawn((
-        screen_root(),
-        DespawnOnExit(AppState::SaveSlots),
-        SaveSlotsRoot,
-        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+    commands
+        .spawn((
+            screen_root(),
+            DespawnOnExit(AppState::SaveSlots),
+            SaveSlotsRoot,
+        ))
+        .with_children(|parent| {
             parent.spawn(menu_background(MenuBackgroundStyle::new(0.3)));
 
             // Title
@@ -152,32 +155,30 @@ fn spawn_save_slots_ui(
             ));
 
             // Slots row
-            parent
-                .spawn((Node {
-                    flex_direction: FlexDirection::Row,
-                    flex_wrap: FlexWrap::Wrap,
-                    width: theme::layout::FILL_PARENT,
-                    min_width: px(0.0),
-                    column_gap: theme::scaled(theme::spacing::LARGE),
-                    row_gap: theme::scaled(theme::spacing::LARGE),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },))
-                .with_children(|row| {
-                    for (i, (index, name, slot_label, empty_label)) in slot_data.iter().enumerate()
-                    {
-                        spawn_slot_card(
-                            row,
-                            *index,
-                            name.as_deref(),
-                            slot_label,
-                            empty_label,
-                            i == 0,
-                            window,
-                        );
-                    }
-                });
+            layout::spawn_collection(
+                parent,
+                slot_data.len(),
+                CollectionLayout::fluid(theme::scaled(theme::spacing::LARGE)),
+                |_| {
+                    CollectionItemLayout::new(
+                        theme::scaled(theme::production::sizes::CARD_MIN_WIDTH),
+                        0.0,
+                        0.0,
+                    )
+                },
+                |card, i| {
+                    let (index, name, slot_label, empty_label) = &slot_data[i];
+                    spawn_slot_card(
+                        card,
+                        *index,
+                        name.as_deref(),
+                        slot_label,
+                        empty_label,
+                        i == 0,
+                        window,
+                    );
+                },
+            );
 
             parent.spawn(notice);
 
@@ -191,12 +192,11 @@ fn spawn_save_slots_ui(
                 ),
                 NavigateTo(AppState::Home),
             ));
-        })),
-    ));
+        });
 }
 
 fn spawn_slot_card(
-    parent: &mut ChildSpawner,
+    parent: &mut ChildSpawnerCommands,
     index: usize,
     name: Option<&str>,
     slot_label: &str,

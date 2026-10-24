@@ -1,6 +1,7 @@
 pub mod animation;
 pub mod components;
 pub mod focus_navigation;
+pub mod layout;
 pub mod navigation;
 pub mod pointer_interaction;
 pub mod rich_text;
@@ -12,6 +13,7 @@ pub mod widget_styles;
 pub use animation::UiAnimationPlugin;
 pub use components::ButtonActivationPlugin;
 pub use focus_navigation::FocusNavigationPlugin;
+pub use layout::ResponsiveLayoutPlugin;
 pub use navigation::NavigationPlugin;
 pub use pointer_interaction::PointerInteractionPlugin;
 #[cfg(not(feature = "demo"))]

@@ -12,6 +12,7 @@ use crate::ui::animation::{AnimatedButton, FloatingCard};
 use crate::ui::components::{
     ButtonActivated, HoverTooltip, button_base, screen_root, standard_button,
 };
+use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::theme;
 
 /// Theme exploration screen showing themes and their lessons.
@@ -264,45 +265,45 @@ pub fn setup_themes(
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),
-        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            let mut title_cmd = parent.spawn((
-                Text::new(title),
-                theme::typography::text(theme::fonts::TITLE, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ));
-            if let Some(style) = card_style {
-                title_cmd.insert(TextShadow {
-                    color: style.colors.title_shadow,
-                    offset: Vec2::new(0.0, 2.0),
-                });
-            }
-            parent.spawn(inline_exploration_notice(notice, window));
-            parent
-                .spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: theme::scaled(theme::spacing::LARGE),
-                    row_gap: theme::scaled(theme::spacing::LARGE),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Stretch,
-                    flex_wrap: FlexWrap::Wrap,
-                    ..default()
-                })
-                .with_children(|grid| {
-                    for (index, data) in themes.iter().enumerate() {
-                        spawn_theme_button(grid, data, index == 0, window, card_style, index);
-                    }
-                });
-            parent.spawn((
-                standard_button(
-                    &back_label,
-                    theme::button_styles::BACK,
-                    theme::scaled(theme::sizes::BUTTON_WIDTH),
-                    window,
-                ),
-                ExploreBackAction(back_destination),
-            ));
-        })),
     ));
+    root.with_children(|parent| {
+        let mut title_cmd = parent.spawn((
+            Text::new(title),
+            theme::typography::text(theme::fonts::TITLE, window),
+            TextColor(theme::colors::TEXT_DARK),
+        ));
+        if let Some(style) = card_style {
+            title_cmd.insert(TextShadow {
+                color: style.colors.title_shadow,
+                offset: Vec2::new(0.0, 2.0),
+            });
+        }
+        parent.spawn(inline_exploration_notice(notice, window));
+        layout::spawn_collection(
+            parent,
+            themes.len(),
+            CollectionLayout::fluid(theme::scaled(theme::spacing::LARGE)),
+            |_| {
+                CollectionItemLayout::new(
+                    theme::scaled(card_dimensions(card_style).width),
+                    0.0,
+                    0.0,
+                )
+            },
+            |cell, index| {
+                spawn_theme_button(cell, &themes[index], index == 0, window, card_style, index);
+            },
+        );
+        parent.spawn((
+            standard_button(
+                &back_label,
+                theme::button_styles::BACK,
+                theme::scaled(theme::sizes::BUTTON_WIDTH),
+                window,
+            ),
+            ExploreBackAction(back_destination),
+        ));
+    });
 
     if card_style.is_some() {
         root.insert(BackgroundColor(Color::NONE));
@@ -436,7 +437,7 @@ fn card_node_layout(dims: &CardDimensions) -> Node {
 /// Inserts a framed card, its shadow, and its floating animation.
 #[allow(clippy::cast_precision_loss)]
 fn insert_card_overlay(
-    button: &mut EntityWorldMut,
+    button: &mut EntityCommands,
     style: ExplorationCardStyle,
     available: bool,
     index: usize,
@@ -488,7 +489,7 @@ fn card_text(text: &str, font_size: f32, color: Color, window: Entity) -> impl B
 }
 
 fn spawn_theme_button(
-    parent: &mut ChildSpawner,
+    parent: &mut ChildSpawnerCommands,
     data: &ThemeButtonData,
     auto_focus: bool,
     window: Entity,
@@ -617,54 +618,54 @@ pub fn setup_theme_lessons(
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ActivitySelection),
-        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            let mut title_cmd = parent.spawn((
-                Text::new(title),
-                theme::typography::text(theme::fonts::TITLE, window),
-                TextColor(theme::colors::TEXT_DARK),
-            ));
-            if let Some(style) = card_style {
-                title_cmd.insert(TextShadow {
-                    color: style.colors.title_shadow,
-                    offset: Vec2::new(0.0, 2.0),
-                });
-            }
-            parent.spawn(inline_exploration_notice(notice, window));
-            parent
-                .spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: theme::scaled(theme::spacing::LARGE),
-                    row_gap: theme::scaled(theme::spacing::LARGE),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Stretch,
-                    flex_wrap: FlexWrap::Wrap,
-                    ..default()
-                })
-                .with_children(|grid| {
-                    for (index, data) in lessons.iter().enumerate() {
-                        spawn_lesson_button(grid, data, index == 0, window, card_style, index);
-                    }
-                });
-            parent.spawn((
-                standard_button(
-                    &back_label,
-                    theme::button_styles::BACK,
-                    theme::scaled(theme::sizes::BUTTON_WIDTH),
-                    window,
-                ),
-                BackToThemesButton {
-                    clear_launch_context,
-                },
-            ));
-        })),
     ));
+    root.with_children(|parent| {
+        let mut title_cmd = parent.spawn((
+            Text::new(title),
+            theme::typography::text(theme::fonts::TITLE, window),
+            TextColor(theme::colors::TEXT_DARK),
+        ));
+        if let Some(style) = card_style {
+            title_cmd.insert(TextShadow {
+                color: style.colors.title_shadow,
+                offset: Vec2::new(0.0, 2.0),
+            });
+        }
+        parent.spawn(inline_exploration_notice(notice, window));
+        layout::spawn_collection(
+            parent,
+            lessons.len(),
+            CollectionLayout::fluid(theme::scaled(theme::spacing::LARGE)),
+            |_| {
+                CollectionItemLayout::new(
+                    theme::scaled(card_dimensions(card_style).width),
+                    0.0,
+                    0.0,
+                )
+            },
+            |cell, index| {
+                spawn_lesson_button(cell, &lessons[index], index == 0, window, card_style, index);
+            },
+        );
+        parent.spawn((
+            standard_button(
+                &back_label,
+                theme::button_styles::BACK,
+                theme::scaled(theme::sizes::BUTTON_WIDTH),
+                window,
+            ),
+            BackToThemesButton {
+                clear_launch_context,
+            },
+        ));
+    });
     if card_style.is_some() {
         root.insert(BackgroundColor(Color::NONE));
     }
 }
 
 fn spawn_lesson_button(
-    parent: &mut ChildSpawner,
+    parent: &mut ChildSpawnerCommands,
     data: &LessonButtonData,
     auto_focus: bool,
     window: Entity,
@@ -747,7 +748,7 @@ fn spawn_lesson_button(
 }
 
 fn spawn_lesson_heading(
-    contents: &mut ChildSpawner,
+    contents: &mut ChildSpawnerCommands,
     data: &LessonButtonData,
     text_color: Color,
     window: Entity,
@@ -789,7 +790,7 @@ fn spawn_lesson_heading(
 }
 
 fn spawn_lesson_action(
-    parent: &mut ChildSpawner,
+    parent: &mut ChildSpawnerCommands,
     data: &LessonButtonData,
     action: &LessonActionPresentation,
     auto_focus: bool,
