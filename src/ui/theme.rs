@@ -1,18 +1,26 @@
 use bevy::prelude::*;
 use bevy::text::{FontSize, FontSource};
+use bevy::ui::UiSystems;
 use bevy::ui_widgets::{Checkbox, RadioButton};
 use bevy::window::WindowResized;
 
 use super::components::{CheckboxMark, RadioMark};
 use super::widget_styles;
 
-/// Reference design vmin (min dimension of the 1280x720 default window).
-/// All design-pixel constants are calibrated for this value.
+mod scaling;
+
+/// Reference design vmin for the default window.
 const REFERENCE_VMIN: f32 = 720.0;
 
-/// Converts a design-pixel value (calibrated for 720 px vmin) to a
-/// viewport-relative [`Val`].  Bevy resolves `VMin` per camera/window,
-/// so the primary window and teacher window each scale independently.
+pub(super) fn design_scale_factor(vmin: f32) -> f32 {
+    if vmin.is_finite() && vmin > 0.0 {
+        (vmin / REFERENCE_VMIN).sqrt()
+    } else {
+        0.0
+    }
+}
+
+/// Converts a design-pixel value into a viewport metric resolved for its UI target.
 pub fn scaled(design_px: f32) -> Val {
     vmin(design_px / REFERENCE_VMIN * 100.0)
 }
@@ -100,6 +108,13 @@ impl Plugin for ThemePlugin {
         });
         app.add_observer(override_default_font);
         app.add_observer(scale_font_on_add);
+        app.add_observer(scaling::capture_design_node);
+        app.add_systems(
+            PostUpdate,
+            scaling::resolve_design_nodes
+                .after(UiSystems::Propagate)
+                .before(UiSystems::Layout),
+        );
         app.add_systems(
             Update,
             (
@@ -138,7 +153,7 @@ fn scale_font_on_add(
         && let Ok(window) = windows.get(design.window)
     {
         let vmin_val = window.width().min(window.height());
-        let scale = vmin_val / REFERENCE_VMIN;
+        let scale = design_scale_factor(vmin_val);
         font.font_size = FontSize::Px(design.size * scale);
     }
 }
@@ -150,7 +165,7 @@ fn scale_fonts_on_window_resize(
 ) {
     for resized_window in resized_windows.read() {
         let vmin_val = resized_window.width.min(resized_window.height);
-        let scale = vmin_val / REFERENCE_VMIN;
+        let scale = design_scale_factor(vmin_val);
         for (design, mut font) in &mut fonts {
             if design.window == resized_window.window {
                 font.font_size = FontSize::Px(design.size * scale);

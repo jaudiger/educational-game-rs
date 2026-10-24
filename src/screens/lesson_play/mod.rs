@@ -56,6 +56,14 @@ impl Plugin for LessonPlayScreenPlugin {
             )
             .add_systems(
                 PostUpdate,
+                layout::fit_question_to_available_height
+                    .run_if(in_state(AppState::LessonPlay))
+                    .run_if(in_state(LessonPhase::ShowQuestion))
+                    .after(UiSystems::Layout)
+                    .after(questions::update_responsive_visual_groups),
+            )
+            .add_systems(
+                PostUpdate,
                 layout::fit_feedback_to_available_height
                     .run_if(in_state(AppState::LessonPlay))
                     .run_if(in_state(LessonPhase::ShowFeedback))

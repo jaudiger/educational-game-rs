@@ -119,9 +119,7 @@ fn prepare_demo_theme_lessons(
     *presentation = ThemeLessonsPresentation {
         available: true,
         title: theme.title.get(i18n.language).to_owned(),
-        back_label: i18n
-            .t(&crate::i18n::TranslationKey::BackToThemes)
-            .into_owned(),
+        back_label: i18n.t(&crate::i18n::TranslationKey::Back).into_owned(),
         notice: None,
         clear_launch_context: true,
         lessons: theme
@@ -144,9 +142,7 @@ fn prepare_demo_theme_lessons(
 
 fn prepare_demo_feedback(i18n: Res<I18n>, mut presentation: ResMut<FeedbackPresentation>) {
     *presentation = FeedbackPresentation {
-        next_button_label: i18n
-            .t(&crate::i18n::TranslationKey::ReturnToActivityList)
-            .into_owned(),
+        next_button_label: i18n.t(&crate::i18n::TranslationKey::Back).into_owned(),
         return_to_catalogue: true,
         save_notice: None,
     };

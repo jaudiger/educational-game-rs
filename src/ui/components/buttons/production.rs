@@ -58,12 +58,16 @@ impl ActionButton {
                 Color::NONE,
             )
             Node {
-                min_width: theme::scaled(120.0),
-                height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
-                padding: UiRect::axes(theme::scaled(theme::spacing::SMALL), theme::scaled(0.0)),
+                min_width: px(0.0),
+                max_width: theme::layout::FILL_PARENT,
+                min_height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
+                height: Val::Auto,
+                padding: UiRect::axes(
+                    theme::scaled(theme::spacing::SMALL),
+                    theme::scaled(theme::spacing::SMALL / 2.0),
+                ),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                overflow: Overflow::clip(),
                 border_radius: {BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS))},
             }
             Children [
@@ -71,6 +75,10 @@ impl ActionButton {
                 @theme::typography::text_scene(theme::production::fonts::BUTTON_SMALL, props.window)
                 TextColor({props.palette.foreground})
                 TextLayout::justify(Justify::Center)
+                Node {
+                    width: theme::layout::FILL_PARENT,
+                    min_width: px(0.0),
+                }
             ]
         }
     }

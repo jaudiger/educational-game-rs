@@ -53,6 +53,8 @@ pub fn setup_home(
             ),
             (
                 Node {
+                    width: theme::layout::FILL_PARENT,
+                    min_width: px(0.0),
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     row_gap: theme::scaled(theme::spacing::MEDIUM),

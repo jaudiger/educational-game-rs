@@ -69,16 +69,21 @@ pub struct PointerHovered(pub bool);
 /// ));
 /// ```
 pub fn screen_root() -> impl Bundle {
+    screen_root_with_node(Node {
+        width: theme::layout::FILL_PARENT,
+        height: theme::layout::FILL_PARENT,
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        flex_direction: FlexDirection::Column,
+        row_gap: theme::scaled(theme::spacing::XLARGE),
+        ..default()
+    })
+}
+
+/// Returns a standard screen root with a caller-provided layout node.
+pub fn screen_root_with_node(node: Node) -> impl Bundle {
     (
-        Node {
-            width: theme::layout::FILL_PARENT,
-            height: theme::layout::FILL_PARENT,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            flex_direction: FlexDirection::Column,
-            row_gap: theme::scaled(theme::spacing::XLARGE),
-            ..default()
-        },
+        node,
         BackgroundColor(theme::colors::BACKGROUND),
         TabGroup::new(0),
     )

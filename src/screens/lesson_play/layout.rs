@@ -9,6 +9,7 @@ use crate::data::{
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
+use crate::questions::QuestionRoot;
 use crate::states::AppState;
 use crate::ui::components::icon_button;
 use crate::ui::theme::{self, GameImages};
@@ -21,6 +22,19 @@ pub struct RejectedLessonLaunch;
 #[derive(Resource, Default)]
 pub struct LessonPlanningInput(pub Option<LessonPlanningConfig>);
 
+pub(super) fn fit_question_to_available_height(
+    containers: Query<&ComputedNode, With<QuestionContainer>>,
+    mut questions: Query<(&ComputedNode, &mut UiTransform), With<QuestionRoot>>,
+) {
+    let Ok(container) = containers.single() else {
+        return;
+    };
+    let Ok((question, mut transform)) = questions.single_mut() else {
+        return;
+    };
+    fit_content_to_available_height(container, question, &mut transform);
+}
+
 pub(super) fn fit_feedback_to_available_height(
     containers: Query<&ComputedNode, With<QuestionContainer>>,
     mut feedbacks: Query<(&ComputedNode, &mut UiTransform), With<super::FeedbackRoot>>,
@@ -31,13 +45,20 @@ pub(super) fn fit_feedback_to_available_height(
     let Ok((feedback, mut transform)) = feedbacks.single_mut() else {
         return;
     };
+    fit_content_to_available_height(container, feedback, &mut transform);
+}
 
+fn fit_content_to_available_height(
+    container: &ComputedNode,
+    content: &ComputedNode,
+    transform: &mut UiTransform,
+) {
     let content_inset = container.content_inset();
     let available_height =
         (container.size().y - content_inset.min_inset.y - content_inset.max_inset.y).max(0.0);
-    let feedback_height = feedback.size().y;
-    let scale = if feedback_height > 0.0 {
-        (available_height / feedback_height).min(1.0)
+    let content_height = content.size().y;
+    let scale = if content_height > 0.0 {
+        (available_height / content_height).min(1.0)
     } else {
         1.0
     };
@@ -158,13 +179,12 @@ fn spawn_top_bar(parent: &mut ChildSpawnerCommands, progress: &str, window: Enti
                     ProgressText,
                 )],
             ));
-            // Quit button (right, compact icon button matching save-slot style)
             bar.spawn((
                 icon_button(
-                    32.0,
-                    6.0,
+                    48.0,
+                    8.0,
                     "X",
-                    theme::fonts::SMALL,
+                    theme::fonts::BUTTON,
                     theme::button_styles::NEUTRAL,
                     window,
                 ),

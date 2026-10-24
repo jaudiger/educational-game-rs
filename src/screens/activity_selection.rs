@@ -13,7 +13,7 @@ use crate::states::{AppState, ExplorationView};
 use crate::ui::animation::FloatingCard;
 use crate::ui::components::{
     ButtonActivated, button_base, disclosure_chevron, disclosure_chevron_transform,
-    list_separator_border, screen_root, standard_button,
+    list_separator_border, screen_root_with_node, standard_button,
 };
 use crate::ui::theme;
 
@@ -128,7 +128,7 @@ fn setup_activity_selection(
     .map(str::to_owned);
     let data = ActivitySelectionScreenData {
         lesson_context: lesson.title.get(i18n.language).to_owned(),
-        back_label: i18n.t(&TranslationKey::BackToLessons).into_owned(),
+        back_label: i18n.t(&TranslationKey::Back).into_owned(),
         groups,
         selected_activity_id,
         sky_theme,
@@ -177,7 +177,16 @@ fn spawn_activity_selection_screen(
         theme::colors::CARD_BG
     };
     let mut root = commands.spawn((
-        screen_root(),
+        screen_root_with_node(Node {
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
+            padding: theme::scaled(theme::spacing::MEDIUM).all(),
+            justify_content: JustifyContent::FlexStart,
+            align_items: AlignItems::Center,
+            flex_direction: FlexDirection::Column,
+            row_gap: theme::scaled(theme::spacing::MEDIUM),
+            ..default()
+        }),
         ActivitySelectionRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),
@@ -185,16 +194,6 @@ fn spawn_activity_selection_screen(
             spawn_activity_selection_content(parent, data, list_background, window);
         })),
     ));
-    root.insert(Node {
-        width: theme::layout::FILL_PARENT,
-        height: theme::layout::FILL_PARENT,
-        padding: theme::scaled(theme::spacing::MEDIUM).all(),
-        justify_content: JustifyContent::FlexStart,
-        align_items: AlignItems::Center,
-        flex_direction: FlexDirection::Column,
-        row_gap: theme::scaled(theme::spacing::SMALL),
-        ..default()
-    });
     if sky_theme {
         root.insert(BackgroundColor(Color::NONE));
     }

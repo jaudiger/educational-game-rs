@@ -118,30 +118,14 @@ pub fn icon_button(
     )
 }
 
-/// Returns a standard button whose width grows to fit its label.
+/// Returns a standard button that wraps its label within its preferred width.
 pub fn standard_button(
     label: &str,
     palette: ButtonPalette,
-    min_width: Val,
+    preferred_width: Val,
     window: Entity,
 ) -> impl Bundle + use<> {
-    (
-        button_base(palette),
-        Node {
-            min_width,
-            height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
-            padding: UiRect::axes(
-                theme::scaled(theme::sizes::BUTTON_PADDING),
-                theme::scaled(0.0),
-            ),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            overflow: Overflow::clip(),
-            border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
-            ..default()
-        },
-        children![standard_button_label(label, palette.foreground, window)],
-    )
+    wrapping_standard_button(label, palette, preferred_width, window)
 }
 
 /// Returns a button with a preferred width that wraps long labels within its parent.
@@ -153,21 +137,7 @@ pub fn wrapping_standard_button(
 ) -> impl Bundle + use<> {
     (
         button_base(palette),
-        Node {
-            width: preferred_width,
-            height: Val::Auto,
-            min_width: px(0.0),
-            max_width: theme::layout::FILL_PARENT,
-            min_height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
-            padding: UiRect::axes(
-                theme::scaled(theme::sizes::BUTTON_PADDING),
-                theme::scaled(0.0),
-            ),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
-            ..default()
-        },
+        standard_button_node(preferred_width, px(0.0)),
         children![(
             standard_button_label(label, palette.foreground, window),
             Node {
@@ -177,6 +147,24 @@ pub fn wrapping_standard_button(
             }
         )],
     )
+}
+
+fn standard_button_node(width: Val, min_width: Val) -> Node {
+    Node {
+        width,
+        height: Val::Auto,
+        min_width,
+        max_width: theme::layout::FILL_PARENT,
+        min_height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
+        padding: UiRect::axes(
+            theme::scaled(theme::sizes::BUTTON_PADDING),
+            theme::scaled(theme::sizes::BUTTON_PADDING / 2.0),
+        ),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
+        ..default()
+    }
 }
 
 fn standard_button_label(label: &str, foreground: Color, window: Entity) -> impl Bundle + use<> {

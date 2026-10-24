@@ -231,10 +231,9 @@ fn prepare_production_feedback(
     let default_selection = LessonLaunchSelection::CompleteLesson;
     let selection = launch_selection.as_deref().unwrap_or(&default_selection);
     let (label, return_to_catalogue) = match selection {
-        LessonLaunchSelection::SingleActivity { .. } => (
-            i18n.t(&TranslationKey::ReturnToActivityList).into_owned(),
-            true,
-        ),
+        LessonLaunchSelection::SingleActivity { .. } => {
+            (i18n.t(&TranslationKey::Back).into_owned(), true)
+        }
         LessonLaunchSelection::CompleteLesson
             if session.current_index + 1 >= session.questions.len() =>
         {

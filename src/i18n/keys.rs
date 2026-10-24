@@ -32,13 +32,10 @@ pub enum TranslationKey {
     CorrectAnswer,
     IncorrectAnswer,
     QuestionProgress(usize, usize),
-    ReturnToActivityList,
 
     // Lesson Summary
 
     // Theme Exploration
-    BackToLessons,
-    BackToThemes,
     Themes,
     ActivityCategoryComparison,
     ActivityCategoryIdentification,
@@ -117,11 +114,8 @@ impl TranslationKey {
                 // Lesson Play
                 CorrectAnswer             => ("Bonne r\u{00e9}ponse !",                    "Correct!"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
-                ReturnToActivityList      => ("Retour a la liste des activit\u{00e9}s",   "Return to activities"),
                 // Lesson Summary
                 // Theme Exploration
-                BackToLessons           => ("Retour aux le\u{00e7}ons",                      "Back to lessons"),
-                BackToThemes            => ("Retour aux th\u{00e9}matiques",          "Back to themes"),
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
                 ActivityCategoryComparison => ("Comparer des fractions",                    "Compare fractions"),
                 ActivityCategoryIdentification => ("Reconna\u{00ee}tre une fraction",       "Identify a fraction"),

@@ -99,14 +99,21 @@ fn tick_animate_scale(
 fn tick_screen_entry(
     mut commands: Commands,
     time: Res<Time>,
-    mut query: Query<(Entity, &mut ScreenEntryAnimation, &mut UiTransform)>,
+    mut query: Query<(
+        Entity,
+        &mut ScreenEntryAnimation,
+        &mut UiTransform,
+        &ComputedUiRenderTargetInfo,
+    )>,
 ) {
     let dt = time.delta_secs();
-    for (entity, mut anim, mut transform) in &mut query {
+    for (entity, mut anim, mut transform, target) in &mut query {
         anim.elapsed += dt;
         let t = (anim.elapsed / anim.duration).min(1.0);
         let y_val = anim.y_curve.sample_clamped(t);
-        transform.translation = Val2::new(vmin(0.0), theme::scaled(y_val));
+        let vmin = target.logical_size().min_element();
+        let scale = theme::design_scale_factor(vmin);
+        transform.translation = Val2::new(px(0.0), px(y_val * scale));
         let scale_val = anim.scale_curve.sample_clamped(t);
         transform.scale = Vec2::splat(scale_val);
         if t >= 1.0 {
@@ -128,12 +135,18 @@ fn tick_floating_cards(time: Res<Time>, mut query: Query<(&FloatingCard, &mut Ui
 
 fn tick_floating_menu_decorations(
     time: Res<Time>,
-    mut query: Query<(&FloatingMenuDecoration, &mut UiTransform)>,
+    mut query: Query<(
+        &FloatingMenuDecoration,
+        &mut UiTransform,
+        &ComputedUiRenderTargetInfo,
+    )>,
 ) {
     let elapsed = time.elapsed_secs();
-    for (decoration, mut transform) in &mut query {
+    for (decoration, mut transform, target) in &mut query {
         let y = decoration.amplitude * elapsed.mul_add(decoration.speed, decoration.phase).sin();
-        transform.translation = Val2::new(px(0.0), theme::scaled(y));
+        let vmin = target.logical_size().min_element();
+        let scale = theme::design_scale_factor(vmin);
+        transform.translation = Val2::new(px(0.0), px(y * scale));
     }
 }
 
@@ -206,10 +219,7 @@ fn auto_screen_entry_animation(trigger: On<Add<DespawnOnExit<AppState>>>, mut co
             elapsed: 0.0,
         },
         UiTransform {
-            translation: Val2::new(
-                vmin(0.0),
-                theme::scaled(theme::animation::SCREEN_ENTRY_START_Y),
-            ),
+            translation: Val2::ZERO,
             scale: Vec2::splat(theme::animation::SCREEN_ENTRY_START_SCALE),
             ..default()
         },

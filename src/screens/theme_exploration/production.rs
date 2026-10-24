@@ -149,7 +149,7 @@ pub fn prepare_theme_lessons(
                 ThemeLessonsPresentation {
                     available: true,
                     title: theme.title.get(i18n.language).to_owned(),
-                    back_label: i18n.t(&TranslationKey::BackToThemes).into_owned(),
+                    back_label: i18n.t(&TranslationKey::Back).into_owned(),
                     notice: status.failed(PersistenceAction::SaveSlot).then(|| {
                         i18n.t(&ProductionTranslationKey::SaveWriteFailed)
                             .into_owned()

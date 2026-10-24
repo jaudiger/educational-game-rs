@@ -393,7 +393,7 @@ pub fn spawn_indexed_choices<F, B>(
             let mut cmd = cell.spawn((
                 button_base(theme::button_styles::ANSWER),
                 Node {
-                    min_width: theme::scaled(theme::sizes::BUTTON_WIDTH),
+                    min_width: px(0.0),
                     height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
                     width: theme::layout::FILL_PARENT,
                     padding: UiRect::axes(
