@@ -1,6 +1,7 @@
+use bevy::ecs::system::SystemParam;
 use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
-use bevy::ui_widgets::{ScrollArea, ScrollIntoView};
+use bevy::ui_widgets::ScrollArea;
 use bevy::window::PrimaryWindow;
 
 use crate::data::content::{QuestionType, SchoolLevel};
@@ -10,7 +11,7 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::screens::activity_categories::activity_category_label;
 use crate::screens::activity_level::activity_level_badge;
-use crate::states::{AppState, ExplorationView};
+use crate::states::{AppState, ExplorationView, InLessonFlow};
 use crate::ui::animation::FloatingCard;
 use crate::ui::components::{
     ButtonActivated, button_base, disclosure_chevron, disclosure_chevron_transform,
@@ -22,19 +23,17 @@ pub struct ActivitySelectionScreenPlugin;
 
 impl Plugin for ActivitySelectionScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            OnEnter(ExplorationView::ActivitySelection),
-            setup_activity_selection,
-        )
-        .add_systems(
-            Update,
-            (
-                handle_activity_selection,
-                handle_activity_group_disclosure,
-                scroll_selected_activity_into_view,
+        app.init_resource::<ActivitySelectionViewState>()
+            .add_systems(OnExit(InLessonFlow), reset_activity_selection_view_state)
+            .add_systems(
+                OnEnter(ExplorationView::ActivitySelection),
+                setup_activity_selection,
             )
-                .run_if(in_state(ExplorationView::ActivitySelection)),
-        );
+            .add_systems(
+                Update,
+                (handle_activity_selection, handle_activity_group_disclosure)
+                    .run_if(in_state(ExplorationView::ActivitySelection)),
+            );
     }
 }
 
@@ -54,10 +53,56 @@ struct ActivityGroupPanel(QuestionType);
 struct ActivityGroupChevron(QuestionType);
 
 #[derive(Component, Reflect)]
-struct ScrollToSelectedActivity;
+struct BackToLessonGridButton;
 
 #[derive(Component, Reflect)]
-struct BackToLessonGridButton;
+struct ActivitySelectionScrollArea;
+
+#[derive(Resource, Reflect, Default)]
+#[reflect(Resource)]
+struct ActivitySelectionViewState {
+    theme_id: Option<String>,
+    lesson_id: Option<String>,
+    scroll_position: ScrollPosition,
+    collapsed_groups: Vec<QuestionType>,
+    selected_activity_id: Option<String>,
+    restore_after_activity: bool,
+}
+
+impl ActivitySelectionViewState {
+    fn prepare_for_entry(&mut self, theme_id: &str, lesson_id: &str) {
+        let restore_view = self.restore_after_activity
+            && self.theme_id.as_deref() == Some(theme_id)
+            && self.lesson_id.as_deref() == Some(lesson_id);
+        if !restore_view {
+            *self = Self {
+                theme_id: Some(theme_id.to_owned()),
+                lesson_id: Some(lesson_id.to_owned()),
+                ..default()
+            };
+        }
+        self.restore_after_activity = false;
+    }
+
+    fn record_activity_launch(&mut self, activity_id: &str, scroll_position: ScrollPosition) {
+        self.selected_activity_id = Some(activity_id.to_owned());
+        self.scroll_position = scroll_position;
+        self.restore_after_activity = true;
+    }
+
+    fn set_group_expanded(&mut self, activity_type: QuestionType, expanded: bool) {
+        if expanded {
+            self.collapsed_groups
+                .retain(|collapsed| *collapsed != activity_type);
+        } else if !self.collapsed_groups.contains(&activity_type) {
+            self.collapsed_groups.push(activity_type);
+        }
+    }
+
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
 
 struct ActivityGroup<T> {
     activity_type: QuestionType,
@@ -84,7 +129,6 @@ struct ActivityGroupView {
     expanded: bool,
     autofocus_group: bool,
     selected_activity_id: Option<String>,
-    autofocus_activity_id: Option<String>,
 }
 
 struct ActivitySelectionScreenData {
@@ -92,7 +136,9 @@ struct ActivitySelectionScreenData {
     back_label: String,
     groups: Vec<ActivityGroupData>,
     selected_activity_id: Option<String>,
+    collapsed_groups: Vec<QuestionType>,
     sky_theme: bool,
+    scroll_position: ScrollPosition,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -101,7 +147,7 @@ fn setup_activity_selection(
     content: Res<ContentLibrary>,
     active_theme: Res<ActiveTheme>,
     selected_lesson: Res<SelectedLesson>,
-    launch_selection: Option<Res<LessonLaunchSelection>>,
+    mut view_state: ResMut<ActivitySelectionViewState>,
     i18n: Res<I18n>,
     settings: Res<crate::data::GameSettings>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
@@ -117,23 +163,24 @@ fn setup_activity_selection(
     };
 
     let groups = localized_activity_groups(lesson, &i18n);
-    let sky_theme = settings.exploration_theme == ExplorationTheme::Sky;
-    let selected_activity_id = match launch_selection.as_deref() {
-        Some(LessonLaunchSelection::SingleActivity { activity_id }) => Some(activity_id.as_str()),
-        Some(LessonLaunchSelection::CompleteLesson) | None => None,
-    }
-    .filter(|id| {
-        groups
-            .iter()
-            .any(|group| group.activities.iter().any(|activity| activity.id == *id))
-    })
-    .map(str::to_owned);
+    view_state.prepare_for_entry(&active_theme.0, lesson_id);
+    let selected_activity_id = view_state
+        .selected_activity_id
+        .as_deref()
+        .filter(|id| {
+            groups
+                .iter()
+                .any(|group| group.activities.iter().any(|activity| activity.id == *id))
+        })
+        .map(str::to_owned);
     let data = ActivitySelectionScreenData {
         lesson_context: lesson.title.get(i18n.language).to_owned(),
         back_label: i18n.t(&TranslationKey::Back).into_owned(),
         groups,
         selected_activity_id,
-        sky_theme,
+        collapsed_groups: view_state.collapsed_groups.clone(),
+        sky_theme: settings.exploration_theme == ExplorationTheme::Sky,
+        scroll_position: view_state.scroll_position.clone(),
     };
     spawn_activity_selection_screen(&mut commands, data, *primary_window);
 }
@@ -213,7 +260,9 @@ fn spawn_activity_selection_content(
         back_label,
         groups,
         selected_activity_id,
+        collapsed_groups,
         sky_theme,
+        scroll_position,
     } = data;
     let has_activities = groups.iter().any(|group| !group.activities.is_empty());
     if sky_theme {
@@ -222,20 +271,46 @@ fn spawn_activity_selection_content(
             theme::typography::text(theme::fonts::HEADING, window),
             TextColor(theme::colors::TEXT_DARK),
         ));
-        parent.spawn((
-            ScrollArea,
-            Node {
-                width: percent(88.0),
-                flex_grow: 1.0,
-                flex_basis: px(0.0),
-                min_height: px(0.0),
-                overflow: Overflow::scroll_y(),
-                border: px(1.0).all(),
-                border_radius: BorderRadius::all(theme::scaled(24.0)),
-                ..default()
-            },
-            BackgroundColor(list_background),
-            BorderColor::all(Color::srgba(0.30, 0.55, 0.84, 0.78)),
+    }
+
+    let border_radius = if sky_theme {
+        theme::scaled(24.0)
+    } else {
+        theme::scaled(theme::sizes::CARD_BORDER_RADIUS)
+    };
+    let border_color = if sky_theme {
+        Color::srgba(0.30, 0.55, 0.84, 0.78)
+    } else {
+        theme::colors::INPUT_BORDER
+    };
+    let mut scroll_area = parent.spawn((
+        ScrollArea,
+        ActivitySelectionScrollArea,
+        scroll_position,
+        Node {
+            width: percent(88.0),
+            flex_grow: 1.0,
+            flex_basis: px(0.0),
+            min_height: px(0.0),
+            flex_direction: FlexDirection::Column,
+            overflow: Overflow::scroll_y(),
+            border: px(1.0).all(),
+            border_radius: BorderRadius::all(border_radius),
+            ..default()
+        },
+        BackgroundColor(list_background),
+        BorderColor::all(border_color),
+        Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
+            scroll_area.spawn(activity_groups_node(
+                groups,
+                collapsed_groups,
+                selected_activity_id,
+                window,
+            ));
+        })),
+    ));
+    if sky_theme {
+        scroll_area.insert((
             BoxShadow::new(
                 Color::srgba(0.08, 0.14, 0.27, 0.15),
                 Val::Px(0.0),
@@ -247,28 +322,6 @@ fn spawn_activity_selection_content(
                 phase: 0.0,
                 amplitude: theme::animation::FLOATING_AMPLITUDE,
             },
-            Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
-                scroll_area.spawn(activity_groups_node(groups, selected_activity_id, window));
-            })),
-        ));
-    } else {
-        parent.spawn((
-            ScrollArea,
-            Node {
-                width: percent(88.0),
-                flex_grow: 1.0,
-                flex_basis: px(0.0),
-                min_height: px(0.0),
-                overflow: Overflow::scroll_y(),
-                border: px(1.0).all(),
-                border_radius: BorderRadius::all(theme::scaled(theme::sizes::CARD_BORDER_RADIUS)),
-                ..default()
-            },
-            BackgroundColor(list_background),
-            BorderColor::all(theme::colors::INPUT_BORDER),
-            Children::spawn(SpawnWith(move |scroll_area: &mut ChildSpawner| {
-                scroll_area.spawn(activity_groups_node(groups, selected_activity_id, window));
-            })),
         ));
     }
     spawn_activity_selection_footer(parent, back_label, has_activities, window);
@@ -307,6 +360,7 @@ fn spawn_activity_selection_footer(
 
 fn activity_groups_node(
     groups: Vec<ActivityGroupData>,
+    collapsed_groups: Vec<QuestionType>,
     selected_activity_id: Option<String>,
     window: Entity,
 ) -> impl Bundle + use<> {
@@ -322,16 +376,15 @@ fn activity_groups_node(
         Children::spawn(SpawnWith(move |list: &mut ChildSpawner| {
             for (index, group) in groups.into_iter().enumerate() {
                 let selected_activity_id = selected_activity_id.clone();
+                let expanded = !collapsed_groups.contains(&group.activity_type);
                 let autofocus_group = selected_activity_id.is_none() && index == 0;
-                let autofocus_activity_id = selected_activity_id.clone();
                 spawn_activity_group(
                     list,
                     ActivityGroupView {
                         group,
-                        expanded: true,
+                        expanded,
                         autofocus_group,
                         selected_activity_id,
-                        autofocus_activity_id,
                     },
                     window,
                 );
@@ -346,7 +399,6 @@ fn spawn_activity_group(parent: &mut ChildSpawner, view: ActivityGroupView, wind
         expanded,
         autofocus_group,
         selected_activity_id,
-        autofocus_activity_id,
     } = view;
     let activity_type = group.activity_type;
     let label = group.label;
@@ -398,7 +450,6 @@ fn spawn_activity_group(parent: &mut ChildSpawner, view: ActivityGroupView, wind
                         TextColor(theme::colors::TEXT_DARK),
                         Node {
                             flex_grow: 1.0,
-                            min_width: px(0.0),
                             ..default()
                         },
                     ));
@@ -430,8 +481,6 @@ fn spawn_activity_group(parent: &mut ChildSpawner, view: ActivityGroupView, wind
                             ActivityButton(activity.id.clone()),
                         ));
                         if selected {
-                            button.insert((AutoFocus, ScrollToSelectedActivity));
-                        } else if autofocus_activity_id.as_deref() == Some(&activity.id) {
                             button.insert(AutoFocus);
                         }
                     }
@@ -497,7 +546,6 @@ fn activity_button(
                 TextLayout::justify(Justify::Left),
                 Node {
                     flex_grow: 1.0,
-                    min_width: px(0.0),
                     ..default()
                 },
             ),
@@ -539,6 +587,7 @@ fn handle_activity_group_disclosure(
     toggles: Query<&ActivityGroupToggle>,
     mut panels: Query<(&ActivityGroupPanel, &mut Node)>,
     mut chevrons: Query<(&ActivityGroupChevron, &mut UiTransform)>,
+    mut view_state: ResMut<ActivitySelectionViewState>,
 ) {
     for event in activations.read() {
         let Ok(toggle) = toggles.get(event.0) else {
@@ -549,6 +598,7 @@ fn handle_activity_group_disclosure(
             if panel.0 == activity_type {
                 let expanded = node.display == Display::None;
                 node.display = disclosure_display(expanded);
+                view_state.set_group_expanded(activity_type, expanded);
                 for (chevron, mut transform) in &mut chevrons {
                     if chevron.0 == activity_type {
                         *transform = disclosure_chevron_transform(expanded);
@@ -559,40 +609,41 @@ fn handle_activity_group_disclosure(
     }
 }
 
-#[allow(clippy::type_complexity)]
-fn scroll_selected_activity_into_view(
-    mut commands: Commands,
-    selected: Query<
-        Entity,
-        (
-            With<ScrollToSelectedActivity>,
-            With<ComputedNode>,
-            With<UiGlobalTransform>,
-        ),
-    >,
-) {
-    for entity in &selected {
-        commands.trigger(ScrollIntoView { entity });
-        commands.entity(entity).remove::<ScrollToSelectedActivity>();
-    }
+#[derive(SystemParam)]
+struct ActivitySelectionActionTargets<'w, 's> {
+    activity_buttons: Query<'w, 's, &'static ActivityButton>,
+    back_buttons: Query<'w, 's, (), With<BackToLessonGridButton>>,
+    scroll_areas: Query<'w, 's, &'static ScrollPosition, With<ActivitySelectionScrollArea>>,
 }
 
 fn handle_activity_selection(
     mut activations: MessageReader<ButtonActivated>,
-    activity_buttons: Query<&ActivityButton>,
-    back_buttons: Query<(), With<BackToLessonGridButton>>,
+    targets: ActivitySelectionActionTargets,
+    mut view_state: ResMut<ActivitySelectionViewState>,
     mut commands: Commands,
     mut next_app_state: ResMut<NextState<AppState>>,
     mut next_exploration_view: ResMut<NextState<ExplorationView>>,
 ) {
     for activation in activations.read() {
-        if let Ok(button) = activity_buttons.get(activation.0) {
+        if let Ok(button) = targets.activity_buttons.get(activation.0) {
+            let scroll_position = targets
+                .scroll_areas
+                .iter()
+                .next()
+                .cloned()
+                .unwrap_or_default();
+            view_state.record_activity_launch(&button.0, scroll_position);
             commands.insert_resource(LessonLaunchSelection::SingleActivity {
                 activity_id: button.0.clone(),
             });
             next_app_state.set(AppState::LessonPlay);
-        } else if back_buttons.contains(activation.0) {
+        } else if targets.back_buttons.contains(activation.0) {
+            view_state.reset();
             next_exploration_view.set(ExplorationView::ThemeLessons);
         }
     }
+}
+
+fn reset_activity_selection_view_state(mut view_state: ResMut<ActivitySelectionViewState>) {
+    view_state.reset();
 }

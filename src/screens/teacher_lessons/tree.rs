@@ -418,18 +418,24 @@ fn lesson_tree_header(
                             LessonDisclosureChevron(chevron_lesson_id),
                         ));
                         row.spawn((
-                            teacher_list_label(
-                                title,
-                                TeacherListLevel::Lesson,
-                                theme::colors::TEXT_DARK,
-                                window,
-                            ),
                             Node {
                                 flex_grow: 1.0,
                                 min_width: px(0.0),
                                 overflow: Overflow::clip(),
                                 ..default()
                             },
+                            children![(
+                                teacher_list_label(
+                                    title,
+                                    TeacherListLevel::Lesson,
+                                    theme::colors::TEXT_DARK,
+                                    window,
+                                ),
+                                Node {
+                                    width: theme::layout::FILL_PARENT,
+                                    ..default()
+                                },
+                            )],
                         ));
                         if has_custom_config {
                             row.spawn((
