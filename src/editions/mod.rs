@@ -55,7 +55,7 @@ impl Plugin for SharedGamePlugin {
         };
         use crate::screens::{
             ActivitySelectionScreenPlugin, HomeScreenPlugin, LessonPlayScreenPlugin,
-            SettingsScreenPlugin, ThemeExplorationScreenPlugin,
+            LessonSummaryScreenPlugin, SettingsScreenPlugin, ThemeExplorationScreenPlugin,
         };
         use crate::states::{ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase};
         use crate::ui::{
@@ -95,6 +95,7 @@ impl Plugin for SharedGamePlugin {
                 ThemeExplorationScreenPlugin,
                 ActivitySelectionScreenPlugin,
                 LessonPlayScreenPlugin,
+                LessonSummaryScreenPlugin,
                 SettingsScreenPlugin,
             ));
     }

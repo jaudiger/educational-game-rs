@@ -59,3 +59,11 @@ pub fn spawn_tooltip_popover(
 
     tooltip_entity
 }
+
+pub fn save_write_failure_notice(text: String, window: Entity) -> impl Bundle + use<> {
+    (
+        Text::new(text),
+        theme::typography::text(theme::fonts::SMALL, window),
+        TextColor(theme::colors::ERROR),
+    )
+}

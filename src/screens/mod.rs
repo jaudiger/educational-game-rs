@@ -3,7 +3,6 @@ pub mod activity_level;
 pub mod activity_selection;
 pub mod home;
 pub mod lesson_play;
-#[cfg(not(feature = "demo"))]
 pub mod lesson_summary;
 #[cfg(not(feature = "demo"))]
 pub mod save_slots;
@@ -22,7 +21,6 @@ pub mod teacher_stats;
 pub use activity_selection::ActivitySelectionScreenPlugin;
 pub use home::HomeScreenPlugin;
 pub use lesson_play::LessonPlayScreenPlugin;
-#[cfg(not(feature = "demo"))]
 pub use lesson_summary::LessonSummaryScreenPlugin;
 #[cfg(not(feature = "demo"))]
 pub use save_slots::SaveSlotsScreenPlugin;

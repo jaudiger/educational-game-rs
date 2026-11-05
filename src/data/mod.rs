@@ -27,12 +27,12 @@ pub use production_system_params::{
 };
 pub use progress::{
     ActiveTheme, ExplorationTheme, GameSettings, Language, LastAnswer, LessonLaunchSelection,
-    LessonSession, QuestionContainer, SelectedLesson, SettingsChanged,
+    LessonScore, LessonSession, QuestionContainer, SelectedLesson, SettingsChanged,
 };
 #[cfg(not(feature = "demo"))]
 pub use save::{
-    ActiveStudent, ClassSave, ClassStudent, IndividualSave, LessonProgress, LessonScore,
-    LessonSessionConfig, PlayerSession, SaveData, get_current_progress,
+    ActiveStudent, ClassSave, ClassStudent, IndividualSave, LessonProgress, LessonSessionConfig,
+    PlayerSession, SaveData, get_current_progress,
 };
 #[cfg(not(feature = "demo"))]
 pub use save_write::{

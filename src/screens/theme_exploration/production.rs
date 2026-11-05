@@ -3,15 +3,15 @@ use std::collections::HashMap;
 
 use crate::data::content::Theme;
 use crate::data::{
-    ContentLibrary, GameMode, LessonLaunchSelection, LessonProgress, PersistenceAction,
-    PersistenceStatus, ProductionPlayerContext, get_current_progress,
+    ContentLibrary, GameMode, LessonProgress, PersistenceAction, PersistenceStatus,
+    ProductionPlayerContext, get_current_progress,
 };
 use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::states::{AppState, ExplorationView};
 
 use super::{
-    ExplorationProgressText, LessonActionPresentation, LessonButtonData, LessonLaunchAction,
-    ThemeButtonData, ThemeLessonsPresentation, ThemeOverviewPresentation,
+    ExplorationProgressText, LessonButtonData, ThemeButtonData, ThemeLessonsPresentation,
+    ThemeOverviewPresentation, lesson_launch_actions,
 };
 
 pub fn prepare_themes(
@@ -112,20 +112,7 @@ pub fn prepare_theme_lessons(
                 } else {
                     None
                 };
-                let actions = [
-                    LessonActionPresentation {
-                        action: LessonLaunchAction::CompleteSeries,
-                        label: i18n.t(&ProductionTranslationKey::PlaySeries).into_owned(),
-                        selection: Some(LessonLaunchSelection::CompleteLesson),
-                    },
-                    LessonActionPresentation {
-                        action: LessonLaunchAction::ChooseActivity,
-                        label: i18n
-                            .t(&ProductionTranslationKey::ChooseActivity)
-                            .into_owned(),
-                        selection: Some(LessonLaunchSelection::CompleteLesson),
-                    },
-                ];
+                let actions = lesson_launch_actions(&i18n);
                 let lessons = theme
                     .lessons
                     .iter()

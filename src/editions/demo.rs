@@ -9,8 +9,8 @@ use crate::screens::lesson_play::layout::{
     LessonPlanningInput, RejectedLessonLaunch, setup_lesson_play,
 };
 use crate::screens::theme_exploration::{
-    LessonActionPresentation, LessonButtonData, LessonLaunchAction, ThemeButtonData,
-    ThemeLessonsPresentation, ThemeOverviewPresentation, setup_theme_lessons, setup_themes,
+    LessonButtonData, ThemeButtonData, ThemeLessonsPresentation, ThemeOverviewPresentation,
+    lesson_launch_actions, setup_theme_lessons, setup_themes,
 };
 use crate::states::AppState;
 use crate::states::{ExplorationView, LessonPhase};
@@ -25,6 +25,7 @@ impl Plugin for DemoEditionPlugin {
             AppState::Home,
             AppState::ThemeExploration,
             AppState::LessonPlay,
+            AppState::LessonSummary,
             AppState::Settings,
         ]))
         .insert_resource(I18n::new(settings.language))
@@ -59,11 +60,8 @@ fn validate_demo_lesson_launch(
 ) {
     commands.remove_resource::<RejectedLessonLaunch>();
     commands.insert_resource(LessonPlanningInput::default());
-    if !matches!(
-        selection.as_deref(),
-        Some(crate::data::LessonLaunchSelection::SingleActivity { .. })
-    ) {
-        bevy::log::error!("Demo requires a single-activity launch");
+    if selection.is_none() {
+        bevy::log::error!("Demo requires a lesson launch selection");
         commands.insert_resource(RejectedLessonLaunch);
         next_state.set(AppState::ThemeExploration);
     }
@@ -130,11 +128,7 @@ fn prepare_demo_theme_lessons(
                 title_text: lesson.title.get(i18n.language).to_owned(),
                 best_percent_text: None,
                 track_progress: false,
-                actions: vec![LessonActionPresentation {
-                    action: LessonLaunchAction::ChooseActivity,
-                    label: String::new(),
-                    selection: None,
-                }],
+                actions: lesson_launch_actions(&i18n).into(),
             })
             .collect(),
     };

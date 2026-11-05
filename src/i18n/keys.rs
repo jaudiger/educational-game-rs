@@ -38,9 +38,17 @@ pub enum TranslationKey {
 
     // Lesson Summary
     FinishLesson,
+    SummaryEncouragement,
+    SummaryGood,
+    SummaryPerfect,
+    SummaryPercentage(u32),
+    SummaryScore(u32, u32),
+    SummaryTitle,
 
     // Theme Exploration
     Themes,
+    ChooseActivity,
+    PlaySeries,
     ActivityCategoryComparison,
     ActivityCategoryIdentification,
     ActivityCategoryMcq,
@@ -121,10 +129,16 @@ impl TranslationKey {
                 CorrectAnswer             => ("Bonne r\u{00e9}ponse !",                    "Correct!"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
                 NextQuestion              => ("Question suivante",                          "Next question"),
+                SummaryEncouragement      => ("Chaque effort compte !",                      "Every effort counts!"),
+                SummaryGood               => ("Bon travail !",                             "Good job!"),
+                SummaryPerfect            => ("Parfait ! Bravo !",                         "Perfect! Well done!"),
                 FinishLesson              => ("Terminer la le\u{00e7}on",                  "Finish lesson"),
+                SummaryTitle              => ("R\u{00e9}sum\u{00e9}",                      "Summary"),
                 // Lesson Summary
                 // Theme Exploration
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
+                ChooseActivity          => ("Choisir une activit\u{00e9}",                "Choose an activity"),
+                PlaySeries              => ("Jouer une s\u{00e9}rie",                    "Play a series"),
                 ActivityCategoryComparison => ("Comparer des fractions",                    "Compare fractions"),
                 ActivityCategoryIdentification => ("Reconna\u{00ee}tre une fraction",       "Identify a fraction"),
                 ActivityCategoryMcq => ("Choisir une r\u{00e9}ponse",                       "Choose an answer"),
@@ -153,6 +167,14 @@ impl TranslationKey {
                 Language::French => format!("{count} activit\u{00e9}s").into(),
                 Language::English if *count == 1 => format!("{count} activity").into(),
                 Language::English => format!("{count} activities").into(),
+            },
+            Self::SummaryPercentage(pct) => match language {
+                Language::French  => format!("R\u{00e9}ussite : {pct} %").into(),
+                Language::English => format!("Success: {pct}%").into(),
+            },
+            Self::SummaryScore(correct, total) => match language {
+                Language::French  => format!("Score : {correct}/{total}").into(),
+                Language::English => format!("Score: {correct}/{total}").into(),
             },
             Self::QuestionProgress(current, total) => match language {
                 Language::French  => format!("Question {current}/{total}").into(),

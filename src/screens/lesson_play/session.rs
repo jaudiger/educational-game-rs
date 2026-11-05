@@ -3,8 +3,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use bevy::prelude::*;
 
 use crate::data::{
-    ActiveStudent, AnswerResult, GameMode, LastAnswer, LessonScore, LessonSession,
-    PersistenceAction, PersistenceMut, PlayerSession, ProductionSettings, SaveData, SelectedLesson,
+    ActiveStudent, AnswerResult, GameMode, LastAnswer, LessonSession, PersistenceAction,
+    PersistenceMut, PlayerSession, ProductionSettings, SaveData, SelectedLesson,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -12,14 +12,11 @@ pub fn record_answer(
     last_answer: Res<LastAnswer>,
     production: Res<ProductionSettings>,
     session: Res<LessonSession>,
-    mut score: ResMut<LessonScore>,
     mut persistence: PersistenceMut<'_>,
     active_student: Option<Res<ActiveStudent>>,
     player_session: Option<Res<PlayerSession>>,
     selected_lesson: Option<Res<SelectedLesson>>,
 ) {
-    update_session_score(&mut score, &last_answer.result);
-
     record_persisted_answer(
         &session,
         &last_answer.result,
@@ -34,14 +31,6 @@ pub fn record_answer(
 pub fn clear_active_student(mut commands: Commands, production: Res<ProductionSettings>) {
     if production.mode == GameMode::Group {
         commands.remove_resource::<ActiveStudent>();
-    }
-}
-
-const fn update_session_score(score: &mut LessonScore, result: &AnswerResult) {
-    let is_correct = matches!(result, AnswerResult::Correct);
-    score.total_answered += 1;
-    if is_correct {
-        score.correct_count += 1;
     }
 }
 

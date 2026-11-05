@@ -338,9 +338,3 @@ pub fn get_current_progress(
         }
     }
 }
-
-#[derive(Resource, Clone, Copy, Debug, Default, Reflect)]
-pub struct LessonScore {
-    pub correct_count: u32,
-    pub total_answered: u32,
-}

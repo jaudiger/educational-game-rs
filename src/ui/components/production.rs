@@ -56,14 +56,6 @@ pub fn sync_persistence_notices(
     }
 }
 
-pub fn save_write_failure_notice(text: String, window: Entity) -> impl Bundle + use<> {
-    (
-        Text::new(text),
-        theme::typography::text(theme::fonts::SMALL, window),
-        TextColor(theme::colors::ERROR),
-    )
-}
-
 #[derive(Component, Reflect)]
 pub struct PopoverConfirmButton;
 

@@ -108,3 +108,9 @@ pub struct LastAnswer {
 
 #[derive(Message, Clone, Copy, Debug)]
 pub struct SettingsChanged;
+
+#[derive(Resource, Clone, Copy, Debug, Default, Reflect)]
+pub struct LessonScore {
+    pub correct_count: u32,
+    pub total_answered: u32,
+}

@@ -3,14 +3,15 @@ use std::path::PathBuf;
 use bevy::prelude::*;
 
 use crate::data::{
-    ActiveStudent, GameMode, LessonLaunchSelection, LessonScore, PersistenceAction,
-    PersistenceStatus, ProductionPlayerContext, ProductionSettings,
+    ActiveStudent, GameMode, LessonLaunchSelection, PersistenceAction, PersistenceStatus,
+    ProductionPlayerContext, ProductionSettings,
 };
 use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::plugins::{PersistencePlugin, TeacherPlugin};
 use crate::screens::home::{HomePresentation, HomeQuitAction};
 use crate::screens::lesson_play::explanations::FeedbackPresentation;
 use crate::screens::lesson_play::{LessonFeedbackSet, session};
+use crate::screens::lesson_summary::{LessonSummaryPresentation, LessonSummarySet};
 use crate::screens::settings::{
     ModePresentation, ModeSelectionRequested, SettingsPresentation, SettingsScreenSet,
 };
@@ -19,15 +20,13 @@ use crate::screens::theme_exploration::{
     ExplorationPresentationSet, setup_theme_lessons, setup_themes,
 };
 use crate::screens::{
-    LessonSummaryScreenPlugin, SaveSlotsScreenPlugin, TeacherLessonsScreenPlugin,
-    TeacherRosterScreenPlugin, TeacherStatsScreenPlugin,
+    SaveSlotsScreenPlugin, TeacherLessonsScreenPlugin, TeacherRosterScreenPlugin,
+    TeacherStatsScreenPlugin,
     lesson_play::layout::{self, LessonPlanningInput},
 };
-use crate::states::{
-    ActiveLesson, AppState, ExplorationView, InLessonFlow, LessonPhase, StateScopedResourceExt,
-};
+use crate::states::{AppState, ExplorationView, InLessonFlow, LessonPhase, StateScopedResourceExt};
 use crate::ui::TextInputPlugin;
-use crate::ui::components::ButtonActivated;
+use crate::ui::components::{ButtonActivated, persistence_message};
 use crate::ui::navigation::AppNavigationPolicy;
 
 pub struct ProductionEditionPlugin {
@@ -50,7 +49,6 @@ impl Plugin for ProductionEditionPlugin {
                 TeacherPlugin,
                 TextInputPlugin,
                 SaveSlotsScreenPlugin,
-                LessonSummaryScreenPlugin,
                 TeacherLessonsScreenPlugin,
                 TeacherRosterScreenPlugin,
                 TeacherStatsScreenPlugin,
@@ -59,7 +57,6 @@ impl Plugin for ProductionEditionPlugin {
                 Update,
                 crate::ui::components::dispatch_confirmation_button_actions,
             )
-            .register_state_scoped_resource::<ActiveLesson, LessonScore>(ActiveLesson)
             .register_state_scoped_resource::<InLessonFlow, ActiveStudent>(InLessonFlow)
             .add_systems(
                 OnEnter(ExplorationView::Themes),
@@ -106,10 +103,11 @@ impl Plugin for ProductionEditionPlugin {
             )
             .add_systems(
                 OnEnter(AppState::LessonPlay),
-                (
-                    initialize_lesson_score,
-                    prepare_lesson_planning.before(layout::setup_lesson_play),
-                ),
+                prepare_lesson_planning.before(layout::setup_lesson_play),
+            )
+            .add_systems(
+                OnEnter(AppState::LessonSummary),
+                prepare_lesson_summary.in_set(LessonSummarySet::Prepare),
             )
             .add_systems(
                 OnEnter(LessonPhase::ShowFeedback),
@@ -126,8 +124,17 @@ impl Plugin for ProductionEditionPlugin {
     }
 }
 
-fn initialize_lesson_score(mut commands: Commands) {
-    commands.insert_resource(LessonScore::default());
+fn prepare_lesson_summary(
+    status: Res<PersistenceStatus>,
+    i18n: Res<I18n>,
+    mut presentation: ResMut<LessonSummaryPresentation>,
+) {
+    let next = LessonSummaryPresentation {
+        save_notice: persistence_message(PersistenceAction::QuestionAnswer, *status, &i18n),
+    };
+    if *presentation != next {
+        *presentation = next;
+    }
 }
 
 fn prepare_lesson_planning(

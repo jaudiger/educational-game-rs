@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 use bevy::ui::UiSystems;
 
-use crate::data::{LastAnswer, LessonLaunchSelection, LessonSession, SelectedLesson};
+use crate::data::{
+    AnswerResult, LastAnswer, LessonLaunchSelection, LessonScore, LessonSession, SelectedLesson,
+};
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::QuestionRoot;
 use crate::questions::registry::{
@@ -33,6 +35,7 @@ impl Plugin for LessonPlayScreenPlugin {
         app.add_message::<QuestionResponseSubmitted>()
             .init_resource::<explanations::FeedbackPresentation>()
             .register_state_scoped_resource::<ActiveLesson, LessonSession>(ActiveLesson)
+            .register_state_scoped_resource::<ActiveLesson, LessonScore>(ActiveLesson)
             .register_state_scoped_resource::<InLessonFlow, SelectedLesson>(InLessonFlow)
             .register_state_scoped_resource::<InLessonFlow, LessonLaunchSelection>(InLessonFlow)
             .register_state_scoped_resource::<ActiveLesson, LastAnswer>(ActiveLesson)
@@ -47,7 +50,10 @@ impl Plugin for LessonPlayScreenPlugin {
                 )
                     .chain(),
             )
-            .add_systems(OnEnter(AppState::LessonPlay), layout::setup_lesson_play)
+            .add_systems(
+                OnEnter(AppState::LessonPlay),
+                (initialize_lesson_score, layout::setup_lesson_play).chain(),
+            )
             .add_systems(
                 PostUpdate,
                 layout::fit_question_to_available_height
@@ -79,6 +85,10 @@ impl Plugin for LessonPlayScreenPlugin {
             )
             .add_systems(
                 OnEnter(LessonPhase::ShowFeedback),
+                record_lesson_score.in_set(LessonFeedbackSet::RecordAnswer),
+            )
+            .add_systems(
+                OnEnter(LessonPhase::ShowFeedback),
                 explanations::setup_feedback_ui.in_set(LessonFeedbackSet::Presentation),
             )
             .add_systems(OnEnter(LessonPhase::Transitioning), advance_question)
@@ -86,6 +96,17 @@ impl Plugin for LessonPlayScreenPlugin {
                 Update,
                 handle_quit_lesson.run_if(in_state(AppState::LessonPlay)),
             );
+    }
+}
+
+fn initialize_lesson_score(mut commands: Commands) {
+    commands.insert_resource(LessonScore::default());
+}
+
+fn record_lesson_score(answer: Res<LastAnswer>, mut score: ResMut<LessonScore>) {
+    score.total_answered += 1;
+    if matches!(&answer.result, AnswerResult::Correct) {
+        score.correct_count += 1;
     }
 }
 

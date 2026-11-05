@@ -7,6 +7,7 @@ use crate::data::{
     ActiveTheme, ContentLibrary, ExplorationTheme, GameSettings, LessonLaunchSelection,
     SelectedLesson,
 };
+use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, ExplorationView, InLessonFlow, StateScopedResourceExt};
 use crate::ui::animation::{AnimatedButton, FloatingCard};
 use crate::ui::components::{
@@ -80,7 +81,6 @@ pub enum LessonLaunchAction {
 struct LessonActionButton {
     lesson_id: String,
     action: LessonLaunchAction,
-    selection: Option<LessonLaunchSelection>,
 }
 
 #[derive(Component, Reflect)]
@@ -120,7 +120,19 @@ pub struct ThemeOverviewPresentation {
 pub struct LessonActionPresentation {
     pub action: LessonLaunchAction,
     pub label: String,
-    pub selection: Option<LessonLaunchSelection>,
+}
+
+pub fn lesson_launch_actions(i18n: &I18n) -> [LessonActionPresentation; 2] {
+    [
+        LessonActionPresentation {
+            action: LessonLaunchAction::CompleteSeries,
+            label: i18n.t(&TranslationKey::PlaySeries).into_owned(),
+        },
+        LessonActionPresentation {
+            action: LessonLaunchAction::ChooseActivity,
+            label: i18n.t(&TranslationKey::ChooseActivity).into_owned(),
+        },
+    ]
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -672,34 +684,8 @@ fn spawn_lesson_button(
     card_style: Option<ExplorationCardStyle>,
     index: usize,
 ) {
-    let (background, text_color) = card_colors(card_style, true);
+    let (background, _) = card_colors(card_style, true);
     let dims = card_dimensions(card_style);
-    if data.actions.len() == 1 {
-        let action = &data.actions[0];
-        let mut card = parent.spawn((
-            button_base(exploration_button_palette(
-                background, text_color, card_style, true,
-            )),
-            card_node_layout(&dims),
-            LessonActionButton {
-                lesson_id: data.id.clone(),
-                action: action.action,
-                selection: action.selection.clone(),
-            },
-        ));
-        card.remove::<AnimatedButton>();
-        if let Some(style) = card_style {
-            insert_card_overlay(&mut card, style, true, index, &dims);
-        }
-        if auto_focus {
-            card.insert(AutoFocus);
-        }
-        card.with_children(|contents| {
-            spawn_lesson_heading(contents, data, text_color, window, card_style);
-        });
-        return;
-    }
-
     let mut card = parent.spawn((
         Node {
             border: px(1.0).all(),
@@ -814,7 +800,6 @@ fn spawn_lesson_action(
         LessonActionButton {
             lesson_id: data.id.clone(),
             action: action.action,
-            selection: action.selection.clone(),
         },
         children![(
             Text::new(action.label.clone()),
@@ -845,21 +830,12 @@ fn handle_theme_lessons(
                 && theme_data.lesson(&lesson_button.lesson_id).is_some()
             {
                 commands.insert_resource(SelectedLesson(Some(lesson_button.lesson_id.clone())));
+                commands.insert_resource(LessonLaunchSelection::CompleteLesson);
                 match lesson_button.action {
                     LessonLaunchAction::CompleteSeries => {
-                        let selection = lesson_button
-                            .selection
-                            .clone()
-                            .unwrap_or(LessonLaunchSelection::CompleteLesson);
-                        commands.insert_resource(selection);
                         next_app_state.set(AppState::LessonPlay);
                     }
                     LessonLaunchAction::ChooseActivity => {
-                        if let Some(selection) = lesson_button.selection.clone() {
-                            commands.insert_resource(selection);
-                        } else {
-                            commands.remove_resource::<LessonLaunchSelection>();
-                        }
                         next_exploration_view.set(ExplorationView::ActivitySelection);
                     }
                 }
