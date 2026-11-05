@@ -568,6 +568,7 @@ impl QuestionDefinition {
                     true,
                     &mut issues,
                 );
+                validate_fraction_shape(definition.shape, definition.denominator, &mut issues);
                 issues.extend(definition.explanation.validation_issues());
             }
             Self::FractionVisualizationTemplate(template) => {
@@ -640,6 +641,7 @@ impl QuestionDefinition {
                     false,
                     &mut issues,
                 );
+                validate_fraction_shape(definition.mode, definition.denominator, &mut issues);
                 if let FractionColoring::Explicit(parts) = &definition.coloring {
                     validate_fraction_coloring(
                         definition.numerator,
@@ -848,6 +850,16 @@ fn validate_fraction(
     }
 }
 
+fn validate_fraction_shape(shape: FractionShape, denominator: u32, issues: &mut Vec<String>) {
+    if matches!(shape, FractionShape::Square | FractionShape::Triangle)
+        && !shape.supports_denominator(denominator)
+    {
+        issues.push(
+            "Square and triangle fraction shapes require a perfect-square denominator".to_owned(),
+        );
+    }
+}
+
 fn validate_fraction_coloring(
     numerator: u32,
     denominator: u32,
@@ -955,13 +967,17 @@ fn validate_grid(rows: u32, cols: u32, issues: &mut Vec<String>) {
 
 fn validate_explanation_visual(visual: Option<&ExplanationVisual>, issues: &mut Vec<String>) {
     match visual {
-        Some(ExplanationVisual::FractionRepresentation { parts, .. }) => {
+        Some(ExplanationVisual::FractionRepresentation { mode, parts }) => {
             validate_fraction(parts.numerator(), parts.denominator(), true, issues);
+            validate_fraction_shape(*mode, parts.denominator(), issues);
         }
         Some(ExplanationVisual::FractionVisualizationFeedback {
-            submitted, correct, ..
+            mode,
+            submitted,
+            correct,
         }) => {
             validate_fraction(correct.numerator(), correct.denominator(), true, issues);
+            validate_fraction_shape(*mode, correct.denominator(), issues);
             if submitted.denominator() != correct.denominator() {
                 issues.push("Submitted fraction coloring has an invalid denominator".to_owned());
             }
@@ -1518,6 +1534,24 @@ pub enum FractionShape {
     Line,
     Square,
     Circle,
+    Triangle,
+}
+
+impl FractionShape {
+    pub const fn supports_denominator(self, denominator: u32) -> bool {
+        match self {
+            Self::Line | Self::Circle => denominator > 0,
+            Self::Square | Self::Triangle => is_perfect_square(denominator),
+        }
+    }
+}
+
+const fn is_perfect_square(value: u32) -> bool {
+    if value == 0 {
+        return false;
+    }
+    let root = value.isqrt();
+    root * root == value
 }
 
 /// Stores the colored state of every equal fraction part.

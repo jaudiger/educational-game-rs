@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Write as _};
 
-use rand::seq::{IndexedRandom, SliceRandom};
+use rand::seq::{IndexedRandom, IteratorRandom, SliceRandom};
 use rand::{Rng, RngExt};
 
 use super::types::{
@@ -381,32 +381,43 @@ const fn fraction_name(denominator: i32) -> (&'static str, &'static str) {
     }
 }
 
-fn random_fraction_shape(rng: &mut impl Rng) -> FractionShape {
+fn random_fraction_shape(denominator: u32, rng: &mut impl Rng) -> FractionShape {
     [
         FractionShape::Line,
         FractionShape::Square,
         FractionShape::Circle,
+        FractionShape::Triangle,
     ]
+    .into_iter()
+    .filter(|shape| shape.supports_denominator(denominator))
     .choose(rng)
-    .copied()
-    .expect("fraction shapes are available")
+    .expect("fraction shapes support the selected denominator")
+}
+
+fn random_fraction_pair(
+    numerator_range: &[u32],
+    denominator_range: &[u32],
+    allow_equal: bool,
+    rng: &mut impl Rng,
+) -> (u32, u32) {
+    let &denominator = denominator_range
+        .choose(rng)
+        .expect("validated fraction template has a denominator");
+    let &numerator = numerator_range
+        .iter()
+        .filter(|&&numerator| {
+            numerator > 0 && numerator <= denominator && (allow_equal || numerator < denominator)
+        })
+        .choose(rng)
+        .expect("validated fraction denominator has a valid numerator");
+    (numerator, denominator)
 }
 
 impl FractionVisualizationTemplate {
     /// Pick a random numerator/denominator pair and shape from the configured ranges.
     pub fn resolve(&self, rng: &mut impl Rng) -> FractionVisualizationDefinition {
-        let &denominator = self
-            .denominator_range
-            .choose(rng)
-            .expect("validated fraction-visualization template has a denominator");
-        let numerator = *self
-            .numerator_range
-            .iter()
-            .filter(|&&numerator| numerator > 0 && numerator <= denominator)
-            .copied()
-            .collect::<Vec<_>>()
-            .choose(rng)
-            .expect("validated fraction-visualization denominator has a numerator");
+        let (numerator, denominator) =
+            random_fraction_pair(&self.numerator_range, &self.denominator_range, true, rng);
 
         let prompt = LocalizedText::new(
             substitute_template(
@@ -438,7 +449,7 @@ impl FractionVisualizationTemplate {
             prompt,
             numerator,
             denominator,
-            shape: random_fraction_shape(rng),
+            shape: random_fraction_shape(denominator, rng),
             explanation,
         }
     }
@@ -697,24 +708,14 @@ impl FractionIdentificationTemplate {
     /// Pick a random fraction from the configured ranges and build the
     /// identification MCQ with distractors.
     pub fn resolve(&self, rng: &mut impl Rng) -> ResolvedFractionIdentification {
-        let &denominator = self
-            .denominator_range
-            .choose(rng)
-            .expect("validated fraction-visualization template has a denominator");
-        let numerator = *self
-            .numerator_range
-            .iter()
-            .filter(|&&numerator| numerator > 0 && numerator < denominator)
-            .copied()
-            .collect::<Vec<_>>()
-            .choose(rng)
-            .expect("validated fraction-visualization denominator has a numerator");
+        let (numerator, denominator) =
+            random_fraction_pair(&self.numerator_range, &self.denominator_range, false, rng);
 
         resolve_fraction_identification(
             generate_fraction_identification(
                 numerator,
                 denominator,
-                random_fraction_shape(rng),
+                random_fraction_shape(denominator, rng),
                 rng,
             ),
             rng,

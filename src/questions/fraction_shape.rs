@@ -19,6 +19,7 @@ use crate::ui::theme;
 
 const SQUARE_SIZE: (u32, u32) = (320, 320);
 const CIRCLE_SIZE: (u32, u32) = (320, 320);
+const TRIANGLE_SIZE: (u32, u32) = (320, 277);
 const GAP_WIDTH: f32 = 4.0;
 const OUTLINE_WIDTH: f32 = 3.0;
 const COLOR_UNCOLORED: Color = Color::srgb(0.73, 0.73, 0.78);
@@ -41,7 +42,7 @@ pub fn spawn_fraction_representation(
                 BAR_HEIGHT,
             ));
         }
-        FractionShape::Square | FractionShape::Circle => {
+        FractionShape::Square | FractionShape::Circle | FractionShape::Triangle => {
             let image = images.add(render_fraction_shape(mode, parts, theme::colors::PRIMARY));
             let (width, height) = design_size(mode);
             parent.spawn((
@@ -56,7 +57,7 @@ pub fn spawn_fraction_representation(
     }
 }
 
-/// Stores the interactive state for a square or circle fraction.
+/// Stores the interactive state for a non-line fraction shape.
 #[derive(Component)]
 pub struct InteractiveFractionShape {
     pub(crate) shape: FractionShape,
@@ -67,7 +68,7 @@ pub struct InteractiveFractionShape {
     pub(crate) image: Handle<Image>,
 }
 
-/// Returns an interactive square or circle fraction control.
+/// Returns an interactive non-line fraction shape control.
 pub fn interactive_fraction_shape(
     images: &mut Assets<Image>,
     shape: FractionShape,
@@ -119,15 +120,21 @@ pub fn fraction_shape_part_at(
     x: f32,
     y: f32,
 ) -> Option<u32> {
-    if denominator == 0 || !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
+    if !shape.supports_denominator(denominator)
+        || !(0.0..=1.0).contains(&x)
+        || !(0.0..=1.0).contains(&y)
+    {
         return None;
     }
 
     let (width, height) = pixel_size(shape);
-    if is_outline(shape, x, y, width, height) || is_gap(shape, denominator, x, y, width, height) {
+    let side = denominator.isqrt();
+    if is_outline(shape, x, y, width, height)
+        || is_gap(shape, denominator, side, x, y, width, height)
+    {
         return None;
     }
-    part_at(shape, denominator, x, y)
+    part_at(shape, denominator, side, x, y)
 }
 
 /// Returns the design size used to display each generated shape texture.
@@ -149,6 +156,7 @@ pub fn render_fraction_shape(
     colored_color: Color,
 ) -> Image {
     let denominator = parts.denominator();
+    let side = denominator.isqrt();
     let (width, height) = pixel_size(shape);
     let pixel_count = (width * height) as usize;
     let mut data = vec![0_u8; pixel_count * 4];
@@ -161,7 +169,8 @@ pub fn render_fraction_shape(
             for x in 0..width {
                 let normalized_x = (x as f32 + 0.5) / width as f32;
                 let normalized_y = (y as f32 + 0.5) / height as f32;
-                let Some(part) = part_at(shape, denominator, normalized_x, normalized_y) else {
+                let Some(part) = part_at(shape, denominator, side, normalized_x, normalized_y)
+                else {
                     continue;
                 };
                 let color = if is_outline(shape, normalized_x, normalized_y, width, height) {
@@ -169,6 +178,7 @@ pub fn render_fraction_shape(
                 } else if is_gap(
                     shape,
                     denominator,
+                    side,
                     normalized_x,
                     normalized_y,
                     width,
@@ -206,6 +216,7 @@ const fn pixel_size(shape: FractionShape) -> (u32, u32) {
         FractionShape::Line => unreachable!(),
         FractionShape::Square => SQUARE_SIZE,
         FractionShape::Circle => CIRCLE_SIZE,
+        FractionShape::Triangle => TRIANGLE_SIZE,
     }
 }
 
@@ -214,18 +225,20 @@ const fn pixel_size(shape: FractionShape) -> (u32, u32) {
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
-fn part_at(shape: FractionShape, denominator: u32, x: f32, y: f32) -> Option<u32> {
-    if denominator == 0 || !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
+fn part_at(shape: FractionShape, denominator: u32, side: u32, x: f32, y: f32) -> Option<u32> {
+    if !shape.supports_denominator(denominator)
+        || !(0.0..=1.0).contains(&x)
+        || !(0.0..=1.0).contains(&y)
+    {
         return None;
     }
 
     match shape {
         FractionShape::Line => unreachable!(),
         FractionShape::Square => {
-            let (rows, columns) = square_grid(denominator);
-            let row = (y * rows as f32).floor() as u32;
-            let column = (x * columns as f32).floor() as u32;
-            (row < rows && column < columns).then_some(row * columns + column)
+            let row = (y * side as f32).floor() as u32;
+            let column = (x * side as f32).floor() as u32;
+            (row < side && column < side).then_some(row * side + column)
         }
         FractionShape::Circle => {
             let dx = x.mul_add(2.0, -1.0);
@@ -237,22 +250,37 @@ fn part_at(shape: FractionShape, denominator: u32, x: f32, y: f32) -> Option<u32
             Some((angle * denominator as f32 / std::f32::consts::TAU).floor() as u32)
                 .map(|part| part.min(denominator - 1))
         }
+        FractionShape::Triangle => {
+            let (left_coordinate, right_coordinate) = triangle_coordinates(x, y)?;
+            let left_grid = left_coordinate * side as f32;
+            let right_grid = right_coordinate * side as f32;
+            let left_cell = left_grid.floor() as u32;
+            let right_cell = right_grid.floor() as u32;
+            let layer = left_cell + right_cell;
+            let triangular_index = layer * (layer + 1) / 2 + left_cell;
+            if left_grid.fract() + right_grid.fract() <= 1.0 {
+                (layer < side).then_some(triangular_index)
+            } else if layer + 1 < side {
+                Some(side * (side + 1) / 2 + triangular_index)
+            } else {
+                None
+            }
+        }
     }
 }
 
-const fn square_grid(denominator: u32) -> (u32, u32) {
-    let mut rows = 1_u32;
-    while rows
-        .saturating_add(1)
-        .saturating_mul(rows.saturating_add(1))
-        <= denominator
-    {
-        rows += 1;
-    }
-    while !denominator.is_multiple_of(rows) {
-        rows -= 1;
-    }
-    (rows, denominator / rows)
+fn triangle_coordinates(x: f32, y: f32) -> Option<(f32, f32)> {
+    let left_coordinate = 0.5_f32.mul_add(y, 0.5) - x;
+    let right_coordinate = 0.5_f32.mul_add(y, x) - 0.5;
+    (left_coordinate >= 0.0 && right_coordinate >= 0.0 && y <= 1.0)
+        .then_some((left_coordinate, right_coordinate))
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn triangle_side_distance_scale(width: u32, height: u32) -> f32 {
+    let inverse_width = 1.0 / width as f32;
+    let inverse_half_height = 0.5 / height as f32;
+    1.0 / inverse_width.hypot(inverse_half_height)
 }
 
 #[allow(clippy::cast_precision_loss)]
@@ -273,6 +301,17 @@ fn is_outline(shape: FractionShape, x: f32, y: f32, width: u32, height: u32) -> 
             let dy = (height as f32).mul_add(-0.5, y);
             radius - dx.hypot(dy) < OUTLINE_WIDTH
         }
+        FractionShape::Triangle => {
+            let Some((left_coordinate, right_coordinate)) =
+                triangle_coordinates(x / width as f32, y / height as f32)
+            else {
+                return false;
+            };
+            let side_scale = triangle_side_distance_scale(width, height);
+            left_coordinate * side_scale < OUTLINE_WIDTH
+                || right_coordinate * side_scale < OUTLINE_WIDTH
+                || height as f32 - y < OUTLINE_WIDTH
+        }
     }
 }
 
@@ -281,12 +320,19 @@ fn is_outline(shape: FractionShape, x: f32, y: f32, width: u32, height: u32) -> 
     clippy::cast_precision_loss,
     clippy::cast_sign_loss
 )]
-fn is_gap(shape: FractionShape, denominator: u32, x: f32, y: f32, width: u32, height: u32) -> bool {
+fn is_gap(
+    shape: FractionShape,
+    denominator: u32,
+    side: u32,
+    x: f32,
+    y: f32,
+    width: u32,
+    height: u32,
+) -> bool {
     match shape {
         FractionShape::Line => unreachable!(),
         FractionShape::Square => {
-            let (rows, columns) = square_grid(denominator);
-            near_grid_line(x, columns, width as f32) || near_grid_line(y, rows, height as f32)
+            near_grid_line(x, side, width as f32) || near_grid_line(y, side, height as f32)
         }
         FractionShape::Circle => {
             let dx = x.mul_add(2.0, -1.0);
@@ -300,6 +346,15 @@ fn is_gap(shape: FractionShape, denominator: u32, x: f32, y: f32, width: u32, he
                 (section - section.round()).abs() * std::f32::consts::TAU / denominator as f32;
             let radius = dx.hypot(dy) * width.min(height) as f32 * 0.5;
             radius > GAP_WIDTH * 0.5 && radius * angle_delta < GAP_WIDTH * 0.5
+        }
+        FractionShape::Triangle => {
+            let Some((left_coordinate, right_coordinate)) = triangle_coordinates(x, y) else {
+                return false;
+            };
+            let side_scale = triangle_side_distance_scale(width, height);
+            near_grid_line(y, side, height as f32)
+                || near_grid_line(left_coordinate, side, side_scale)
+                || near_grid_line(right_coordinate, side, side_scale)
         }
     }
 }

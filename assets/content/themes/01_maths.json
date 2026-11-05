@@ -125,7 +125,7 @@
                   "en": "Colour {n}/{d} of the pie"
                 },
                 "numerator_range": [1, 2, 3, 4, 5, 6, 7],
-                "denominator_range": [3, 4, 5, 6, 8, 10, 12],
+                "denominator_range": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
                 "explanation_template": {
                   "fr": "Il y a {d} parts au total et {n} sont coloriées : c'est la fraction {fraction}.",
                   "en": "There are {d} parts in total and {n} are colored: that's the fraction {fraction}."
