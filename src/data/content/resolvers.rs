@@ -381,28 +381,37 @@ const fn fraction_name(denominator: i32) -> (&'static str, &'static str) {
     }
 }
 
-fn random_fraction_shape(denominator: u32, rng: &mut impl Rng) -> FractionShape {
+fn random_fraction_shape(rng: &mut impl Rng) -> FractionShape {
     [
         FractionShape::Line,
         FractionShape::Square,
         FractionShape::Circle,
         FractionShape::Triangle,
     ]
-    .into_iter()
-    .filter(|shape| shape.supports_denominator(denominator))
     .choose(rng)
-    .expect("fraction shapes support the selected denominator")
+    .copied()
+    .expect("fraction shapes are available")
 }
 
 fn random_fraction_pair(
+    shape: FractionShape,
     numerator_range: &[u32],
     denominator_range: &[u32],
     allow_equal: bool,
     rng: &mut impl Rng,
 ) -> (u32, u32) {
     let &denominator = denominator_range
+        .iter()
+        .filter(|&&denominator| {
+            shape.supports_denominator(denominator)
+                && numerator_range.iter().any(|&numerator| {
+                    numerator > 0
+                        && numerator <= denominator
+                        && (allow_equal || numerator < denominator)
+                })
+        })
         .choose(rng)
-        .expect("validated fraction template has a denominator");
+        .expect("validated fraction template has a compatible denominator");
     let &numerator = numerator_range
         .iter()
         .filter(|&&numerator| {
@@ -414,10 +423,16 @@ fn random_fraction_pair(
 }
 
 impl FractionVisualizationTemplate {
-    /// Pick a random numerator/denominator pair and shape from the configured ranges.
+    /// Choose a shape uniformly and a compatible fraction from the configured ranges.
     pub fn resolve(&self, rng: &mut impl Rng) -> FractionVisualizationDefinition {
-        let (numerator, denominator) =
-            random_fraction_pair(&self.numerator_range, &self.denominator_range, true, rng);
+        let shape = random_fraction_shape(rng);
+        let (numerator, denominator) = random_fraction_pair(
+            shape,
+            &self.numerator_range,
+            &self.denominator_range,
+            true,
+            rng,
+        );
 
         let prompt = LocalizedText::new(
             substitute_template(
@@ -449,7 +464,7 @@ impl FractionVisualizationTemplate {
             prompt,
             numerator,
             denominator,
-            shape: random_fraction_shape(denominator, rng),
+            shape,
             explanation,
         }
     }
@@ -708,16 +723,17 @@ impl FractionIdentificationTemplate {
     /// Pick a random fraction from the configured ranges and build the
     /// identification MCQ with distractors.
     pub fn resolve(&self, rng: &mut impl Rng) -> ResolvedFractionIdentification {
-        let (numerator, denominator) =
-            random_fraction_pair(&self.numerator_range, &self.denominator_range, false, rng);
+        let shape = random_fraction_shape(rng);
+        let (numerator, denominator) = random_fraction_pair(
+            shape,
+            &self.numerator_range,
+            &self.denominator_range,
+            false,
+            rng,
+        );
 
         resolve_fraction_identification(
-            generate_fraction_identification(
-                numerator,
-                denominator,
-                random_fraction_shape(denominator, rng),
-                rng,
-            ),
+            generate_fraction_identification(numerator, denominator, shape, rng),
             rng,
         )
     }

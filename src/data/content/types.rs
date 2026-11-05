@@ -590,6 +590,12 @@ impl QuestionDefinition {
                     true,
                     &mut issues,
                 );
+                validate_fraction_shape_ranges(
+                    &template.numerator_range,
+                    &template.denominator_range,
+                    true,
+                    &mut issues,
+                );
             }
             Self::FractionComparison(definition) => {
                 validate_fraction(
@@ -655,6 +661,12 @@ impl QuestionDefinition {
             }
             Self::FractionIdentificationTemplate(template) => {
                 validate_fraction_ranges(
+                    &template.numerator_range,
+                    &template.denominator_range,
+                    false,
+                    &mut issues,
+                );
+                validate_fraction_shape_ranges(
                     &template.numerator_range,
                     &template.denominator_range,
                     false,
@@ -929,6 +941,26 @@ fn validate_fraction_ranges(
             .any(|&d| !numerators.iter().any(|&n| n <= d && (allow_equal || n < d)))
     {
         issues.push("Every fraction range value needs a valid pair".to_owned());
+    }
+}
+
+fn validate_fraction_shape_ranges(
+    numerators: &[u32],
+    denominators: &[u32],
+    allow_equal: bool,
+    issues: &mut Vec<String>,
+) {
+    let has_square_pair = denominators.iter().any(|&denominator| {
+        FractionShape::Square.supports_denominator(denominator)
+            && numerators.iter().any(|&numerator| {
+                numerator > 0
+                    && numerator <= denominator
+                    && (allow_equal || numerator < denominator)
+            })
+    });
+    if !has_square_pair {
+        issues
+            .push("Fraction generation ranges must support square and triangle shapes".to_owned());
     }
 }
 
