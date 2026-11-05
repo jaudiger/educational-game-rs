@@ -44,7 +44,7 @@
             },
             {
               "id": "fraction_addition",
-              "school_level": "CE2",
+              "school_level": "CM1",
               "catalog_label": {
                 "fr": "Additionner des fractions de même dénominateur",
                 "en": "Add fractions with the same denominator"
@@ -163,7 +163,7 @@
             },
             {
               "id": "fraction_comparison_same_numerator",
-              "school_level": "CE2",
+              "school_level": "CM1",
               "catalog_label": {
                 "fr": "Comparer des fractions avec le même numérateur",
                 "en": "Compare fractions with the same numerator"
@@ -186,11 +186,11 @@
               }
             },
             {
-              "id": "fraction_comparison_multiple_denominators",
-              "school_level": "CE2",
+              "id": "fraction_comparison_different_numerators_and_denominators",
+              "school_level": "CM1",
               "catalog_label": {
-                "fr": "Comparer des fractions de dénominateurs différents",
-                "en": "Compare fractions with different denominators"
+                "fr": "Comparer des fractions à numérateurs et dénominateurs différents",
+                "en": "Compare fractions with different numerators and denominators"
               },
               "definition": {
                 "type": "FractionComparisonTemplate",
@@ -200,7 +200,7 @@
                 },
                 "character_a": "Jade",
                 "character_b": "Noah",
-                "mode": "MultipleDenominator",
+                "mode": "DifferentNumeratorsAndDenominators",
                 "denominator_range": [3, 4, 6, 8, 12],
                 "numerator_range": [1, 2, 3, 4, 5, 6, 7],
                 "explanation_template": {
@@ -216,7 +216,7 @@
           "exercises": [
             {
               "id": "fraction_identification",
-              "school_level": "CE2",
+              "school_level": "CM1",
               "catalog_label": {
                 "fr": "Identifier la fraction coloriée",
                 "en": "Identify the shaded fraction"

@@ -265,7 +265,7 @@ struct FractionComparisonEntry<'a> {
 }
 
 /// Renders original fraction bars then converted bars with common denominator.
-/// Shows `original => converted` for each character (`MultipleDenominator`).
+/// Shows each original fraction alongside its common-denominator form.
 fn spawn_fraction_comparison_conversion_visual(
     parent: &mut ChildSpawnerCommands,
     a: &FractionComparisonEntry<'_>,

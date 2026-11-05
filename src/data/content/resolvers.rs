@@ -11,7 +11,7 @@ use super::types::{
     FractionIdentificationTemplate, FractionShape, FractionVisualizationDefinition,
     FractionVisualizationTemplate, LocalizedExplanation, LocalizedText, McqDefinition, McqResolver,
     McqTemplate, NumericInputDefinition, NumericInputTemplate, ParameterRange, QuestionVisual,
-    fraction_value_pair_is_safe,
+    fraction_value_pair_is_safe, has_distinct_valid_numerators,
 };
 
 /// Shuffle `correct` together with `distractors` and return the shuffled list
@@ -505,7 +505,7 @@ impl FractionComparisonTemplate {
                 let nb = numerators[1];
                 ((na, denominator), (nb, denominator))
             }
-            ComparisonMode::MultipleDenominator => {
+            ComparisonMode::DifferentNumeratorsAndDenominators => {
                 let eligible_denominators: Vec<u32> = self
                     .denominator_range
                     .iter()
@@ -519,30 +519,18 @@ impl FractionComparisonTemplate {
                 let mut denominator_pairs = Vec::new();
                 for &da in &eligible_denominators {
                     for &db in &eligible_denominators {
-                        if da != db && (da % db == 0 || db % da == 0) {
+                        if da != db
+                            && (da % db == 0 || db % da == 0)
+                            && has_distinct_valid_numerators(&self.numerator_range, da, db)
+                        {
                             denominator_pairs.push((da, db));
                         }
                     }
                 }
-                let &(da, db) = denominator_pairs
-                    .choose(rng)
-                    .expect("validated multiple-denominator template has a pair");
-                let na = *self
-                    .numerator_range
-                    .iter()
-                    .filter(|&&n| n > 0 && n < da)
-                    .copied()
-                    .collect::<Vec<_>>()
-                    .choose(rng)
-                    .expect("validated first denominator has a numerator");
-                let nb = *self
-                    .numerator_range
-                    .iter()
-                    .filter(|&&n| n > 0 && n < db)
-                    .copied()
-                    .collect::<Vec<_>>()
-                    .choose(rng)
-                    .expect("validated second denominator has a numerator");
+                let &(da, db) = denominator_pairs.choose(rng).expect(
+                    "validated comparison template has distinct numerator and denominator pairs",
+                );
+                let (na, nb) = self.select_different_numerators(da, db, rng);
                 ((na, da), (nb, db))
             }
             ComparisonMode::SameNumerator => {
@@ -564,6 +552,30 @@ impl FractionComparisonTemplate {
         }
     }
 
+    fn select_different_numerators(
+        &self,
+        denominator_a: u32,
+        denominator_b: u32,
+        rng: &mut impl Rng,
+    ) -> (u32, u32) {
+        let mut pairs = Vec::new();
+        for &numerator_a in &self.numerator_range {
+            for &numerator_b in &self.numerator_range {
+                if numerator_a > 0
+                    && numerator_a < denominator_a
+                    && numerator_b > 0
+                    && numerator_b < denominator_b
+                    && numerator_a != numerator_b
+                {
+                    pairs.push((numerator_a, numerator_b));
+                }
+            }
+        }
+        *pairs
+            .choose(rng)
+            .expect("validated comparison template has distinct numerators")
+    }
+
     fn build_visual(&self, fraction_a: (u32, u32), fraction_b: (u32, u32)) -> ExplanationVisual {
         match self.mode {
             ComparisonMode::SameDenominator | ComparisonMode::SameNumerator => {
@@ -578,7 +590,7 @@ impl FractionComparisonTemplate {
                     },
                 }
             }
-            ComparisonMode::MultipleDenominator => {
+            ComparisonMode::DifferentNumeratorsAndDenominators => {
                 let common_d = fraction_a.1.max(fraction_b.1);
                 ExplanationVisual::FractionComparisonWithConversion {
                     a: ComparisonSideWithConversion {
@@ -615,7 +627,7 @@ fn comparison_explanation_text(
             "Ils mangent le même nombre de parts et les parts ont la même taille. Les fractions sont donc égales.",
             "They eat the same number of slices, and the slices are the same size. The fractions are therefore equal.",
         ),
-        ComparisonMode::MultipleDenominator => LocalizedText::new(
+        ComparisonMode::DifferentNumeratorsAndDenominators => LocalizedText::new(
             "Après conversion en parts de même taille, les deux fractions sont égales.",
             "After converting to slices of the same size, the two fractions are equal.",
         ),

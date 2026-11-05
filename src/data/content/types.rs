@@ -718,9 +718,9 @@ impl QuestionDefinition {
                     Language::French => "Même numérateur",
                     Language::English => "Same numerator",
                 },
-                ComparisonMode::MultipleDenominator => match language {
-                    Language::French => "Dénominateurs multiples",
-                    Language::English => "Multiple denominators",
+                ComparisonMode::DifferentNumeratorsAndDenominators => match language {
+                    Language::French => "Numérateurs et dénominateurs différents",
+                    Language::English => "Different numerators and denominators",
                 },
             }
             .to_owned(),
@@ -1158,6 +1158,32 @@ fn validate_mcq_template(template: &McqTemplate, issues: &mut Vec<String>) {
     }
 }
 
+pub(super) fn has_distinct_valid_numerators(
+    numerator_range: &[u32],
+    denominator_a: u32,
+    denominator_b: u32,
+) -> bool {
+    let first_a = numerator_range
+        .iter()
+        .copied()
+        .find(|&numerator| numerator > 0 && numerator < denominator_a);
+    let first_b = numerator_range
+        .iter()
+        .copied()
+        .find(|&numerator| numerator > 0 && numerator < denominator_b);
+    let (Some(first_a), Some(first_b)) = (first_a, first_b) else {
+        return false;
+    };
+
+    first_a != first_b
+        || numerator_range
+            .iter()
+            .any(|&numerator| numerator > 0 && numerator < denominator_a && numerator != first_b)
+        || numerator_range
+            .iter()
+            .any(|&numerator| numerator > 0 && numerator < denominator_b && numerator != first_a)
+}
+
 fn validate_comparison_template(template: &FractionComparisonTemplate, issues: &mut Vec<String>) {
     if template.numerator_range.len() > MAX_CONTENT_RANGE_VALUES
         || template.denominator_range.len() > MAX_CONTENT_RANGE_VALUES
@@ -1214,11 +1240,15 @@ fn validate_comparison_template(template: &FractionComparisonTemplate, issues: &
                 .count()
                 >= 2
         }),
-        ComparisonMode::MultipleDenominator => eligible_denominators.iter().any(|&a| {
-            eligible_denominators
-                .iter()
-                .any(|&b| a != b && (a % b == 0 || b % a == 0))
-        }),
+        ComparisonMode::DifferentNumeratorsAndDenominators => {
+            eligible_denominators.iter().any(|&a| {
+                eligible_denominators.iter().any(|&b| {
+                    a != b
+                        && (a % b == 0 || b % a == 0)
+                        && has_distinct_valid_numerators(&template.numerator_range, a, b)
+                })
+            })
+        }
     };
     if !can_make_question {
         issues.push("Comparison ranges cannot generate the selected mode".to_owned());
@@ -1339,7 +1369,7 @@ pub enum ExplanationVisual {
         b: ComparisonSide,
     },
     /// Two pairs of bars: original fractions then converted to a common
-    /// denominator, showing why one is larger. Used for `MultipleDenominator`.
+    /// denominator, showing why one is larger. Used for `DifferentNumeratorsAndDenominators`.
     FractionComparisonWithConversion {
         a: ComparisonSideWithConversion,
         b: ComparisonSideWithConversion,
@@ -1435,7 +1465,7 @@ pub enum ComparisonAnswer {
 pub enum ComparisonMode {
     SameDenominator,
     SameNumerator,
-    MultipleDenominator,
+    DifferentNumeratorsAndDenominators,
 }
 
 /// A concrete numeric-input question: textual prompt + expected numeric answer.
