@@ -181,7 +181,7 @@ fn spawn_feedback_content(
         .with_children(|feedback| {
             spawn_question_card(feedback, |card| {
                 spawn_result_text(card, i18n, is_correct, window);
-                spawn_explanation_section(card, i18n, explanation, window, images);
+                spawn_explanation_section(card, i18n, explanation, is_correct, window, images);
             });
             spawn_controls_card(feedback, |card| {
                 if let Some(notice) = &presentation.save_notice {
@@ -200,6 +200,7 @@ fn spawn_explanation_section(
     parent: &mut ChildSpawnerCommands,
     i18n: &I18n,
     explanation: &FeedbackExplanation,
+    is_correct: bool,
     window: Entity,
     images: &mut Assets<Image>,
 ) {
@@ -218,7 +219,14 @@ fn spawn_explanation_section(
         .with_children(|section| {
             spawn_explanation_text(section, text, i18n.language, theme::fonts::HEADING, window);
             if let Some(visual) = visual {
-                spawn_explanation_visual(section, visual, window, i18n.language, images);
+                spawn_explanation_visual(
+                    section,
+                    visual,
+                    is_correct,
+                    window,
+                    i18n.language,
+                    images,
+                );
             }
         });
 }

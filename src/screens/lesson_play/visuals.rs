@@ -13,6 +13,7 @@ use crate::ui::theme;
 pub fn spawn_explanation_visual(
     parent: &mut ChildSpawnerCommands,
     visual: &ExplanationVisual,
+    is_correct: bool,
     window: Entity,
     language: Language,
     images: &mut Assets<Image>,
@@ -38,10 +39,11 @@ pub fn spawn_explanation_visual(
                     ..default()
                 })
                 .with_children(|representations| {
-                    for (label, parts) in [
-                        (TranslationKey::SubmittedColoring, submitted),
-                        (TranslationKey::ExpectedColoring, correct),
-                    ] {
+                    let colorings = [
+                        Some((TranslationKey::SubmittedColoring, submitted)),
+                        (!is_correct).then_some((TranslationKey::ExpectedColoring, correct)),
+                    ];
+                    for (label, parts) in colorings.into_iter().flatten() {
                         representations
                             .spawn(Node {
                                 flex_direction: FlexDirection::Column,
