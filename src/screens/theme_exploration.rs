@@ -261,7 +261,7 @@ pub fn setup_themes(
     let card_style = ExplorationCardStyle::for_exploration_theme(settings.exploration_theme);
 
     let mut root = commands.spawn((
-        screen_root(),
+        screen_root(theme::scaled(theme::spacing::LARGE)),
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),
@@ -614,7 +614,7 @@ pub fn setup_theme_lessons(
     let clear_launch_context = presentation.clear_launch_context;
     let card_style = ExplorationCardStyle::for_exploration_theme(settings.exploration_theme);
     let mut root = commands.spawn((
-        screen_root(),
+        screen_root(theme::scaled(theme::spacing::LARGE)),
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ActivitySelection),

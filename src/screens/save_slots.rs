@@ -140,7 +140,7 @@ fn spawn_save_slots_ui(
 
     commands
         .spawn((
-            screen_root(),
+            screen_root(theme::scaled(theme::spacing::LARGE)),
             DespawnOnExit(AppState::SaveSlots),
             SaveSlotsRoot,
         ))

@@ -43,7 +43,7 @@ fn setup_lesson_summary(
     let save_notice = persistence_message(PersistenceAction::QuestionAnswer, *write_status, &i18n);
 
     commands
-        .spawn((screen_root(), DespawnOnExit(AppState::LessonSummary)))
+        .spawn((screen_root(px(0.0)), DespawnOnExit(AppState::LessonSummary)))
         .with_children(|parent| {
             parent.spawn(summary_title(&i18n, window));
             parent.spawn(summary_score(&i18n, correct, total, window));

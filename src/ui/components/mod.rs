@@ -64,25 +64,30 @@ pub struct PointerHovered(pub bool);
 /// Compose via tuple with `DespawnOnExit`, `children![]`, and optional markers:
 /// ```ignore
 /// commands.spawn((
-///     screen_root(),
+///     screen_root(px(0.0)),
 ///     DespawnOnExit(AppState::Home),
 ///     children![...],
 /// ));
 /// ```
-pub fn screen_root() -> impl Bundle {
-    screen_root_with_node(Node {
-        width: theme::layout::FILL_PARENT,
-        height: theme::layout::FILL_PARENT,
-        justify_content: JustifyContent::Center,
-        align_items: AlignItems::Center,
-        flex_direction: FlexDirection::Column,
-        row_gap: theme::scaled(theme::spacing::XLARGE),
-        ..default()
-    })
+pub fn screen_root(horizontal_padding: Val) -> impl Bundle {
+    screen_root_with_node(
+        Node {
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            flex_direction: FlexDirection::Column,
+            row_gap: theme::scaled(theme::spacing::XLARGE),
+            ..default()
+        },
+        horizontal_padding,
+    )
 }
 
-/// Returns a standard screen root with a caller-provided layout node.
-pub fn screen_root_with_node(node: Node) -> impl Bundle {
+/// Returns a screen root with a caller-provided layout and horizontal padding.
+pub fn screen_root_with_node(mut node: Node, horizontal_padding: Val) -> impl Bundle {
+    node.padding.left = horizontal_padding;
+    node.padding.right = horizontal_padding;
     (
         node,
         BackgroundColor(theme::colors::BACKGROUND),

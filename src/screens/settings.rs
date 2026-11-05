@@ -206,7 +206,7 @@ fn spawn_settings_ui(
 
     commands
         .spawn((
-            screen_root(),
+            screen_root(px(0.0)),
             DespawnOnExit(AppState::Settings),
             SettingsRoot,
         ))

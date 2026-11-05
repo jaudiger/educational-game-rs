@@ -227,16 +227,19 @@ fn spawn_activity_selection_screen(
         theme::colors::CARD_BG
     };
     let mut root = commands.spawn((
-        screen_root_with_node(Node {
-            width: theme::layout::FILL_PARENT,
-            height: theme::layout::FILL_PARENT,
-            padding: theme::scaled(theme::spacing::MEDIUM).all(),
-            justify_content: JustifyContent::FlexStart,
-            align_items: AlignItems::Center,
-            flex_direction: FlexDirection::Column,
-            row_gap: theme::scaled(theme::spacing::MEDIUM),
-            ..default()
-        }),
+        screen_root_with_node(
+            Node {
+                width: theme::layout::FILL_PARENT,
+                height: theme::layout::FILL_PARENT,
+                padding: UiRect::vertical(theme::scaled(theme::spacing::MEDIUM)),
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::Center,
+                flex_direction: FlexDirection::Column,
+                row_gap: theme::scaled(theme::spacing::MEDIUM),
+                ..default()
+            },
+            theme::scaled(theme::spacing::LARGE),
+        ),
         ActivitySelectionRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),

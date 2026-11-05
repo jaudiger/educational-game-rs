@@ -42,7 +42,7 @@ pub fn setup_home(
     let play_destination = presentation.play_destination;
 
     commands.spawn((
-        screen_root(),
+        screen_root(px(0.0)),
         DespawnOnExit(AppState::Home),
         children![
             menu_background(MenuBackgroundStyle::new(0.48)),
