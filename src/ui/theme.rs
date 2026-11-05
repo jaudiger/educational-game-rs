@@ -12,7 +12,8 @@ mod scaling;
 /// Reference design vmin for the default window.
 pub(super) const REFERENCE_VMIN: f32 = 720.0;
 
-pub(super) fn design_scale_factor(vmin: f32) -> f32 {
+/// Returns the viewport scale applied to design-pixel values.
+pub fn design_scale_factor(vmin: f32) -> f32 {
     if vmin.is_finite() && vmin > 0.0 {
         (vmin / REFERENCE_VMIN).sqrt()
     } else {
@@ -394,6 +395,7 @@ pub mod sizes {
     pub const BUTTON_WIDTH: f32 = 300.0;
     pub const BUTTON_HEIGHT: f32 = 60.0;
     pub const BUTTON_PADDING: f32 = 16.0;
+    pub const ANSWER_BUTTON_PADDING: f32 = 72.0;
     pub const BUTTON_BORDER_RADIUS: f32 = 12.0;
     pub const CARD_PADDING: f32 = 24.0;
     pub const CARD_BORDER_RADIUS: f32 = 16.0;

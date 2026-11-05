@@ -33,9 +33,11 @@ pub enum TranslationKey {
     // Lesson Play
     CorrectAnswer,
     IncorrectAnswer,
+    NextQuestion,
     QuestionProgress(usize, usize),
 
     // Lesson Summary
+    FinishLesson,
 
     // Theme Exploration
     Themes,
@@ -118,6 +120,8 @@ impl TranslationKey {
                 // Lesson Play
                 CorrectAnswer             => ("Bonne r\u{00e9}ponse !",                    "Correct!"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),
+                NextQuestion              => ("Question suivante",                          "Next question"),
+                FinishLesson              => ("Terminer la le\u{00e7}on",                  "Finish lesson"),
                 // Lesson Summary
                 // Theme Exploration
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),

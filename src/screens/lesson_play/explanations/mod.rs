@@ -3,8 +3,8 @@ use bevy::window::PrimaryWindow;
 
 use crate::data::content::{LocalizedExplanation, QuestionInstance};
 use crate::data::{
-    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, QuestionContainer,
-    QuestionResponse,
+    AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonLaunchSelection,
+    LessonSession, QuestionContainer, QuestionResponse,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::{spawn_controls_card, spawn_question_card};
@@ -34,6 +34,40 @@ pub struct FeedbackPresentation {
     pub next_button_label: String,
     pub return_to_catalogue: bool,
     pub save_notice: Option<String>,
+}
+
+impl FeedbackPresentation {
+    /// Builds feedback navigation and applies the edition-specific notice.
+    pub fn for_lesson(
+        session: &LessonSession,
+        selection: Option<&LessonLaunchSelection>,
+        i18n: &I18n,
+        save_notice: Option<String>,
+    ) -> Self {
+        let default_selection = LessonLaunchSelection::CompleteLesson;
+        let selection = selection.unwrap_or(&default_selection);
+        let has_next_question = session.current_index + 1 < session.questions.len();
+        let (label, return_to_catalogue) = feedback_navigation(selection, has_next_question);
+
+        Self {
+            next_button_label: i18n.t(&label).into_owned(),
+            return_to_catalogue,
+            save_notice,
+        }
+    }
+}
+
+const fn feedback_navigation(
+    selection: &LessonLaunchSelection,
+    has_next_question: bool,
+) -> (TranslationKey, bool) {
+    match selection {
+        LessonLaunchSelection::SingleActivity { .. } => (TranslationKey::Back, true),
+        LessonLaunchSelection::CompleteLesson if has_next_question => {
+            (TranslationKey::NextQuestion, false)
+        }
+        LessonLaunchSelection::CompleteLesson => (TranslationKey::FinishLesson, false),
+    }
 }
 
 /// Spawns shared answer feedback for the active exercise.

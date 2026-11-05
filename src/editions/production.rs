@@ -228,33 +228,12 @@ fn prepare_production_feedback(
     status: Res<PersistenceStatus>,
     mut presentation: ResMut<FeedbackPresentation>,
 ) {
-    let default_selection = LessonLaunchSelection::CompleteLesson;
-    let selection = launch_selection.as_deref().unwrap_or(&default_selection);
-    let (label, return_to_catalogue) = match selection {
-        LessonLaunchSelection::SingleActivity { .. } => {
-            (i18n.t(&TranslationKey::Back).into_owned(), true)
-        }
-        LessonLaunchSelection::CompleteLesson
-            if session.current_index + 1 >= session.questions.len() =>
-        {
-            (
-                i18n.t(&ProductionTranslationKey::FinishLesson).into_owned(),
-                false,
-            )
-        }
-        LessonLaunchSelection::CompleteLesson => (
-            i18n.t(&ProductionTranslationKey::NextQuestion).into_owned(),
-            false,
-        ),
-    };
-    let next = FeedbackPresentation {
-        next_button_label: label,
-        return_to_catalogue,
-        save_notice: status.failed(PersistenceAction::QuestionAnswer).then(|| {
-            i18n.t(&ProductionTranslationKey::SaveWriteFailed)
-                .into_owned()
-        }),
-    };
+    let save_notice = status.failed(PersistenceAction::QuestionAnswer).then(|| {
+        i18n.t(&ProductionTranslationKey::SaveWriteFailed)
+            .into_owned()
+    });
+    let next =
+        FeedbackPresentation::for_lesson(&session, launch_selection.as_deref(), &i18n, save_notice);
     if *presentation != next {
         *presentation = next;
     }

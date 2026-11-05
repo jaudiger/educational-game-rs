@@ -1,3 +1,4 @@
+mod choice_layout;
 pub mod fraction_bar;
 pub mod fraction_comparison;
 pub mod fraction_identification;
@@ -9,6 +10,7 @@ pub mod numeric_input;
 pub mod numeric_keypad;
 pub mod registry;
 
+pub use choice_layout::QuestionChoiceLayoutPlugin;
 pub use fraction_comparison::FractionComparisonPlugin;
 pub use fraction_identification::FractionIdentificationPlugin;
 pub use fraction_visualization::FractionVisualizationPlugin;
@@ -19,10 +21,12 @@ pub use registry::{AnswerSubmitted, QuestionRoot};
 use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 
-use crate::ui::components::{button_base, stacked_fraction, wrapping_standard_button};
+use crate::ui::components::{button_base, stacked_fraction};
 use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::rich_text::{TextSegment, parse_fraction_segments, spawn_question_text};
 use crate::ui::theme;
+
+use choice_layout::{EqualChoiceWidthButton, EqualChoiceWidthGroup};
 
 const TWO_COLUMN_CELL_BASIS: f32 = 400.0;
 const THREE_COLUMN_CELL_BASIS: f32 = 280.0;
@@ -156,21 +160,92 @@ fn responsive_grid_layout(max_columns: usize, gap_design: f32) -> ResponsiveGrid
     }
 }
 
+fn answer_button<B: Bundle>(content: B) -> impl Bundle + use<B> {
+    (
+        button_base(theme::button_styles::ANSWER),
+        Node {
+            width: Val::Auto,
+            height: Val::Auto,
+            min_width: px(0.0),
+            min_height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
+            max_width: theme::layout::FILL_PARENT,
+            padding: UiRect::axes(
+                theme::scaled(theme::sizes::ANSWER_BUTTON_PADDING),
+                theme::scaled(theme::sizes::ANSWER_BUTTON_PADDING / 2.0),
+            ),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border_radius: BorderRadius::all(theme::scaled(theme::sizes::BUTTON_BORDER_RADIUS)),
+            ..default()
+        },
+        EqualChoiceWidthButton,
+        children![content],
+    )
+}
+
+pub fn answer_text_button(label: &str, window: Entity) -> impl Bundle + use<> {
+    answer_button((
+        Text::new(label),
+        theme::typography::text(theme::fonts::BUTTON, window),
+        TextColor(theme::button_styles::ANSWER.foreground),
+        TextLayout::justify(Justify::Center),
+        Node {
+            width: Val::Auto,
+            min_width: px(0.0),
+            ..default()
+        },
+    ))
+}
+
 /// Spawns answer choices in a responsive grid with centered cells.
 pub fn spawn_choice_grid(
     parent: &mut ChildSpawnerCommands,
     choice_count: usize,
-    spawn_choice: impl FnMut(&mut ChildSpawnerCommands, usize),
+    mut spawn_choice: impl FnMut(&mut ChildSpawnerCommands, usize),
 ) {
     let gap_design = theme::spacing::MEDIUM;
     let grid = responsive_grid_layout(2, gap_design);
-    layout::spawn_collection(
-        parent,
-        choice_count,
-        CollectionLayout::grid(grid.max_width, theme::scaled(gap_design)),
-        |_| CollectionItemLayout::new(grid.cell_basis, 1.0, 1.0),
-        spawn_choice,
-    );
+    let mut collection = parent.spawn((
+        Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: theme::scaled(gap_design),
+            width: theme::layout::FILL_PARENT,
+            max_width: grid.max_width,
+            ..default()
+        },
+        EqualChoiceWidthGroup::default(),
+    ));
+    collection.with_children(|rows| {
+        for row_start in (0..choice_count).step_by(2) {
+            let row_end = (row_start + 2).min(choice_count);
+            rows.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                column_gap: theme::scaled(gap_design),
+                row_gap: theme::scaled(gap_design),
+                width: theme::layout::FILL_PARENT,
+                ..default()
+            })
+            .with_children(|row| {
+                for index in row_start..row_end {
+                    row.spawn(Node {
+                        flex_basis: Val::Auto,
+                        flex_grow: 0.0,
+                        flex_shrink: 1.0,
+                        min_width: px(0.0),
+                        max_width: percent(90.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    })
+                    .with_children(|cell| spawn_choice(cell, index));
+                }
+            });
+        }
+    });
 }
 
 /// Spawns question visuals in a responsive layout below the question prompt.
@@ -252,48 +327,21 @@ pub fn spawn_indexed_choices<F, B>(
 
         if let Some((n, d)) = pure_fraction {
             let mut cmd = cell.spawn((
-                button_base(theme::button_styles::ANSWER),
-                Node {
-                    min_width: px(0.0),
-                    height: theme::scaled(theme::sizes::BUTTON_HEIGHT),
-                    width: theme::layout::FILL_PARENT,
-                    padding: UiRect::axes(
-                        theme::scaled(theme::sizes::BUTTON_PADDING),
-                        theme::scaled(0.0),
-                    ),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    overflow: Overflow::clip(),
-                    border_radius: BorderRadius::all(theme::scaled(
-                        theme::sizes::BUTTON_BORDER_RADIUS,
-                    )),
-                    ..default()
-                },
-                make_marker(index),
-            ));
-            cmd.with_children(|btn| {
-                btn.spawn(stacked_fraction(
+                answer_button(stacked_fraction(
                     n,
                     d,
                     theme::fonts::BUTTON,
                     theme::button_styles::ANSWER.foreground,
                     theme::button_styles::ANSWER.foreground,
                     window,
-                ));
-            });
+                )),
+                make_marker(index),
+            ));
             if index == 0 {
                 cmd.insert(AutoFocus);
             }
         } else {
-            let mut cmd = cell.spawn((
-                wrapping_standard_button(
-                    choice_text,
-                    theme::button_styles::ANSWER,
-                    theme::layout::FILL_PARENT,
-                    window,
-                ),
-                make_marker(index),
-            ));
+            let mut cmd = cell.spawn((answer_text_button(choice_text, window), make_marker(index)));
             if index == 0 {
                 cmd.insert(AutoFocus);
             }

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::data::{ActiveTheme, ContentLibrary, GameSettings};
+use crate::data::{ActiveTheme, ContentLibrary, GameSettings, LessonLaunchSelection};
 use crate::i18n::I18n;
 use crate::screens::home::HomePresentation;
 use crate::screens::lesson_play::LessonFeedbackSet;
@@ -140,10 +140,11 @@ fn prepare_demo_theme_lessons(
     };
 }
 
-fn prepare_demo_feedback(i18n: Res<I18n>, mut presentation: ResMut<FeedbackPresentation>) {
-    *presentation = FeedbackPresentation {
-        next_button_label: i18n.t(&crate::i18n::TranslationKey::Back).into_owned(),
-        return_to_catalogue: true,
-        save_notice: None,
-    };
+fn prepare_demo_feedback(
+    session: Res<crate::data::LessonSession>,
+    selection: Option<Res<LessonLaunchSelection>>,
+    i18n: Res<I18n>,
+    mut presentation: ResMut<FeedbackPresentation>,
+) {
+    *presentation = FeedbackPresentation::for_lesson(&session, selection.as_deref(), &i18n, None);
 }

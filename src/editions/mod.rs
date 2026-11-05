@@ -51,7 +51,7 @@ impl Plugin for SharedGamePlugin {
         };
         use crate::questions::{
             FractionComparisonPlugin, FractionIdentificationPlugin, FractionVisualizationPlugin,
-            McqPlugin, NumericInputPlugin,
+            McqPlugin, NumericInputPlugin, QuestionChoiceLayoutPlugin,
         };
         use crate::screens::{
             ActivitySelectionScreenPlugin, HomeScreenPlugin, LessonPlayScreenPlugin,
@@ -83,6 +83,7 @@ impl Plugin for SharedGamePlugin {
                 UiAnimationPlugin,
             ))
             .add_plugins((
+                QuestionChoiceLayoutPlugin,
                 McqPlugin,
                 FractionVisualizationPlugin,
                 FractionComparisonPlugin,

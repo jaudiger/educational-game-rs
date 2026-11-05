@@ -13,7 +13,6 @@ use super::registry::{QuestionRoot, register_question_systems};
 use crate::data::content::{ComparisonAnswer, FractionParts};
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
-use crate::ui::components::wrapping_standard_button;
 use crate::ui::rich_text::spawn_question_text;
 use crate::ui::theme;
 
@@ -160,12 +159,7 @@ fn spawn_choice_buttons(
 
 fn comparison_button(label: &str, answer: ComparisonAnswer, window: Entity) -> impl Bundle + use<> {
     (
-        wrapping_standard_button(
-            label,
-            theme::button_styles::ANSWER,
-            theme::layout::FILL_PARENT,
-            window,
-        ),
+        super::answer_text_button(label, window),
         ComparisonChoice { answer },
     )
 }
