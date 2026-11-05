@@ -28,9 +28,13 @@ pub fn submit_response(
 pub fn submit_answer(
     commands: &mut Commands,
     next_phase: &mut ResMut<NextState<LessonPhase>>,
+    response: QuestionResponse,
     result: AnswerResult,
 ) {
-    commands.insert_resource(LastAnswer(result.clone()));
+    commands.insert_resource(LastAnswer {
+        result: result.clone(),
+        response,
+    });
     commands.trigger(AnswerSubmitted { result });
     next_phase.set(LessonPhase::ShowFeedback);
 }
@@ -94,7 +98,7 @@ pub fn assess_question_responses(
     for response in responses.read() {
         match assess_response(&question.instance, &response.0) {
             Ok(result) => {
-                submit_answer(&mut commands, &mut next_phase, result);
+                submit_answer(&mut commands, &mut next_phase, response.0.clone(), result);
                 return;
             }
             Err(issue) => bevy::log::warn!(

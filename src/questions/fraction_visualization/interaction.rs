@@ -5,14 +5,14 @@ use bevy::ui::{InteractionDisabled, Pressed};
 use crate::data::QuestionResponse;
 use crate::questions::fraction_bar::FractionSlice;
 use crate::questions::fraction_shape::{
-    InteractiveFractionShape, fraction_shape_part_at, render_fraction_shape_with_parts,
+    InteractiveFractionShape, fraction_shape_part_at, render_fraction_shape,
 };
 use crate::questions::registry::QuestionResponseSubmitted;
 use crate::questions::registry::submit_response;
 use crate::ui::components::{ButtonActivated, ButtonVisualStyle};
 use crate::ui::theme;
 
-use super::ValidateButton;
+use super::{FractionVisualizationSelection, ValidateButton};
 
 pub(super) fn record_fraction_shape_click(
     mut click: On<PointerClick>,
@@ -43,15 +43,18 @@ pub(super) fn record_fraction_shape_click(
 
 pub(super) fn handle_slice_toggle(
     mut activations: MessageReader<ButtonActivated>,
-    mut slice_query: Query<(&mut FractionSlice, &mut ButtonVisualStyle)>,
+    mut slice_query: Query<(&FractionSlice, &mut ButtonVisualStyle)>,
     mut shape_query: Query<&mut InteractiveFractionShape>,
     mut images: ResMut<Assets<Image>>,
+    mut selection: ResMut<FractionVisualizationSelection>,
 ) {
     let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     for entity in activated_entities {
-        if let Ok((mut slice, mut style)) = slice_query.get_mut(entity) {
-            slice.colored = !slice.colored;
-            style.0 = if slice.colored {
+        if let Ok((slice, mut style)) = slice_query.get_mut(entity) {
+            let Some(colored) = selection.0.toggle(slice.index) else {
+                continue;
+            };
+            style.0 = if colored {
                 theme::button_styles::FRACTION_SLICE_COLORED
             } else {
                 theme::button_styles::FRACTION_SLICE_UNCOLORED
@@ -73,45 +76,30 @@ pub(super) fn handle_slice_toggle(
         let Some(part) = selected_part else {
             continue;
         };
-        let Some(colored) = shape.colored_parts.get_mut(part as usize) else {
+        if selection.0.toggle(part).is_none() {
             continue;
-        };
-        *colored = !*colored;
+        }
 
         if let Some(mut image) = images.get_mut(&shape.image) {
-            *image = render_fraction_shape_with_parts(
-                shape.shape,
-                shape.denominator,
-                &shape.colored_parts,
-                theme::colors::PRIMARY,
-            );
+            *image = render_fraction_shape(shape.shape, &selection.0, theme::colors::PRIMARY);
         }
     }
 }
 
-#[allow(clippy::cast_possible_truncation)]
 pub(super) fn handle_validate(
     mut activations: MessageReader<ButtonActivated>,
     validate_query: Query<(), With<ValidateButton>>,
-    slices: Query<&FractionSlice>,
-    shape_slices: Query<&InteractiveFractionShape>,
     mut responses: MessageWriter<QuestionResponseSubmitted>,
+    selection: Res<FractionVisualizationSelection>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    for entity in activated_entities {
+    for entity in activations.read().map(|event| event.0) {
         if !validate_query.contains(entity) {
             continue;
         }
-
-        let colored_count = slices.iter().filter(|slice| slice.colored).count() as u32
-            + shape_slices
-                .iter()
-                .map(InteractiveFractionShape::colored_count)
-                .sum::<u32>();
         submit_response(
             &mut responses,
             QuestionResponse::FractionVisualization {
-                colored_parts: colored_count,
+                colored_parts: selection.0.clone(),
             },
         );
         return;

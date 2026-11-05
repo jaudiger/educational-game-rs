@@ -18,11 +18,11 @@ pub fn record_answer(
     player_session: Option<Res<PlayerSession>>,
     selected_lesson: Option<Res<SelectedLesson>>,
 ) {
-    update_session_score(&mut score, &last_answer);
+    update_session_score(&mut score, &last_answer.result);
 
     record_persisted_answer(
         &session,
-        &last_answer,
+        &last_answer.result,
         production.mode,
         active_student.as_deref(),
         player_session.as_deref(),

@@ -464,7 +464,7 @@ pub enum QuestionInstance {
     Mcq(McqDefinition),
     FractionVisualization(FractionVisualizationDefinition),
     FractionComparison(FractionComparisonDefinition),
-    FractionIdentification(FractionIdentificationDefinition),
+    FractionIdentification(ResolvedFractionIdentification),
     NumericInput(NumericInputDefinition),
 }
 
@@ -502,13 +502,15 @@ impl QuestionInstance {
                 definition.fraction_b.hash(&mut hasher);
                 definition.answer.hash(&mut hasher);
             }
-            Self::FractionIdentification(definition) => {
-                definition.numerator.hash(&mut hasher);
-                definition.denominator.hash(&mut hasher);
-                definition.mode.hash(&mut hasher);
-                definition
+            Self::FractionIdentification(question) => {
+                question.definition.numerator.hash(&mut hasher);
+                question.definition.denominator.hash(&mut hasher);
+                question.definition.mode.hash(&mut hasher);
+                question.colored_parts.hash(&mut hasher);
+                question
+                    .definition
                     .choices
-                    .get(definition.correct_index)?
+                    .get(question.definition.correct_index)?
                     .hash(&mut hasher);
             }
             Self::NumericInput(definition) => {
@@ -638,6 +640,14 @@ impl QuestionDefinition {
                     false,
                     &mut issues,
                 );
+                if let FractionColoring::Explicit(parts) = &definition.coloring {
+                    validate_fraction_coloring(
+                        definition.numerator,
+                        definition.denominator,
+                        parts,
+                        &mut issues,
+                    );
+                }
                 validate_choices(&definition.choices, definition.correct_index, &mut issues);
                 issues.extend(definition.explanation.validation_issues());
             }
@@ -838,6 +848,17 @@ fn validate_fraction(
     }
 }
 
+fn validate_fraction_coloring(
+    numerator: u32,
+    denominator: u32,
+    parts: &FractionParts,
+    issues: &mut Vec<String>,
+) {
+    if !parts.matches_fraction(numerator, denominator) {
+        issues.push("Fraction coloring does not match its numerator and denominator".to_owned());
+    }
+}
+
 fn validate_comparison_answer(
     fraction_a: (u32, u32),
     fraction_b: (u32, u32),
@@ -934,12 +955,16 @@ fn validate_grid(rows: u32, cols: u32, issues: &mut Vec<String>) {
 
 fn validate_explanation_visual(visual: Option<&ExplanationVisual>, issues: &mut Vec<String>) {
     match visual {
-        Some(ExplanationVisual::FractionRepresentation {
-            numerator,
-            denominator,
-            ..
+        Some(ExplanationVisual::FractionRepresentation { parts, .. }) => {
+            validate_fraction(parts.numerator(), parts.denominator(), true, issues);
+        }
+        Some(ExplanationVisual::FractionVisualizationFeedback {
+            submitted, correct, ..
         }) => {
-            validate_fraction(*numerator, *denominator, true, issues);
+            validate_fraction(correct.numerator(), correct.denominator(), true, issues);
+            if submitted.denominator() != correct.denominator() {
+                issues.push("Submitted fraction coloring has an invalid denominator".to_owned());
+            }
         }
         Some(ExplanationVisual::FractionAddition { a, b, c }) => {
             validate_question_visual(
@@ -1353,9 +1378,14 @@ pub struct ComparisonSideWithConversion {
 pub enum ExplanationVisual {
     /// A fraction representation with a concrete display mode.
     FractionRepresentation {
-        numerator: u32,
-        denominator: u32,
         mode: FractionShape,
+        parts: FractionParts,
+    },
+    /// Shows the submitted coloring alongside the expected fraction.
+    FractionVisualizationFeedback {
+        mode: FractionShape,
+        submitted: FractionParts,
+        correct: FractionParts,
     },
     /// Two fraction bars (`a/b` + `c/b`) and the result bar (`(a+c)/b`).
     FractionAddition { a: u32, b: u32, c: u32 },
@@ -1426,11 +1456,11 @@ pub struct FractionVisualizationDefinition {
 }
 
 impl FractionVisualizationDefinition {
-    pub const fn explanation_visual(&self) -> ExplanationVisual {
-        ExplanationVisual::FractionRepresentation {
-            numerator: self.numerator,
-            denominator: self.denominator,
+    pub fn feedback_visual(&self, submitted: FractionParts) -> ExplanationVisual {
+        ExplanationVisual::FractionVisualizationFeedback {
             mode: self.shape,
+            submitted,
+            correct: FractionParts::first_colored(self.numerator, self.denominator),
         }
     }
 }
@@ -1490,7 +1520,64 @@ pub enum FractionShape {
     Circle,
 }
 
-/// A resolved fraction identification MCQ: given a shape, pick the fraction.
+/// Stores the colored state of every equal fraction part.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Reflect, Deserialize, Serialize)]
+#[serde(transparent)]
+pub struct FractionParts(Vec<bool>);
+
+impl FractionParts {
+    pub const fn from_selection(parts: Vec<bool>) -> Self {
+        Self(parts)
+    }
+
+    pub fn uncolored(denominator: u32) -> Self {
+        Self(vec![
+            false;
+            usize::try_from(denominator)
+                .expect("fraction denominator fits usize")
+        ])
+    }
+
+    pub fn first_colored(numerator: u32, denominator: u32) -> Self {
+        Self((0..denominator).map(|part| part < numerator).collect())
+    }
+
+    pub fn denominator(&self) -> u32 {
+        u32::try_from(self.0.len()).expect("fraction parts count fits u32")
+    }
+
+    pub fn numerator(&self) -> u32 {
+        u32::try_from(self.0.iter().filter(|&&colored| colored).count())
+            .expect("colored fraction parts count fits u32")
+    }
+
+    pub fn is_colored(&self, index: u32) -> bool {
+        usize::try_from(index)
+            .ok()
+            .and_then(|index| self.0.get(index))
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub fn toggle(&mut self, index: u32) -> Option<bool> {
+        let Ok(index) = usize::try_from(index) else {
+            return None;
+        };
+        let part = self.0.get_mut(index)?;
+        *part = !*part;
+        Some(*part)
+    }
+
+    pub fn matches_fraction(&self, numerator: u32, denominator: u32) -> bool {
+        self.denominator() == denominator && self.numerator() == numerator
+    }
+
+    pub(super) fn as_mut_slice(&mut self) -> &mut [bool] {
+        &mut self.0
+    }
+}
+
+/// A fraction identification question definition with its coloring policy.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FractionIdentificationDefinition {
@@ -1498,17 +1585,34 @@ pub struct FractionIdentificationDefinition {
     pub denominator: u32,
     #[serde(default)]
     pub mode: FractionShape,
+    #[serde(default)]
+    pub coloring: FractionColoring,
     pub choices: Vec<String>,
     pub correct_index: usize,
     pub explanation: LocalizedExplanation,
 }
 
-impl FractionIdentificationDefinition {
-    pub const fn explanation_visual(&self) -> ExplanationVisual {
+/// Coloring policy for a fraction identification question.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Reflect, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub enum FractionColoring {
+    #[default]
+    Random,
+    Explicit(FractionParts),
+}
+
+/// A resolved fraction identification question with its exact coloring.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ResolvedFractionIdentification {
+    pub definition: FractionIdentificationDefinition,
+    pub colored_parts: FractionParts,
+}
+
+impl ResolvedFractionIdentification {
+    pub fn explanation_visual(&self) -> ExplanationVisual {
         ExplanationVisual::FractionRepresentation {
-            numerator: self.numerator,
-            denominator: self.denominator,
-            mode: self.mode,
+            mode: self.definition.mode,
+            parts: self.colored_parts.clone(),
         }
     }
 }
@@ -1614,7 +1718,7 @@ pub struct ResolvedQuestion {
 }
 
 /// Whether the student answered correctly or not.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Reflect)]
 pub enum AnswerResult {
     #[default]
     Correct,

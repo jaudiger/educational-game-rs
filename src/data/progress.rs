@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use super::assessment::QuestionResponse;
 use super::content::{AnswerResult, ResolvedQuestion};
 
 pub use crate::i18n::Language;
@@ -98,10 +99,12 @@ pub struct ActiveTheme(pub String);
 #[derive(Component, Reflect)]
 pub struct QuestionContainer;
 
-/// Stores the result of the last submitted answer.
-/// Inserted by question plugins, read by lesson play for feedback display.
-#[derive(Resource, Clone, Debug, Deref, Reflect)]
-pub struct LastAnswer(#[reflect(ignore)] pub AnswerResult);
+/// Stores a submitted response with its assessed result for feedback and scoring.
+#[derive(Resource, Clone, Debug, Reflect)]
+pub struct LastAnswer {
+    pub result: AnswerResult,
+    pub response: QuestionResponse,
+}
 
 #[derive(Message, Clone, Copy, Debug)]
 pub struct SettingsChanged;

@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy::ui::auto_directional_navigation::AutoDirectionalNavigation;
 use bevy::ui_widgets::Button;
 
+use crate::data::content::FractionParts;
 use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
 
@@ -29,23 +30,20 @@ const SLICE_BORDER: f32 = 1.5;
 #[derive(Component, Reflect)]
 #[require(Button)]
 pub struct FractionSlice {
-    pub colored: bool,
+    pub index: u32,
 }
 
-/// Returns a fraction bar with optional interactive slices and custom dimensions.
-///
-/// The slice count and colored count determine its contents, while the bar color
-/// applies to colored slices. Interactive slices receive focus and hover states.
-/// The supplied dimensions are design pixels and scale with the target viewport.
-#[allow(clippy::cast_precision_loss, clippy::too_many_arguments)]
+/// Returns a fraction bar for a concrete selection of parts.
+#[allow(clippy::cast_precision_loss)]
 pub fn fraction_bar(
-    denominator: u32,
-    colored_count: u32,
+    parts: &FractionParts,
     bar_color: Color,
     interactive: bool,
     bar_width: f32,
     bar_height: f32,
 ) -> impl Bundle {
+    let denominator = parts.denominator();
+    let parts = parts.clone();
     let slice_width = if denominator > 0 {
         SLICE_GAP.mul_add(-(denominator.saturating_sub(1) as f32), bar_width) / denominator as f32
     } else {
@@ -60,8 +58,8 @@ pub fn fraction_bar(
             ..default()
         },
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            for i in 0..denominator {
-                let is_colored = i < colored_count;
+            for index in 0..denominator {
+                let is_colored = parts.is_colored(index);
                 let palette = if interactive {
                     if is_colored {
                         theme::button_styles::FRACTION_SLICE_COLORED
@@ -83,7 +81,7 @@ pub fn fraction_bar(
                         width: theme::scaled(slice_width),
                         height: theme::scaled(bar_height),
                         border: UiRect::all(theme::scaled(SLICE_BORDER)),
-                        border_radius: slice_border_radius(i, denominator),
+                        border_radius: slice_border_radius(index, denominator),
                         ..default()
                     },
                     BackgroundColor(palette.background.normal),
@@ -92,9 +90,7 @@ pub fn fraction_bar(
 
                 if interactive {
                     cmd.insert((
-                        FractionSlice {
-                            colored: is_colored,
-                        },
+                        FractionSlice { index },
                         ButtonVisualStyle(palette),
                         AutoDirectionalNavigation::default(),
                         TabIndex(0),
@@ -104,7 +100,7 @@ pub fn fraction_bar(
                             Color::NONE,
                         ),
                     ));
-                    if i == 0 {
+                    if index == 0 {
                         cmd.insert(AutoFocus);
                     }
                 }

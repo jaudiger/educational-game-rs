@@ -9,8 +9,10 @@ use bevy::window::PrimaryWindow;
 use super::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, fraction_bar};
 use super::fraction_shape::interactive_fraction_shape;
 use super::registry::{QuestionRoot, register_question_systems};
+use crate::data::content::FractionParts;
 use crate::data::{FractionShape, LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
+use crate::states::{ActiveLesson, StateScopedResourceExt};
 use crate::ui::components::standard_button;
 use crate::ui::theme;
 
@@ -29,7 +31,10 @@ impl Plugin for FractionVisualizationPlugin {
             )
                 .chain(),
         );
-        app.add_observer(interaction::record_fraction_shape_click);
+        app.register_state_scoped_resource::<ActiveLesson, FractionVisualizationSelection>(
+            ActiveLesson,
+        )
+        .add_observer(interaction::record_fraction_shape_click);
     }
 }
 
@@ -39,6 +44,9 @@ struct FractionVisualizationRoot;
 
 #[derive(Component, Reflect)]
 struct ValidateButton;
+
+#[derive(Resource, Reflect)]
+pub(super) struct FractionVisualizationSelection(pub FractionParts);
 
 fn spawn_fraction_vis_ui(
     mut commands: Commands,
@@ -55,6 +63,8 @@ fn spawn_fraction_vis_ui(
     let QuestionInstance::FractionVisualization(def) = &question.instance else {
         return;
     };
+    let parts = FractionParts::uncolored(def.denominator);
+    commands.insert_resource(FractionVisualizationSelection(parts.clone()));
 
     commands.entity(*container).with_children(|parent| {
         parent
@@ -69,8 +79,7 @@ fn spawn_fraction_vis_ui(
                         |visual, _| match def.shape {
                             FractionShape::Line => {
                                 visual.spawn(fraction_bar(
-                                    def.denominator,
-                                    0,
+                                    &parts,
                                     theme::colors::PRIMARY,
                                     true,
                                     BAR_WIDTH,
@@ -81,7 +90,7 @@ fn spawn_fraction_vis_ui(
                                 visual.spawn(interactive_fraction_shape(
                                     &mut images,
                                     shape,
-                                    def.denominator,
+                                    &parts,
                                     theme::colors::PRIMARY,
                                 ));
                             }

@@ -7,10 +7,11 @@ use rand::{Rng, RngExt};
 use super::types::{
     ComparisonAnswer, ComparisonMode, ComparisonSide, ComparisonSideWithConversion,
     ExplanationColorRole, ExplanationPlaceholder, ExplanationValue, ExplanationVisual,
-    FractionComparisonDefinition, FractionComparisonTemplate, FractionIdentificationDefinition,
-    FractionIdentificationTemplate, FractionShape, FractionVisualizationDefinition,
-    FractionVisualizationTemplate, LocalizedExplanation, LocalizedText, McqDefinition, McqResolver,
-    McqTemplate, NumericInputDefinition, NumericInputTemplate, ParameterRange, QuestionVisual,
+    FractionColoring, FractionComparisonDefinition, FractionComparisonTemplate,
+    FractionIdentificationDefinition, FractionIdentificationTemplate, FractionParts, FractionShape,
+    FractionVisualizationDefinition, FractionVisualizationTemplate, LocalizedExplanation,
+    LocalizedText, McqDefinition, McqResolver, McqTemplate, NumericInputDefinition,
+    NumericInputTemplate, ParameterRange, QuestionVisual, ResolvedFractionIdentification,
     fraction_value_pair_is_safe, has_distinct_valid_numerators,
 };
 
@@ -274,8 +275,7 @@ impl McqTemplate {
             #[allow(clippy::cast_sign_loss)]
             explanation_visual: Some(ExplanationVisual::FractionRepresentation {
                 mode: FractionShape::Line,
-                numerator: 1,
-                denominator: d as u32,
+                parts: FractionParts::first_colored(1, d as u32),
             }),
             question_visual: None,
         }
@@ -696,7 +696,7 @@ fn comparison_explanation_placeholders(
 impl FractionIdentificationTemplate {
     /// Pick a random fraction from the configured ranges and build the
     /// identification MCQ with distractors.
-    pub fn resolve(&self, rng: &mut impl Rng) -> FractionIdentificationDefinition {
+    pub fn resolve(&self, rng: &mut impl Rng) -> ResolvedFractionIdentification {
         let &denominator = self
             .denominator_range
             .choose(rng)
@@ -710,7 +710,15 @@ impl FractionIdentificationTemplate {
             .choose(rng)
             .expect("validated fraction-visualization denominator has a numerator");
 
-        generate_fraction_identification(numerator, denominator, random_fraction_shape(rng), rng)
+        resolve_fraction_identification(
+            generate_fraction_identification(
+                numerator,
+                denominator,
+                random_fraction_shape(rng),
+                rng,
+            ),
+            rng,
+        )
     }
 }
 
@@ -899,6 +907,7 @@ fn generate_fraction_identification(
         numerator,
         denominator,
         mode,
+        coloring: FractionColoring::Random,
         choices,
         correct_index,
         explanation: LocalizedExplanation::new(
@@ -919,6 +928,29 @@ fn generate_fraction_identification(
             ],
         ),
     }
+}
+
+pub(super) fn resolve_fraction_identification(
+    definition: FractionIdentificationDefinition,
+    rng: &mut impl Rng,
+) -> ResolvedFractionIdentification {
+    let colored_parts = match &definition.coloring {
+        FractionColoring::Random => {
+            random_fraction_parts(definition.numerator, definition.denominator, rng)
+        }
+        FractionColoring::Explicit(parts) => parts.clone(),
+    };
+    ResolvedFractionIdentification {
+        definition,
+        colored_parts,
+    }
+}
+
+fn random_fraction_parts(numerator: u32, denominator: u32, rng: &mut impl Rng) -> FractionParts {
+    let mut parts =
+        FractionParts::from_selection((0..denominator).map(|part| part < numerator).collect());
+    parts.as_mut_slice().shuffle(rng);
+    parts
 }
 
 fn decimal_trailing_zeros(value: u32) -> usize {

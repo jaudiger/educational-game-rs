@@ -4,6 +4,7 @@ use bevy::window::PrimaryWindow;
 use crate::data::content::{LocalizedExplanation, QuestionInstance};
 use crate::data::{
     AnswerResult, ExplanationVisual, GameSettings, LastAnswer, LessonSession, QuestionContainer,
+    QuestionResponse,
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::questions::{spawn_controls_card, spawn_question_card};
@@ -49,11 +50,15 @@ pub(super) fn setup_feedback_ui(
     primary_window: Single<Entity, With<PrimaryWindow>>,
 ) {
     let window = *primary_window;
-    let is_correct = matches!(**last_answer, AnswerResult::Correct);
+    let is_correct = matches!(&last_answer.result, AnswerResult::Correct);
     let explanation = session
         .current()
         .map_or(FeedbackExplanation::Hidden, |question| {
-            build_feedback_explanation(settings.show_explanations, &question.instance)
+            build_feedback_explanation(
+                settings.show_explanations,
+                &question.instance,
+                &last_answer.response,
+            )
         });
 
     commands.entity(*container).with_children(|parent| {
@@ -72,6 +77,7 @@ pub(super) fn setup_feedback_ui(
 fn build_feedback_explanation(
     show_explanation: bool,
     definition: &QuestionInstance,
+    response: &QuestionResponse,
 ) -> FeedbackExplanation {
     let text = localized_explanation(definition);
     for issue in text.validation_issues() {
@@ -82,7 +88,7 @@ fn build_feedback_explanation(
     }
     FeedbackExplanation::Visible {
         text,
-        visual: explanation_visual(definition),
+        visual: explanation_visual(definition, response),
     }
 }
 
@@ -91,17 +97,25 @@ fn localized_explanation(definition: &QuestionInstance) -> LocalizedExplanation 
         QuestionInstance::Mcq(d) => d.explanation.clone(),
         QuestionInstance::FractionVisualization(d) => d.explanation.clone(),
         QuestionInstance::FractionComparison(d) => d.explanation.clone(),
-        QuestionInstance::FractionIdentification(d) => d.explanation.clone(),
+        QuestionInstance::FractionIdentification(d) => d.definition.explanation.clone(),
         QuestionInstance::NumericInput(d) => d.explanation.clone(),
     }
 }
 
-fn explanation_visual(definition: &QuestionInstance) -> Option<ExplanationVisual> {
+fn explanation_visual(
+    definition: &QuestionInstance,
+    response: &QuestionResponse,
+) -> Option<ExplanationVisual> {
     match definition {
         QuestionInstance::Mcq(d) => d.explanation_visual.clone(),
         QuestionInstance::FractionComparison(d) => d.explanation_visual.clone(),
         QuestionInstance::FractionIdentification(d) => Some(d.explanation_visual()),
-        QuestionInstance::FractionVisualization(d) => Some(d.explanation_visual()),
+        QuestionInstance::FractionVisualization(d) => match response {
+            QuestionResponse::FractionVisualization { colored_parts } => {
+                Some(d.feedback_visual(colored_parts.clone()))
+            }
+            _ => None,
+        },
         QuestionInstance::NumericInput(d) => d.explanation_visual.clone(),
     }
 }

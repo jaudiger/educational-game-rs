@@ -12,6 +12,7 @@ use bevy::ui::widget::ImageNode;
 use bevy::ui_widgets::Button;
 
 use crate::data::FractionShape;
+use crate::data::content::FractionParts;
 use crate::questions::fraction_bar::{BAR_HEIGHT, BAR_WIDTH, fraction_bar};
 use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
@@ -23,19 +24,17 @@ const OUTLINE_WIDTH: f32 = 3.0;
 const COLOR_UNCOLORED: Color = Color::srgb(0.73, 0.73, 0.78);
 const COLOR_OUTLINE: Color = Color::srgb(0.60, 0.60, 0.65);
 
-/// Spawns the selected fraction representation using the same view in question and feedback.
+/// Spawns a fraction representation using its exact colored-part selection.
 pub fn spawn_fraction_representation(
     parent: &mut ChildSpawnerCommands,
     images: &mut Assets<Image>,
-    numerator: u32,
-    denominator: u32,
     mode: FractionShape,
+    parts: &FractionParts,
 ) {
     match mode {
         FractionShape::Line => {
             parent.spawn(fraction_bar(
-                denominator,
-                numerator,
+                parts,
                 theme::colors::PRIMARY,
                 false,
                 BAR_WIDTH,
@@ -43,12 +42,7 @@ pub fn spawn_fraction_representation(
             ));
         }
         FractionShape::Square | FractionShape::Circle => {
-            let image = images.add(render_fraction_shape_by_numerator(
-                mode,
-                denominator,
-                numerator,
-                theme::colors::PRIMARY,
-            ));
+            let image = images.add(render_fraction_shape(mode, parts, theme::colors::PRIMARY));
             let (width, height) = design_size(mode);
             parent.spawn((
                 ImageNode::new(image),
@@ -67,36 +61,21 @@ pub fn spawn_fraction_representation(
 pub struct InteractiveFractionShape {
     pub(crate) shape: FractionShape,
     pub(crate) denominator: u32,
-    pub(crate) colored_parts: Vec<bool>,
     pub(crate) pending_pointer_part: Option<u32>,
     pub(crate) pointer_click_pending: bool,
     pub(crate) keyboard_part: u32,
     pub(crate) image: Handle<Image>,
 }
 
-impl InteractiveFractionShape {
-    pub fn colored_count(&self) -> u32 {
-        self.colored_parts
-            .iter()
-            .map(|&colored| u32::from(colored))
-            .sum()
-    }
-}
-
 /// Returns an interactive square or circle fraction control.
 pub fn interactive_fraction_shape(
     images: &mut Assets<Image>,
     shape: FractionShape,
-    denominator: u32,
+    parts: &FractionParts,
     colored_color: Color,
 ) -> impl Bundle {
-    let colored_parts = vec![false; denominator as usize];
-    let image = images.add(render_fraction_shape_with_parts(
-        shape,
-        denominator,
-        &colored_parts,
-        colored_color,
-    ));
+    let denominator = parts.denominator();
+    let image = images.add(render_fraction_shape(shape, parts, colored_color));
     let palette = theme::ButtonPalette::new(
         theme::ButtonColorStates::flat(Color::NONE),
         theme::colors::TEXT_DARK,
@@ -124,7 +103,6 @@ pub fn interactive_fraction_shape(
         InteractiveFractionShape {
             shape,
             denominator,
-            colored_parts,
             pending_pointer_part: None,
             pointer_click_pending: false,
             keyboard_part: 0,
@@ -152,26 +130,6 @@ pub fn fraction_shape_part_at(
     part_at(shape, denominator, x, y)
 }
 
-/// Builds a pre-colored image from the current interactive state.
-pub fn render_fraction_shape_with_parts(
-    shape: FractionShape,
-    denominator: u32,
-    colored_parts: &[bool],
-    colored_color: Color,
-) -> Image {
-    render_fraction_shape(
-        shape,
-        denominator,
-        |part| {
-            colored_parts
-                .get(part as usize)
-                .copied()
-                .unwrap_or_default()
-        },
-        colored_color,
-    )
-}
-
 /// Returns the design size used to display each generated shape texture.
 #[allow(clippy::cast_precision_loss)]
 const fn design_size(shape: FractionShape) -> (f32, f32) {
@@ -179,32 +137,18 @@ const fn design_size(shape: FractionShape) -> (f32, f32) {
     (width as f32, height as f32)
 }
 
-/// Builds a pre-colored fraction image with transparent gaps between its parts.
+/// Builds a fraction image with transparent gaps between its parts.
 #[allow(
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
     clippy::cast_sign_loss
 )]
-fn render_fraction_shape_by_numerator(
+pub fn render_fraction_shape(
     shape: FractionShape,
-    denominator: u32,
-    numerator: u32,
+    parts: &FractionParts,
     colored_color: Color,
 ) -> Image {
-    render_fraction_shape(shape, denominator, |part| part < numerator, colored_color)
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_precision_loss,
-    clippy::cast_sign_loss
-)]
-fn render_fraction_shape(
-    shape: FractionShape,
-    denominator: u32,
-    is_colored: impl Fn(u32) -> bool,
-    colored_color: Color,
-) -> Image {
+    let denominator = parts.denominator();
     let (width, height) = pixel_size(shape);
     let pixel_count = (width * height) as usize;
     let mut data = vec![0_u8; pixel_count * 4];
@@ -231,7 +175,7 @@ fn render_fraction_shape(
                     height,
                 ) {
                     continue;
-                } else if is_colored(part) {
+                } else if parts.is_colored(part) {
                     colored
                 } else {
                     uncolored

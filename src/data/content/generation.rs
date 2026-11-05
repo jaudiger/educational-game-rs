@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use super::resolvers::resolve_fraction_identification;
 use super::types::{QuestionDefinition, QuestionInstance};
 
 /// Resolve one catalog definition into a concrete question instance.
@@ -22,8 +23,11 @@ pub(super) fn resolve_question(
         QuestionDefinition::FractionComparisonTemplate(template) => {
             QuestionInstance::FractionComparison(template.resolve(rng))
         }
-        QuestionDefinition::FractionIdentification(value) => {
-            QuestionInstance::FractionIdentification(value.clone())
+        QuestionDefinition::FractionIdentification(definition) => {
+            QuestionInstance::FractionIdentification(resolve_fraction_identification(
+                definition.clone(),
+                rng,
+            ))
         }
         QuestionDefinition::FractionIdentificationTemplate(template) => {
             QuestionInstance::FractionIdentification(template.resolve(rng))

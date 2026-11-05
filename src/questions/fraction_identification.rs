@@ -68,9 +68,8 @@ fn spawn_identification_ui(
                             spawn_fraction_representation(
                                 visual,
                                 &mut images,
-                                def.numerator,
-                                def.denominator,
-                                def.mode,
+                                def.definition.mode,
+                                &def.colored_parts,
                             );
                         },
                     );
@@ -78,7 +77,7 @@ fn spawn_identification_ui(
                 super::spawn_controls_card(root, |card| {
                     super::spawn_indexed_choices(
                         card,
-                        &def.choices,
+                        &def.definition.choices,
                         |i| IdentificationChoice { index: i },
                         window,
                     );

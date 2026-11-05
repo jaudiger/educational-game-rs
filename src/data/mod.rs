@@ -15,7 +15,7 @@ pub mod system_params;
 
 pub use assessment::{QuestionResponse, assess_response};
 pub use content::{
-    AnswerResult, ContentLibrary, ExplanationVisual, FractionShape, QuestionInstance,
+    AnswerResult, ContentLibrary, ExplanationVisual, FractionParts, FractionShape, QuestionInstance,
 };
 #[cfg(not(feature = "demo"))]
 pub use persistence::{PersistencePaths, load_or_default, write_json_atomic};

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-use crate::data::{ExplanationVisual, Language};
+use crate::data::{ExplanationVisual, FractionParts, Language};
+use crate::i18n::TranslationKey;
 use crate::questions::fraction_bar::fraction_bar;
 use crate::questions::fraction_shape::spawn_fraction_representation;
 use crate::questions::{QuestionVisualLayout, QuestionVisualSizing, spawn_question_visuals};
@@ -17,12 +18,47 @@ pub fn spawn_explanation_visual(
     images: &mut Assets<Image>,
 ) {
     match visual {
-        ExplanationVisual::FractionRepresentation {
-            numerator,
-            denominator,
+        ExplanationVisual::FractionRepresentation { mode, parts, .. } => {
+            spawn_fraction_representation(parent, images, *mode, parts);
+        }
+        ExplanationVisual::FractionVisualizationFeedback {
             mode,
+            submitted,
+            correct,
+            ..
         } => {
-            spawn_fraction_representation(parent, images, *numerator, *denominator, *mode);
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    flex_wrap: FlexWrap::Wrap,
+                    column_gap: theme::scaled(theme::spacing::LARGE),
+                    row_gap: theme::scaled(theme::spacing::MEDIUM),
+                    ..default()
+                })
+                .with_children(|representations| {
+                    for (label, parts) in [
+                        (TranslationKey::SubmittedColoring, submitted),
+                        (TranslationKey::ExpectedColoring, correct),
+                    ] {
+                        representations
+                            .spawn(Node {
+                                flex_direction: FlexDirection::Column,
+                                align_items: AlignItems::Center,
+                                row_gap: theme::scaled(theme::spacing::SMALL),
+                                ..default()
+                            })
+                            .with_children(|representation| {
+                                representation.spawn((
+                                    Text::new(label.translate(language).to_string()),
+                                    theme::typography::text(theme::fonts::BODY, window),
+                                    TextColor(theme::colors::TEXT_DARK),
+                                ));
+                                spawn_fraction_representation(representation, images, *mode, parts);
+                            });
+                    }
+                });
         }
         ExplanationVisual::FractionAddition { a, b, c } => {
             spawn_fraction_addition_visual(parent, *a, *b, *c, window);
@@ -94,8 +130,7 @@ fn spawn_fraction_addition_visual(
         |cell, index| match index {
             0 => {
                 cell.spawn(fraction_bar(
-                    b,
-                    a,
+                    &FractionParts::first_colored(a, b),
                     theme::colors::PRIMARY,
                     false,
                     MINI_BAR_WIDTH,
@@ -111,8 +146,7 @@ fn spawn_fraction_addition_visual(
             }
             2 => {
                 cell.spawn(fraction_bar(
-                    b,
-                    c,
+                    &FractionParts::first_colored(c, b),
                     theme::colors::SECONDARY,
                     false,
                     MINI_BAR_WIDTH,
@@ -128,8 +162,7 @@ fn spawn_fraction_addition_visual(
             }
             _ => {
                 cell.spawn(fraction_bar(
-                    b,
-                    a + c,
+                    &FractionParts::first_colored(a + c, b),
                     theme::colors::SUCCESS,
                     false,
                     MINI_BAR_WIDTH,
@@ -158,8 +191,7 @@ fn spawn_whole_fractions_visual(parent: &mut ChildSpawnerCommands, count: u32, d
         |_| CollectionItemLayout::new(Val::Auto, 0.0, 0.0),
         |cell, _| {
             cell.spawn(fraction_bar(
-                denominator,
-                denominator,
+                &FractionParts::first_colored(denominator, denominator),
                 theme::colors::PRIMARY,
                 false,
                 MINI_BAR_WIDTH,
@@ -252,7 +284,11 @@ fn spawn_labelled_bar(
                 ));
             });
             row.spawn(fraction_bar(
-                fraction.1, fraction.0, color, false, width, height,
+                &FractionParts::first_colored(fraction.0, fraction.1),
+                color,
+                false,
+                width,
+                height,
             ));
         });
 }
@@ -326,8 +362,7 @@ fn spawn_conversion_row(
             }
             1 => {
                 cell.spawn(fraction_bar(
-                    entry.fraction.1,
-                    entry.fraction.0,
+                    &FractionParts::first_colored(entry.fraction.0, entry.fraction.1),
                     color,
                     false,
                     width,
@@ -362,8 +397,7 @@ fn spawn_conversion_row(
             }
             _ => {
                 cell.spawn(fraction_bar(
-                    entry.converted.1,
-                    entry.converted.0,
+                    &FractionParts::first_colored(entry.converted.0, entry.converted.1),
                     color,
                     false,
                     width,

@@ -10,7 +10,7 @@ use bevy::window::PrimaryWindow;
 
 use super::fraction_bar::{BAR_HEIGHT, fraction_bar};
 use super::registry::{QuestionRoot, register_question_systems};
-use crate::data::content::ComparisonAnswer;
+use crate::data::content::{ComparisonAnswer, FractionParts};
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::{I18n, TranslationKey};
 use crate::ui::components::wrapping_standard_button;
@@ -125,8 +125,7 @@ fn spawn_character_row(
             // Pre-coloured bar (hidden when teacher disables the visual)
             if show_bar {
                 row.spawn(fraction_bar(
-                    fraction.1,
-                    fraction.0,
+                    &FractionParts::first_colored(fraction.0, fraction.1),
                     bar_color,
                     false,
                     COMPARISON_BAR_WIDTH,

@@ -4,7 +4,7 @@ use bevy::window::PrimaryWindow;
 use super::fraction_bar::fraction_bar;
 use super::multiplication_grid::spawn_multiplication_grid;
 use super::registry::{QuestionRoot, register_question_systems};
-use crate::data::content::QuestionVisual;
+use crate::data::content::{FractionParts, QuestionVisual};
 use crate::data::{LessonSession, QuestionContainer, QuestionInstance};
 use crate::i18n::I18n;
 use crate::ui::theme;
@@ -111,8 +111,7 @@ fn spawn_fraction_addition_visuals(
         |visual, index| match index {
             0 => {
                 visual.spawn(fraction_bar(
-                    b,
-                    a,
+                    &FractionParts::first_colored(a, b),
                     theme::colors::PRIMARY,
                     false,
                     MINI_BAR_WIDTH,
@@ -128,8 +127,7 @@ fn spawn_fraction_addition_visuals(
             }
             _ => {
                 visual.spawn(fraction_bar(
-                    b,
-                    c,
+                    &FractionParts::first_colored(c, b),
                     theme::colors::SECONDARY,
                     false,
                     MINI_BAR_WIDTH,

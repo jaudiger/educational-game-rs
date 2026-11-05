@@ -27,6 +27,8 @@ pub enum TranslationKey {
 
     // Fraction Visualization
     Validate,
+    SubmittedColoring,
+    ExpectedColoring,
 
     // Lesson Play
     CorrectAnswer,
@@ -111,6 +113,8 @@ impl TranslationKey {
                 WhatFractionColored       => ("Quelle fraction est colori\u{00e9}e ?",    "What fraction is colored?"),
                 // Fraction Visualization
                 Validate                  => ("Valider",                                   "Validate"),
+                SubmittedColoring          => ("Coloriage effectu\u{00e9}",                    "Submitted coloring"),
+                ExpectedColoring          => ("Coloriage attendu",                          "Expected coloring"),
                 // Lesson Play
                 CorrectAnswer             => ("Bonne r\u{00e9}ponse !",                    "Correct!"),
                 IncorrectAnswer           => ("Mauvaise r\u{00e9}ponse",                   "Incorrect"),

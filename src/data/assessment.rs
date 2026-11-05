@@ -1,10 +1,14 @@
-use crate::data::content::types::{AnswerResult, ComparisonAnswer, QuestionInstance};
+use bevy::prelude::Reflect;
+
+use crate::data::content::types::{
+    AnswerResult, ComparisonAnswer, FractionParts, QuestionInstance,
+};
 
 /// A response emitted by a question interaction, before correctness is known.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Reflect)]
 pub enum QuestionResponse {
     McqChoice(usize),
-    FractionVisualization { colored_parts: u32 },
+    FractionVisualization { colored_parts: FractionParts },
     FractionComparison(ComparisonAnswer),
     FractionIdentificationChoice(usize),
     NumericInput(u32),
@@ -35,10 +39,10 @@ pub fn assess_response(
             QuestionInstance::FractionVisualization(definition),
             QuestionResponse::FractionVisualization { colored_parts },
         ) => {
-            if *colored_parts > definition.denominator {
+            if colored_parts.denominator() != definition.denominator {
                 return Err(InvalidResponse::ColoredPartsOutOfRange);
             }
-            *colored_parts == definition.numerator
+            colored_parts.numerator() == definition.numerator
         }
         (
             QuestionInstance::FractionComparison(definition),
@@ -48,10 +52,10 @@ pub fn assess_response(
             QuestionInstance::FractionIdentification(definition),
             QuestionResponse::FractionIdentificationChoice(index),
         ) => {
-            if *index >= definition.choices.len() {
+            if *index >= definition.definition.choices.len() {
                 return Err(InvalidResponse::ChoiceIndexOutOfRange);
             }
-            *index == definition.correct_index
+            *index == definition.definition.correct_index
         }
         (QuestionInstance::NumericInput(definition), QuestionResponse::NumericInput(value)) => {
             if *value > crate::data::content::types::MAX_NUMERIC_INPUT_ANSWER {
