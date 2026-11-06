@@ -169,8 +169,8 @@ impl TranslationKey {
                 Language::English => format!("{count} activities").into(),
             },
             Self::SummaryPercentage(pct) => match language {
-                Language::French  => format!("R\u{00e9}ussite : {pct} %").into(),
-                Language::English => format!("Success: {pct}%").into(),
+                Language::French  => format!("{pct} %").into(),
+                Language::English => format!("{pct}%").into(),
             },
             Self::SummaryScore(correct, total) => match language {
                 Language::French  => format!("Score : {correct}/{total}").into(),

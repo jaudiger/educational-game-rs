@@ -30,6 +30,9 @@ pub struct AnimatedButton;
 #[derive(Component, Reflect, Default, Clone)]
 pub struct ButtonScaleAnimationDisabled;
 
+#[derive(Component, Reflect, Default, Clone)]
+pub struct ScreenEntryAnimationDisabled;
+
 /// One-shot scale animation via `UiTransform`.
 /// Self-removes when complete.
 #[derive(Component)]
@@ -200,8 +203,15 @@ fn animate_button_hover(mut commands: Commands, query: AnimatedButtonQuery<'_, '
 
 /// Observer that auto-inserts a `ScreenEntryAnimation` on every entity that
 /// gets a `DespawnOnExit<AppState>` component added (i.e. screen roots).
-fn auto_screen_entry_animation(trigger: On<Add<DespawnOnExit<AppState>>>, mut commands: Commands) {
+fn auto_screen_entry_animation(
+    trigger: On<Add<DespawnOnExit<AppState>>>,
+    mut commands: Commands,
+    disabled: Query<(), With<ScreenEntryAnimationDisabled>>,
+) {
     let entity = trigger.event_target();
+    if disabled.contains(entity) {
+        return;
+    }
 
     commands.entity(entity).insert((
         ScreenEntryAnimation {
