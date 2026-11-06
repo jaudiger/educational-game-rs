@@ -13,21 +13,20 @@
 //! [`LessonMascotPlugin`].
 
 use bevy::prelude::*;
-use bevy::scene::{EntityCommandsSceneExt, Scene, SceneComponent, bsn};
+use bevy::scene::{EntityCommandsSceneExt, EntityWorldMutSceneExt, Scene, SceneComponent, bsn};
 
 use crate::data::ExplorationTheme;
-use crate::states::AppState;
+use crate::states::ActiveLesson;
 use crate::ui::theme;
 
-/// Registers animation systems for the lesson play mascot.
+/// Registers idle animation systems for the Sky balloon on lesson screens.
 pub struct LessonMascotPlugin;
 
 impl Plugin for LessonMascotPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (animate_swaying_envelope, animate_pulled_basket)
-                .run_if(in_state(AppState::LessonPlay)),
+            (animate_swaying_envelope, animate_pulled_basket).run_if(in_state(ActiveLesson)),
         );
     }
 }
@@ -50,7 +49,25 @@ struct SkyBalloonMascot;
 struct SkyBalloonMascotProps {
     envelope_image: Handle<Image>,
     basket_image: Handle<Image>,
+    placement: BalloonPlacement,
 }
+
+#[derive(Clone)]
+pub struct SkyBalloonAssets {
+    envelope_image: Handle<Image>,
+    basket_image: Handle<Image>,
+}
+
+#[derive(Clone, Copy, Default)]
+enum BalloonPlacement {
+    #[default]
+    Lesson,
+    Summary,
+}
+
+#[derive(Component, Reflect, Default)]
+#[require(UiTransform)]
+pub struct SummaryBalloon;
 
 /// Design-pixel width for the balloon envelope (aspect ratio 256:320 = 0.8).
 const SKY_ENVELOPE_WIDTH: f32 = 196.0;
@@ -100,6 +117,13 @@ pub fn spawn_lesson_mascot(
     }
 }
 
+pub fn load_sky_balloon_assets(asset_server: &AssetServer) -> SkyBalloonAssets {
+    SkyBalloonAssets {
+        envelope_image: asset_server.load("cursor/balloon_envelope.png"),
+        basket_image: asset_server.load("cursor/balloon_basket.png"),
+    }
+}
+
 /// Spawns an animated balloon (envelope + basket) for the Sky theme.
 ///
 /// The balloon reuses the cursor assets displayed as UI image nodes. It
@@ -107,32 +131,69 @@ pub fn spawn_lesson_mascot(
 /// resting on the painted grass. The envelope gently sways while the
 /// basket follows with a dephased pull.
 fn spawn_sky_balloon_mascot(parent: &mut ChildSpawnerCommands, asset_server: &AssetServer) {
-    let envelope_image = asset_server.load("cursor/balloon_envelope.png");
-    let basket_image = asset_server.load("cursor/balloon_basket.png");
+    let assets = load_sky_balloon_assets(asset_server);
+    parent
+        .spawn_empty()
+        .apply_scene(sky_balloon_scene(assets, BalloonPlacement::Lesson));
+}
 
-    parent.spawn_empty().apply_scene(bsn! {
+pub fn spawn_summary_balloon(parent: &mut ChildSpawner, assets: SkyBalloonAssets) {
+    let mut balloon = parent.spawn_empty();
+    balloon.insert(SummaryBalloon);
+    balloon.queue_apply_scene(sky_balloon_scene(assets, BalloonPlacement::Summary));
+}
+
+fn sky_balloon_scene(assets: SkyBalloonAssets, placement: BalloonPlacement) -> impl Scene {
+    bsn! {
         @SkyBalloonMascot {
-            @envelope_image: {envelope_image},
-            @basket_image: {basket_image},
+            @envelope_image: {assets.envelope_image},
+            @basket_image: {assets.basket_image},
+            @placement: {placement},
         }
-    });
+    }
 }
 
 impl SkyBalloonMascot {
     fn scene(props: SkyBalloonMascotProps) -> impl Scene {
-        bsn! {
-            Node {
+        let layout = match props.placement {
+            BalloonPlacement::Lesson => BalloonLayout {
                 position_type: PositionType::Absolute,
                 right: percent(8.0),
                 bottom: percent(47.0),
+                root_width: Val::Auto,
+                envelope_width: SKY_ENVELOPE_WIDTH,
+                envelope_height: SKY_ENVELOPE_HEIGHT,
+                basket_width: SKY_BASKET_WIDTH,
+                basket_height: SKY_BASKET_HEIGHT,
+                basket_overlap: SKY_BASKET_OVERLAP,
+            },
+            BalloonPlacement::Summary => BalloonLayout {
+                position_type: PositionType::Absolute,
+                right: percent(1.0),
+                bottom: percent(7.0),
+                root_width: theme::scaled(160.0),
+                envelope_width: 142.0,
+                envelope_height: 178.0,
+                basket_width: 93.0,
+                basket_height: 58.0,
+                basket_overlap: 9.0,
+            },
+        };
+
+        bsn! {
+            Node {
+                position_type: {layout.position_type},
+                right: {layout.right},
+                bottom: {layout.bottom},
+                width: {layout.root_width},
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
             }
             Children [
                 SwayingEnvelope
                 Node {
-                    width: theme::scaled(SKY_ENVELOPE_WIDTH),
-                    height: theme::scaled(SKY_ENVELOPE_HEIGHT),
+                    width: theme::scaled(layout.envelope_width),
+                    height: theme::scaled(layout.envelope_height),
                 }
                 ImageNode {
                     image: {props.envelope_image}
@@ -140,9 +201,9 @@ impl SkyBalloonMascot {
                 --
                 PulledBasket
                 Node {
-                    width: theme::scaled(SKY_BASKET_WIDTH),
-                    height: theme::scaled(SKY_BASKET_HEIGHT),
-                    margin: UiRect::top(theme::scaled(-SKY_BASKET_OVERLAP)),
+                    width: theme::scaled(layout.basket_width),
+                    height: theme::scaled(layout.basket_height),
+                    margin: UiRect::top(theme::scaled(-layout.basket_overlap)),
                 }
                 ImageNode {
                     image: {props.basket_image}
@@ -150,6 +211,19 @@ impl SkyBalloonMascot {
             ]
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct BalloonLayout {
+    position_type: PositionType,
+    right: Val,
+    bottom: Val,
+    root_width: Val,
+    envelope_width: f32,
+    envelope_height: f32,
+    basket_width: f32,
+    basket_height: f32,
+    basket_overlap: f32,
 }
 
 /// Applies a gentle pendular sway to the balloon envelope.
