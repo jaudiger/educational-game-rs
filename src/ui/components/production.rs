@@ -121,7 +121,7 @@ pub fn spawn_confirmation_modal(
                     Children::spawn(SpawnWith(move |buttons: &mut ChildSpawner| {
                         let mut confirm = buttons.spawn_empty();
                         confirm.insert(PopoverConfirmButton);
-                        let _ = confirm.apply_scene(action_button_scene(
+                        confirm.queue_apply_scene(action_button_scene(
                             &confirm_owned,
                             confirm_palette,
                             window,
@@ -129,7 +129,7 @@ pub fn spawn_confirmation_modal(
 
                         let mut cancel = buttons.spawn_empty();
                         cancel.insert(PopoverCancelButton);
-                        let _ = cancel.apply_scene(action_button_scene(
+                        cancel.queue_apply_scene(action_button_scene(
                             &cancel_owned,
                             theme::button_styles::NEUTRAL,
                             window,

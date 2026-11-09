@@ -410,7 +410,7 @@ fn spawn_mode_section(
                     if checked {
                         button.insert(Checked);
                     }
-                    let _ = button.apply_scene(radio_button_scene(label, window));
+                    button.queue_apply_scene(radio_button_scene(label, window));
                 },
             );
             group.observe(handle_mode_radio_change);
@@ -471,7 +471,7 @@ fn spawn_language_section(
                     if checked {
                         button.insert(Checked);
                     }
-                    let _ = button.apply_scene(radio_button_scene(label, window));
+                    button.queue_apply_scene(radio_button_scene(label, window));
                 },
             );
             group.observe(handle_language_radio_change);
@@ -560,14 +560,14 @@ fn spawn_theme_section(
                             if sky_checked {
                                 button.insert(Checked);
                             }
-                            let _ = button.apply_scene(radio_button_scene(&sky_label, window));
+                            button.queue_apply_scene(radio_button_scene(&sky_label, window));
                         }
                         1 => {
                             button.insert(ExplorationThemeRadio(ExplorationTheme::Ocean));
                             if ocean_checked {
                                 button.insert(Checked);
                             }
-                            let _ = button.apply_scene(radio_button_muted_scene(
+                            button.queue_apply_scene(radio_button_muted_scene(
                                 &ocean_label,
                                 &coming_soon,
                                 window,
@@ -578,7 +578,7 @@ fn spawn_theme_section(
                             if space_checked {
                                 button.insert(Checked);
                             }
-                            let _ = button.apply_scene(radio_button_muted_scene(
+                            button.queue_apply_scene(radio_button_muted_scene(
                                 &space_label,
                                 &coming_soon,
                                 window,
@@ -644,7 +644,7 @@ fn spawn_bool_setting_section(
             if enabled {
                 checkbox.insert(Checked);
             }
-            let _ = checkbox.apply_scene(checkbox_scene(&checkbox_label, window));
+            checkbox.queue_apply_scene(checkbox_scene(&checkbox_label, window));
         },
     );
 }
@@ -691,7 +691,7 @@ fn spawn_volume_section(
                     observe(persist_volume_on_pointer_release),
                     observe(persist_volume_on_pointer_cancel),
                 ));
-                let _ = slider.apply_scene(slider_scene(0.0, 1.0, volume, 0.05));
+                slider.queue_apply_scene(slider_scene(0.0, 1.0, volume, 0.05));
 
                 let percent = ((volume.clamp(0.0, 1.0) * 100.0).round()) as u32;
                 controls.spawn((

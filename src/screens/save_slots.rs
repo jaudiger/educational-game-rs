@@ -478,7 +478,7 @@ fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
         Children::spawn(SpawnWith(move |row: &mut ChildSpawner| {
             let mut create = row.spawn_empty();
             create.insert(ConfirmCreateButton);
-            let _ = create.apply_scene(action_button_scene(
+            create.queue_apply_scene(action_button_scene(
                 &create_label,
                 theme::button_styles::ACTION_PRIMARY,
                 window,
@@ -486,7 +486,7 @@ fn creation_buttons(i18n: &I18n, window: Entity) -> impl Bundle + use<> {
 
             let mut cancel = row.spawn_empty();
             cancel.insert(CancelCreateButton);
-            let _ = cancel.apply_scene(action_button_scene(
+            cancel.queue_apply_scene(action_button_scene(
                 &cancel_label,
                 theme::button_styles::NEUTRAL,
                 window,
