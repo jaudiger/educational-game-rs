@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod cloud_material;
 pub mod content;
 pub mod lesson_mascot;
 #[cfg(not(feature = "demo"))]
@@ -10,6 +11,7 @@ pub mod sky_cursor;
 pub mod teacher;
 
 pub use audio::GameAudioPlugin;
+pub use cloud_material::CloudMaterialPlugin;
 pub use content::ContentPlugin;
 pub use lesson_mascot::LessonMascotPlugin;
 #[cfg(not(feature = "demo"))]

@@ -5,6 +5,7 @@ use bevy::window::PrimaryWindow;
 
 use crate::data::LessonScore;
 use crate::i18n::{I18n, TranslationKey};
+use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudUiMaterial};
 use crate::plugins::lesson_mascot::{load_sky_balloon_assets, spawn_summary_balloon};
 use crate::states::AppState;
 use crate::ui::animation::ScreenEntryAnimationDisabled;
@@ -41,6 +42,7 @@ pub(super) fn setup_lesson_summary(
     i18n: Res<I18n>,
     asset_server: Res<AssetServer>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
+    mut cloud_materials: ResMut<Assets<ProceduralCloudUiMaterial>>,
 ) {
     let window = *primary_window;
     let percentage = score_percentage(*score);
@@ -57,6 +59,10 @@ pub(super) fn setup_lesson_summary(
         _ => theme::colors::SECONDARY,
     };
     let style = SummaryThemeStyle::sky();
+    let cloud_material = cloud_materials.add(ProceduralCloudUiMaterial::new(
+        CloudShapeId::Puffy,
+        Color::WHITE,
+    ));
     let balloon_assets = load_sky_balloon_assets(&asset_server);
     let card = SummaryCardPresentation {
         title: i18n.t(&TranslationKey::SummaryTitle).into_owned(),
@@ -113,7 +119,7 @@ pub(super) fn setup_lesson_summary(
                     content.spawn(summary_card(card, window));
                 })),
             ),
-            summary_curtain(style),
+            summary_curtain(style, cloud_material),
         ],
     ));
 }

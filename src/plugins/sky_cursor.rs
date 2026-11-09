@@ -13,11 +13,12 @@ use bevy::picking::pointer::{
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Anchor;
+use bevy::sprite_render::MeshMaterial2d;
 use bevy::window::{CursorMoved, CursorOptions, PrimaryWindow, WindowRef};
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
-use crate::plugins::sky_background::generate_cloud_image;
+use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudMaterial};
 use crate::states::AppState;
 use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
@@ -199,8 +200,9 @@ struct BalloonBasket;
 #[derive(Component, Reflect)]
 struct CloudPuffSpawner {
     timer: Timer,
+    puff_shapes: Vec<CloudShapeId>,
     #[reflect(ignore)]
-    puff_textures: Vec<Handle<Image>>,
+    puff_meshes: Vec<Handle<Mesh>>,
 }
 
 #[derive(Component, Reflect)]
@@ -251,31 +253,6 @@ const BASKET_SCALE: f32 = 0.25;
 const BASKET_OFFSET_Y: f32 = 23.0;
 /// Positions the envelope above the cursor origin.
 const ENVELOPE_BASE_Y: f32 = 20.0;
-
-/// A cloud shape: `(image_width, image_height, blobs)` where each blob
-/// is `(center_x, center_y, radius)`.
-type CloudShape = (u32, u32, Vec<(f32, f32, f32)>);
-
-/// Small cloud puff shapes for the balloon trail particles.
-fn cloud_puff_definitions() -> Vec<CloudShape> {
-    vec![
-        (
-            30,
-            30,
-            vec![(15.0, 15.0, 14.0), (12.0, 18.0, 10.0), (20.0, 13.0, 11.0)],
-        ),
-        (
-            45,
-            22,
-            vec![(12.0, 12.0, 10.0), (25.0, 11.0, 12.0), (38.0, 13.0, 9.0)],
-        ),
-        (
-            35,
-            28,
-            vec![(17.0, 14.0, 14.0), (12.0, 16.0, 10.0), (24.0, 12.0, 11.0)],
-        ),
-    ]
-}
 
 #[allow(
     clippy::cast_possible_truncation,
@@ -492,7 +469,7 @@ fn near_segment(x: f32, y: f32, start: Vec2, end: Vec2, width: f32) -> bool {
 fn setup_balloon_cursor(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut images: ResMut<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     settings: Res<GameSettings>,
     mut cursor_opts: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
@@ -509,10 +486,13 @@ fn setup_balloon_cursor(
     let envelope_texture: Handle<Image> = asset_server.load("cursor/balloon_envelope.png");
     let basket_texture: Handle<Image> = asset_server.load("cursor/balloon_basket.png");
 
-    // Generate cloud puff textures procedurally (no PNG assets needed)
-    let puff_textures: Vec<Handle<Image>> = cloud_puff_definitions()
+    let puff_shapes = CloudShapeId::ALL.to_vec();
+    let puff_meshes = puff_shapes
         .iter()
-        .map(|(w, h, blobs)| images.add(generate_cloud_image(*w, *h, blobs)))
+        .map(|shape_id| {
+            let canvas = shape_id.canvas();
+            meshes.add(Rectangle::new(canvas.x, canvas.y))
+        })
         .collect();
 
     let cursor_layer = RenderLayers::layer(CURSOR_RENDER_LAYER);
@@ -526,7 +506,8 @@ fn setup_balloon_cursor(
         cursor_layer.clone(),
         CloudPuffSpawner {
             timer: Timer::from_seconds(1.6, TimerMode::Repeating),
-            puff_textures,
+            puff_shapes,
+            puff_meshes,
         },
         children![
             // Balloon envelope
@@ -873,15 +854,21 @@ fn spawn_cloud_puffs_system(
     time: Res<Time>,
     mut commands: Commands,
     mut spawner_query: Query<(&mut CloudPuffSpawner, &GlobalTransform)>,
+    mut materials: ResMut<Assets<ProceduralCloudMaterial>>,
 ) {
     let mut rng = rand::rng();
 
     for (mut spawner, global_transform) in &mut spawner_query {
         spawner.timer.tick(time.delta());
 
-        if spawner.timer.just_finished() && !spawner.puff_textures.is_empty() {
-            let texture_index = rng.random_range(0..spawner.puff_textures.len());
-            let texture = spawner.puff_textures[texture_index].clone();
+        if spawner.timer.just_finished() {
+            let shape_index = rng.random_range(0..spawner.puff_shapes.len());
+            let shape_id = spawner.puff_shapes[shape_index];
+            let material = materials.add(ProceduralCloudMaterial::new(
+                shape_id,
+                shape_id.canvas(),
+                Color::srgba(1.0, 1.0, 1.0, 0.35),
+            ));
 
             let root_pos = global_transform.translation();
             let offset_y = rng.random_range(-15.0_f32..15.0);
@@ -895,12 +882,9 @@ fn spawn_cloud_puffs_system(
                     velocity: Vec2::new(20.0, drift_y),
                     initial_opacity: 0.35,
                 },
-                Sprite {
-                    image: texture,
-                    color: Color::srgba(1.0, 1.0, 1.0, 0.35),
-                    ..default()
-                },
-                Transform::from_translation(spawn_pos).with_scale(Vec3::splat(0.5)),
+                Mesh2d(spawner.puff_meshes[shape_index].clone()),
+                MeshMaterial2d(material),
+                Transform::from_translation(spawn_pos).with_scale(Vec3::splat(0.1)),
                 RenderLayers::layer(CURSOR_RENDER_LAYER),
             ));
         }
@@ -910,12 +894,18 @@ fn spawn_cloud_puffs_system(
 fn animate_cloud_puffs_system(
     time: Res<Time>,
     mut commands: Commands,
-    mut puff_query: Query<(Entity, &mut CloudPuff, &mut Transform, &mut Sprite)>,
+    mut puff_query: Query<(
+        Entity,
+        &mut CloudPuff,
+        &mut Transform,
+        &MeshMaterial2d<ProceduralCloudMaterial>,
+    )>,
+    mut materials: ResMut<Assets<ProceduralCloudMaterial>>,
 ) {
     let dt = time.delta_secs();
     let elapsed = time.elapsed_secs();
 
-    for (entity, mut puff, mut transform, mut sprite) in &mut puff_query {
+    for (entity, mut puff, mut transform, material_component) in &mut puff_query {
         puff.lifetime.tick(time.delta());
 
         // Vertical oscillation
@@ -925,7 +915,9 @@ fn animate_cloud_puffs_system(
         transform.translation.y = puff.velocity.y.mul_add(dt, transform.translation.y);
 
         let opacity = puff.initial_opacity * (1.0 - puff.lifetime.fraction());
-        sprite.color = Color::srgba(1.0, 1.0, 1.0, opacity);
+        if let Some(mut material) = materials.get_mut(&material_component.0) {
+            material.set_opacity(opacity);
+        }
 
         if puff.lifetime.is_finished() {
             commands.entity(entity).despawn();

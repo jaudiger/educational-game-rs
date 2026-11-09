@@ -2,16 +2,18 @@
 //!
 //! Spawns a gradient sky and multiple layers of drifting clouds during
 //! `AppState::ThemeExploration` when the sky theme is selected. Clouds are
-//! procedurally generated with no external assets required.
+//! rendered from WGSL-authored cloud shapes.
 
 use bevy::asset::RenderAssetUsages;
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::sprite_render::MeshMaterial2d;
 use bevy::window::PrimaryWindow;
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
+use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudMaterial};
 use crate::states::AppState;
 
 /// Renders an animated sky background with parallax clouds.
@@ -44,7 +46,7 @@ impl Plugin for SkyBackgroundPlugin {
 #[derive(Component, Reflect)]
 struct SkyGradient;
 
-/// Marks a drifting cloud sprite.
+/// Marks a drifting cloud mesh.
 #[derive(Component, Reflect)]
 struct SkyCloud {
     /// Horizontal speed in pixels per second.
@@ -166,123 +168,11 @@ fn generate_gradient_image() -> Image {
     image
 }
 
-/// Generates a procedural cloud image from overlapping soft blobs.
-///
-/// Each blob contributes a smooth quartic falloff. Overlapping blobs
-/// accumulate, producing natural-looking puffy edges. The result is a
-/// white texture with varying alpha.
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::cast_precision_loss
-)]
-pub fn generate_cloud_image(width: u32, height: u32, blobs: &[(f32, f32, f32)]) -> Image {
-    let pixel_count = (width * height * 4) as usize;
-    let mut data = vec![0u8; pixel_count];
-
-    for y in 0..height {
-        for x in 0..width {
-            let px = x as f32;
-            let py = y as f32;
-
-            let mut alpha = 0.0_f32;
-            for &(cx, cy, radius) in blobs {
-                let dx = px - cx;
-                let dy = py - cy;
-                let dist_sq = dx.mul_add(dx, dy * dy);
-                let r_sq = radius * radius;
-                if dist_sq < r_sq {
-                    let t = 1.0 - dist_sq / r_sq;
-                    alpha = t.mul_add(t, alpha); // quartic falloff
-                }
-            }
-            alpha = alpha.min(1.0);
-
-            let idx = ((y * width + x) * 4) as usize;
-            data[idx] = 255;
-            data[idx + 1] = 255;
-            data[idx + 2] = 255;
-            data[idx + 3] = (alpha * 230.0) as u8;
-        }
-    }
-
-    let mut image = Image::new(
-        Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        data,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    image.sampler = ImageSampler::linear();
-    image
-}
-
-/// A blob definition: `(center_x, center_y, radius)` in pixel coordinates.
-type Blob = (f32, f32, f32);
-
-/// A cloud shape: `(image_width, image_height, blobs)`.
-type CloudShape = (u32, u32, Vec<Blob>);
-
-/// Returns cloud shape definitions per variant.
-fn cloud_definitions() -> Vec<CloudShape> {
-    vec![
-        // Cloud 0: wide cumulus
-        (
-            220,
-            90,
-            vec![
-                (55.0, 55.0, 40.0),
-                (110.0, 48.0, 50.0),
-                (165.0, 52.0, 42.0),
-                (85.0, 35.0, 32.0),
-                (140.0, 33.0, 35.0),
-                (40.0, 62.0, 28.0),
-                (180.0, 58.0, 28.0),
-            ],
-        ),
-        // Cloud 1: tall puffy
-        (
-            150,
-            100,
-            vec![
-                (75.0, 64.0, 44.0),
-                (48.0, 58.0, 36.0),
-                (102.0, 60.0, 38.0),
-                (75.0, 38.0, 36.0),
-                (55.0, 42.0, 28.0),
-                (95.0, 40.0, 30.0),
-            ],
-        ),
-        // Cloud 2: small wisp
-        (
-            100,
-            55,
-            vec![(35.0, 32.0, 26.0), (62.0, 28.0, 28.0), (50.0, 36.0, 22.0)],
-        ),
-        // Cloud 3: elongated streak
-        (
-            200,
-            70,
-            vec![
-                (40.0, 40.0, 28.0),
-                (80.0, 38.0, 34.0),
-                (120.0, 40.0, 32.0),
-                (160.0, 42.0, 28.0),
-                (60.0, 30.0, 22.0),
-                (100.0, 28.0, 26.0),
-                (140.0, 31.0, 24.0),
-            ],
-        ),
-    ]
-}
-
 fn setup_sky_background(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ProceduralCloudMaterial>>,
     settings: Res<GameSettings>,
     window: Single<&Window, With<PrimaryWindow>>,
 ) {
@@ -311,15 +201,10 @@ fn setup_sky_background(
         DespawnOnExit(AppState::ThemeExploration),
     ));
 
-    // --- Cloud textures (one per shape variant) ---
-    let definitions = cloud_definitions();
-    let cloud_textures: Vec<(Handle<Image>, u32)> = definitions
-        .iter()
-        .map(|(w, h, blobs)| {
-            let handle = images.add(generate_cloud_image(*w, *h, blobs));
-            (handle, *w)
-        })
-        .collect();
+    let cloud_meshes = CloudShapeId::ALL.map(|shape_id| {
+        let canvas = shape_id.canvas();
+        meshes.add(Rectangle::new(canvas.x, canvas.y))
+    });
 
     // --- Spawn cloud sprites across parallax layers ---
     let mut rng = rand::rng();
@@ -328,12 +213,12 @@ fn setup_sky_background(
 
     for layer in CLOUD_LAYERS {
         for _ in 0..layer.count {
-            let tex_idx = rng.random_range(0..cloud_textures.len());
-            let (ref handle, img_w) = cloud_textures[tex_idx];
+            let shape_index = rng.random_range(0..CloudShapeId::ALL.len());
+            let shape_id = CloudShapeId::ALL[shape_index];
 
             let scale = rng.random_range(layer.scale_min..layer.scale_max);
-            #[allow(clippy::cast_precision_loss)]
-            let cloud_half_w = img_w as f32 * scale / 2.0;
+            let canvas = shape_id.canvas();
+            let cloud_half_w = canvas.x * scale / 2.0;
 
             let spawn_margin = half_w + cloud_half_w;
             let x = rng.random_range(-spawn_margin..spawn_margin);
@@ -346,11 +231,12 @@ fn setup_sky_background(
                     speed: layer.speed,
                     half_width: cloud_half_w,
                 },
-                Sprite {
-                    image: handle.clone(),
-                    color: Color::srgba(1.0, 1.0, 1.0, layer.opacity),
-                    ..default()
-                },
+                Mesh2d(cloud_meshes[shape_index].clone()),
+                MeshMaterial2d(materials.add(ProceduralCloudMaterial::new(
+                    shape_id,
+                    canvas,
+                    Color::srgba(1.0, 1.0, 1.0, layer.opacity),
+                ))),
                 Transform::from_xyz(x, y, layer.z).with_scale(Vec3::splat(scale)),
                 DespawnOnExit(AppState::ThemeExploration),
             ));

@@ -1,5 +1,7 @@
 use bevy::prelude::*;
+use bevy::ui_render::ui_material::MaterialNode;
 
+use crate::plugins::cloud_material::ProceduralCloudUiMaterial;
 use crate::ui::theme;
 
 #[derive(Component, Reflect)]
@@ -37,8 +39,6 @@ pub(super) struct SummaryThemeStyle {
     pub(super) background: Color,
     pub(super) accent: Color,
     pub(super) curtain: Color,
-    pub(super) cloud_primary: Color,
-    pub(super) cloud_secondary: Color,
 }
 
 #[derive(Clone, Copy)]
@@ -115,8 +115,6 @@ impl SummaryThemeStyle {
             background: Color::srgb(0.68, 0.85, 0.96),
             accent: Color::srgb(0.16, 0.43, 0.72),
             curtain: Color::srgb(0.85, 0.93, 0.98),
-            cloud_primary: Color::srgb(1.0, 1.0, 1.0),
-            cloud_secondary: Color::srgb(0.93, 0.97, 1.0),
         }
     }
 }
@@ -444,7 +442,10 @@ pub(super) fn animate_sun_sparkles(
     }
 }
 
-pub(super) fn summary_curtain(style: SummaryThemeStyle) -> impl Bundle + use<> {
+pub(super) fn summary_curtain(
+    style: SummaryThemeStyle,
+    cloud_material: Handle<ProceduralCloudUiMaterial>,
+) -> impl Bundle + use<> {
     (
         Node {
             position_type: PositionType::Absolute,
@@ -459,16 +460,17 @@ pub(super) fn summary_curtain(style: SummaryThemeStyle) -> impl Bundle + use<> {
             color: style.curtain,
         },
         Pickable::IGNORE,
-        Children::spawn(SpawnIter(REVEAL_SHAPES.into_iter().map(move |spec| {
-            summary_reveal_shape(spec, style.cloud_primary, style.cloud_secondary)
-        }))),
+        Children::spawn(SpawnIter(
+            REVEAL_SHAPES
+                .into_iter()
+                .map(move |spec| summary_reveal_shape(spec, cloud_material.clone())),
+        )),
     )
 }
 
 fn summary_reveal_shape(
     spec: RevealShapeSpec,
-    primary: Color,
-    secondary: Color,
+    cloud_material: Handle<ProceduralCloudUiMaterial>,
 ) -> impl Bundle + use<> {
     (
         Node {
@@ -480,31 +482,10 @@ fn summary_reveal_shape(
             ..default()
         },
         UiTransform::default(),
+        MaterialNode(cloud_material),
         SummaryCloud {
             exit_direction: spec.exit_direction,
         },
-        Pickable::IGNORE,
-        children![
-            cloud_lobe(15.0, 36.0, 64.0, 48.0, primary),
-            cloud_lobe(0.0, 19.0, 49.0, 60.0, secondary),
-            cloud_lobe(45.0, 11.0, 43.0, 67.0, primary),
-            cloud_lobe(59.0, 33.0, 36.0, 49.0, secondary),
-        ],
-    )
-}
-
-fn cloud_lobe(left: f32, top: f32, width: f32, height: f32, color: Color) -> impl Bundle + use<> {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            left: percent(left),
-            top: percent(top),
-            width: percent(width),
-            height: percent(height),
-            border_radius: BorderRadius::all(percent(50.0)),
-            ..default()
-        },
-        BackgroundColor(color),
         Pickable::IGNORE,
     )
 }

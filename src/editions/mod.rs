@@ -46,8 +46,8 @@ pub struct SharedGamePlugin;
 impl Plugin for SharedGamePlugin {
     fn build(&self, app: &mut App) {
         use crate::plugins::{
-            GameAudioPlugin, LessonMascotPlugin, SettingsPlugin, SkyBackgroundPlugin,
-            SkyCursorPlugin,
+            CloudMaterialPlugin, GameAudioPlugin, LessonMascotPlugin, SettingsPlugin,
+            SkyBackgroundPlugin, SkyCursorPlugin,
         };
         use crate::questions::{
             FractionComparisonPlugin, FractionIdentificationPlugin, FractionVisualizationPlugin,
@@ -70,6 +70,7 @@ impl Plugin for SharedGamePlugin {
             .add_sub_state::<ExplorationView>()
             .add_plugins((
                 SkyCursorPlugin,
+                CloudMaterialPlugin,
                 ButtonActivationPlugin,
                 FocusNavigationPlugin,
                 GameAudioPlugin,
