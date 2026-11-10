@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod balloon_material;
 pub mod cloud_material;
 pub mod content;
 pub mod cursor_material;
@@ -13,6 +14,7 @@ pub mod sky_background;
 pub mod teacher;
 
 pub use audio::GameAudioPlugin;
+pub use balloon_material::BalloonMaterialPlugin;
 pub use cloud_material::CloudMaterialPlugin;
 pub use content::ContentPlugin;
 pub use cursor_material::CursorMaterialPlugin;

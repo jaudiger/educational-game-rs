@@ -6,8 +6,11 @@ use bevy::window::PrimaryWindow;
 
 use crate::data::LessonScore;
 use crate::i18n::{I18n, TranslationKey};
+use crate::plugins::balloon_material::BalloonUiMaterial;
 use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudUiMaterial};
-use crate::plugins::lesson_mascot::{load_sky_balloon_assets, spawn_summary_balloon};
+use crate::plugins::lesson_mascot::{
+    SkyBalloonAssets, create_sky_balloon_assets, spawn_summary_balloon,
+};
 use crate::states::AppState;
 use crate::ui::animation::ScreenEntryAnimationDisabled;
 use crate::ui::components::{save_write_failure_notice, standard_button};
@@ -44,6 +47,7 @@ pub(super) struct SummaryMaterials<'w> {
     clouds: ResMut<'w, Assets<ProceduralCloudUiMaterial>>,
     sun: ResMut<'w, Assets<SummarySunMaterial>>,
     flare: ResMut<'w, Assets<SummaryLensFlareMaterial>>,
+    balloon: ResMut<'w, Assets<BalloonUiMaterial>>,
 }
 
 pub(super) fn setup_lesson_summary(
@@ -51,7 +55,6 @@ pub(super) fn setup_lesson_summary(
     score: Res<LessonScore>,
     presentation: Res<LessonSummaryPresentation>,
     i18n: Res<I18n>,
-    asset_server: Res<AssetServer>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
     mut materials: SummaryMaterials,
 ) {
@@ -76,7 +79,7 @@ pub(super) fn setup_lesson_summary(
     ));
     let sun_material = materials.sun.add(SummarySunMaterial::new());
     let flare_material = materials.flare.add(SummaryLensFlareMaterial::new());
-    let balloon_assets = load_sky_balloon_assets(&asset_server);
+    let balloon_assets: SkyBalloonAssets = create_sky_balloon_assets(&mut materials.balloon);
     let card = SummaryCardPresentation {
         title: i18n.t(&TranslationKey::SummaryTitle).into_owned(),
         percentage: i18n

@@ -16,6 +16,7 @@ use bevy::prelude::*;
 use bevy::scene::{EntityCommandsSceneExt, EntityWorldMutSceneExt, Scene, SceneComponent, bsn};
 
 use crate::data::ExplorationTheme;
+use crate::plugins::balloon_material::{BalloonPart, BalloonUiMaterial};
 use crate::states::ActiveLesson;
 use crate::ui::theme;
 
@@ -32,7 +33,7 @@ impl Plugin for LessonMascotPlugin {
 }
 
 /// Marker for the balloon envelope node, animated with a pendular sway
-/// whose pivot is simulated at the top-center of the image.
+/// whose pivot is simulated at the top-center of the visual.
 #[derive(Component, Clone, Default, Reflect)]
 struct SwayingEnvelope;
 
@@ -47,15 +48,15 @@ struct SkyBalloonMascot;
 
 #[derive(Default)]
 struct SkyBalloonMascotProps {
-    envelope_image: Handle<Image>,
-    basket_image: Handle<Image>,
+    envelope_material: Handle<BalloonUiMaterial>,
+    basket_material: Handle<BalloonUiMaterial>,
     placement: BalloonPlacement,
 }
 
 #[derive(Clone)]
 pub struct SkyBalloonAssets {
-    envelope_image: Handle<Image>,
-    basket_image: Handle<Image>,
+    envelope_material: Handle<BalloonUiMaterial>,
+    basket_material: Handle<BalloonUiMaterial>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -69,14 +70,10 @@ enum BalloonPlacement {
 #[require(UiTransform)]
 pub struct SummaryBalloon;
 
-/// Design-pixel width for the balloon envelope (aspect ratio 256:320 = 0.8).
+/// Design-pixel width for the balloon envelope.
 const SKY_ENVELOPE_WIDTH: f32 = 196.0;
-/// Design-pixel height for the balloon envelope.
-const SKY_ENVELOPE_HEIGHT: f32 = 245.0;
-/// Design-pixel width for the balloon basket (aspect ratio 128:80 = 1.6).
+/// Design-pixel width for the balloon basket.
 const SKY_BASKET_WIDTH: f32 = 129.0;
-/// Design-pixel height for the balloon basket.
-const SKY_BASKET_HEIGHT: f32 = 81.0;
 /// Vertical overlap between envelope bottom and basket top (design pixels).
 const SKY_BASKET_OVERLAP: f32 = 12.0;
 
@@ -108,30 +105,33 @@ const BOB_FREQUENCY: f32 = 0.8;
 pub fn spawn_lesson_mascot(
     parent: &mut ChildSpawnerCommands,
     exploration_theme: ExplorationTheme,
-    asset_server: &AssetServer,
+    materials: &mut Assets<BalloonUiMaterial>,
 ) {
     match exploration_theme {
-        ExplorationTheme::Sky => spawn_sky_balloon_mascot(parent, asset_server),
+        ExplorationTheme::Sky => spawn_sky_balloon_mascot(parent, materials),
         // Future themes: add a spawn function and match arm here.
         ExplorationTheme::Ocean | ExplorationTheme::Space => {}
     }
 }
 
-pub fn load_sky_balloon_assets(asset_server: &AssetServer) -> SkyBalloonAssets {
+pub fn create_sky_balloon_assets(materials: &mut Assets<BalloonUiMaterial>) -> SkyBalloonAssets {
     SkyBalloonAssets {
-        envelope_image: asset_server.load("cursor/balloon_envelope.png"),
-        basket_image: asset_server.load("cursor/balloon_basket.png"),
+        envelope_material: materials.add(BalloonUiMaterial::new(BalloonPart::Envelope)),
+        basket_material: materials.add(BalloonUiMaterial::new(BalloonPart::Basket)),
     }
 }
 
 /// Spawns an animated balloon (envelope + basket) for the Sky theme.
 ///
-/// The balloon reuses the cursor assets displayed as UI image nodes. It
+/// The balloon reuses the procedural cursor design in UI material nodes. It
 /// is absolutely positioned in the middle-right area of the background,
 /// resting on the painted grass. The envelope gently sways while the
 /// basket follows with a dephased pull.
-fn spawn_sky_balloon_mascot(parent: &mut ChildSpawnerCommands, asset_server: &AssetServer) {
-    let assets = load_sky_balloon_assets(asset_server);
+fn spawn_sky_balloon_mascot(
+    parent: &mut ChildSpawnerCommands,
+    materials: &mut Assets<BalloonUiMaterial>,
+) {
+    let assets = create_sky_balloon_assets(materials);
     parent
         .spawn_empty()
         .apply_scene(sky_balloon_scene(assets, BalloonPlacement::Lesson));
@@ -146,8 +146,8 @@ pub fn spawn_summary_balloon(parent: &mut ChildSpawner, assets: SkyBalloonAssets
 fn sky_balloon_scene(assets: SkyBalloonAssets, placement: BalloonPlacement) -> impl Scene {
     bsn! {
         @SkyBalloonMascot {
-            @envelope_image: {assets.envelope_image},
-            @basket_image: {assets.basket_image},
+            @envelope_material: {assets.envelope_material},
+            @basket_material: {assets.basket_material},
             @placement: {placement},
         }
     }
@@ -162,9 +162,7 @@ impl SkyBalloonMascot {
                 bottom: percent(47.0),
                 root_width: Val::Auto,
                 envelope_width: SKY_ENVELOPE_WIDTH,
-                envelope_height: SKY_ENVELOPE_HEIGHT,
                 basket_width: SKY_BASKET_WIDTH,
-                basket_height: SKY_BASKET_HEIGHT,
                 basket_overlap: SKY_BASKET_OVERLAP,
             },
             BalloonPlacement::Summary => BalloonLayout {
@@ -173,12 +171,12 @@ impl SkyBalloonMascot {
                 bottom: percent(7.0),
                 root_width: theme::scaled(160.0),
                 envelope_width: 142.0,
-                envelope_height: 178.0,
                 basket_width: 93.0,
-                basket_height: 58.0,
                 basket_overlap: 9.0,
             },
         };
+        let envelope_height = BalloonPart::Envelope.height_for_width(layout.envelope_width);
+        let basket_height = BalloonPart::Basket.height_for_width(layout.basket_width);
 
         bsn! {
             Node {
@@ -193,21 +191,17 @@ impl SkyBalloonMascot {
                 SwayingEnvelope
                 Node {
                     width: theme::scaled(layout.envelope_width),
-                    height: theme::scaled(layout.envelope_height),
+                    height: theme::scaled(envelope_height),
                 }
-                ImageNode {
-                    image: {props.envelope_image}
-                }
+                MaterialNode<BalloonUiMaterial>({props.envelope_material})
                 --
                 PulledBasket
                 Node {
                     width: theme::scaled(layout.basket_width),
-                    height: theme::scaled(layout.basket_height),
+                    height: theme::scaled(basket_height),
                     margin: UiRect::top(theme::scaled(-layout.basket_overlap)),
                 }
-                ImageNode {
-                    image: {props.basket_image}
-                }
+                MaterialNode<BalloonUiMaterial>({props.basket_material})
             ]
         }
     }
@@ -220,9 +214,7 @@ struct BalloonLayout {
     bottom: Val,
     root_width: Val,
     envelope_width: f32,
-    envelope_height: f32,
     basket_width: f32,
-    basket_height: f32,
     basket_overlap: f32,
 }
 

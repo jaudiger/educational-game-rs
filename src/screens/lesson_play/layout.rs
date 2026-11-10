@@ -8,6 +8,7 @@ use crate::data::{
     SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
+use crate::plugins::balloon_material::BalloonUiMaterial;
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
 use crate::questions::QuestionRoot;
 use crate::states::AppState;
@@ -71,8 +72,8 @@ fn fit_content_to_available_height(
 #[allow(clippy::too_many_arguments)]
 pub fn setup_lesson_play(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     images: Res<GameImages>,
+    mut balloon_materials: ResMut<Assets<BalloonUiMaterial>>,
     selected_lesson: Res<SelectedLesson>,
     launch_selection: Option<Res<LessonLaunchSelection>>,
     rejected_launch: Option<Res<RejectedLessonLaunch>>,
@@ -141,7 +142,7 @@ pub fn setup_lesson_play(
         ))
         .with_children(|parent| {
             // Mascot first: absolutely positioned, renders behind siblings.
-            spawn_lesson_mascot(parent, settings.exploration_theme, &asset_server);
+            spawn_lesson_mascot(parent, settings.exploration_theme, &mut balloon_materials);
             spawn_top_bar(parent, &progress, window);
             spawn_question_container(parent);
         });

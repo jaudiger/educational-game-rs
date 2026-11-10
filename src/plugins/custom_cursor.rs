@@ -9,12 +9,12 @@ use bevy::picking::pointer::{
     PointerAction, PointerButton, PointerId, PointerInput, PointerLocation,
 };
 use bevy::prelude::*;
-use bevy::sprite::Anchor;
 use bevy::sprite_render::MeshMaterial2d;
 use bevy::window::{CursorMoved, CursorOptions, PrimaryWindow, WindowRef};
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
+use crate::plugins::balloon_material::{BalloonMaterial, BalloonPart};
 use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudMaterial};
 use crate::plugins::cursor_material::{CursorEyeFrame, CursorMaterial};
 use crate::states::AppState;
@@ -167,11 +167,13 @@ impl TouchCursorState {
 }
 
 #[derive(Component, Reflect)]
+#[require(Transform, Visibility)]
 struct BalloonEnvelope {
     base_y: f32,
 }
 
 #[derive(Component, Reflect)]
+#[require(Transform, Visibility)]
 struct BalloonBasket;
 
 #[derive(Component, Reflect)]
@@ -229,8 +231,8 @@ const ENVELOPE_BASE_Y: f32 = 20.0;
 
 fn setup_balloon_cursor(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut balloon_materials: ResMut<Assets<BalloonMaterial>>,
     settings: Res<GameSettings>,
     mut cursor_opts: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
@@ -244,8 +246,12 @@ fn setup_balloon_cursor(
     // Hide the OS cursor
     cursor_opts.visible = false;
 
-    let envelope_texture: Handle<Image> = asset_server.load("cursor/balloon_envelope.png");
-    let basket_texture: Handle<Image> = asset_server.load("cursor/balloon_basket.png");
+    let envelope_canvas = BalloonPart::Envelope.canvas();
+    let basket_canvas = BalloonPart::Basket.canvas();
+    let envelope_mesh = meshes.add(Rectangle::new(envelope_canvas.x, envelope_canvas.y));
+    let basket_mesh = meshes.add(Rectangle::new(basket_canvas.x, basket_canvas.y));
+    let envelope_material = balloon_materials.add(BalloonMaterial::new(BalloonPart::Envelope));
+    let basket_material = balloon_materials.add(BalloonMaterial::new(BalloonPart::Basket));
 
     let puff_shapes = CloudShapeId::ALL.to_vec();
     let puff_meshes = puff_shapes
@@ -275,20 +281,27 @@ fn setup_balloon_cursor(
                 BalloonEnvelope {
                     base_y: ENVELOPE_BASE_Y,
                 },
-                Sprite::from_image(envelope_texture),
-                Anchor::BOTTOM_CENTER,
                 Transform::from_xyz(0.0, ENVELOPE_BASE_Y, 1.0)
                     .with_scale(Vec3::splat(ENVELOPE_SCALE)),
-                cursor_layer.clone(),
+                children![(
+                    Mesh2d(envelope_mesh),
+                    MeshMaterial2d(envelope_material),
+                    Transform::from_xyz(0.0, envelope_canvas.y * 0.5, 0.0),
+                    Pickable::IGNORE,
+                    cursor_layer.clone(),
+                )],
             ),
-            // Balloon basket
             (
                 BalloonBasket,
-                Sprite::from_image(basket_texture),
-                Anchor::TOP_CENTER,
                 Transform::from_xyz(0.0, BASKET_OFFSET_Y, 2.0)
                     .with_scale(Vec3::splat(BASKET_SCALE)),
-                cursor_layer,
+                children![(
+                    Mesh2d(basket_mesh),
+                    MeshMaterial2d(basket_material),
+                    Transform::from_xyz(0.0, -basket_canvas.y * 0.5, 0.0),
+                    Pickable::IGNORE,
+                    cursor_layer,
+                )],
             ),
         ],
     ));
