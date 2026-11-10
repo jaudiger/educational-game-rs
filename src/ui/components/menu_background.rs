@@ -1,7 +1,7 @@
-use bevy::prelude::*;
-
+use crate::plugins::menu_decoration::{MenuDecorationShape, MenuDecorationVisual};
 use crate::ui::animation::FloatingMenuDecoration;
 use crate::ui::theme;
+use bevy::prelude::*;
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct MenuBackgroundStyle(f32);
@@ -35,6 +35,7 @@ struct Decoration {
     horizontal: HorizontalAnchor,
     vertical: VerticalAnchor,
     color: Color,
+    shape: MenuDecorationShape,
     radius: Val,
     phase: f32,
     amplitude: f32,
@@ -48,6 +49,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Left(Val::Percent(-8.0)),
         vertical: VerticalAnchor::Top(Val::Percent(5.0)),
         color: theme::colors::PASTEL_BLUE,
+        shape: MenuDecorationShape::Ellipse,
         radius: Val::Percent(50.0),
         phase: 0.0,
         amplitude: 12.0,
@@ -59,6 +61,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Right(Val::Percent(-5.0)),
         vertical: VerticalAnchor::Top(Val::Percent(-6.0)),
         color: theme::colors::PASTEL_PEACH,
+        shape: MenuDecorationShape::RoundedRectangle,
         radius: Val::Px(72.0),
         phase: std::f32::consts::PI,
         amplitude: 14.0,
@@ -70,7 +73,8 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Left(Val::Percent(12.0)),
         vertical: VerticalAnchor::Bottom(Val::Percent(-12.0)),
         color: theme::colors::PASTEL_LAVENDER,
-        radius: Val::Percent(50.0),
+        shape: MenuDecorationShape::RoundedRectangle,
+        radius: Val::Px(54.0),
         phase: 0.8,
         amplitude: 11.0,
         speed: std::f32::consts::TAU / 10.0,
@@ -81,6 +85,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Right(Val::Percent(-8.0)),
         vertical: VerticalAnchor::Bottom(Val::Percent(7.0)),
         color: theme::colors::PASTEL_MINT,
+        shape: MenuDecorationShape::Ellipse,
         radius: Val::Percent(50.0),
         phase: 2.4,
         amplitude: 13.0,
@@ -92,6 +97,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Left(Val::Percent(-4.0)),
         vertical: VerticalAnchor::Top(Val::Percent(43.0)),
         color: theme::colors::PASTEL_PEACH,
+        shape: MenuDecorationShape::Ellipse,
         radius: Val::Percent(50.0),
         phase: 4.0,
         amplitude: 10.0,
@@ -110,15 +116,15 @@ pub fn menu_background(style: MenuBackgroundStyle) -> impl Bundle + use<> {
             ..default()
         },
         Pickable::IGNORE,
-        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            for decoration in DECORATIONS {
-                spawn_decoration(parent, decoration, style);
-            }
-        })),
+        Children::spawn(SpawnIter(
+            DECORATIONS
+                .into_iter()
+                .map(move |decoration| decoration_bundle(decoration, style)),
+        )),
     )
 }
 
-fn spawn_decoration(parent: &mut ChildSpawner, decoration: Decoration, style: MenuBackgroundStyle) {
+fn decoration_bundle(decoration: Decoration, style: MenuBackgroundStyle) -> impl Bundle + use<> {
     let (left, right) = match decoration.horizontal {
         HorizontalAnchor::Left(value) => (value, Val::Auto),
         HorizontalAnchor::Right(value) => (Val::Auto, value),
@@ -127,7 +133,7 @@ fn spawn_decoration(parent: &mut ChildSpawner, decoration: Decoration, style: Me
         VerticalAnchor::Top(value) => (value, Val::Auto),
         VerticalAnchor::Bottom(value) => (Val::Auto, value),
     };
-    let mut entity = parent.spawn((
+    (
         Node {
             position_type: PositionType::Absolute,
             left,
@@ -139,12 +145,12 @@ fn spawn_decoration(parent: &mut ChildSpawner, decoration: Decoration, style: Me
             border_radius: BorderRadius::all(decoration.radius),
             ..default()
         },
-        BackgroundColor(decoration.color.with_alpha(style.opacity())),
+        MenuDecorationVisual::new(decoration.shape, decoration.color, style.opacity()),
         Pickable::IGNORE,
-    ));
-    entity.insert(FloatingMenuDecoration {
-        phase: decoration.phase,
-        amplitude: decoration.amplitude,
-        speed: decoration.speed,
-    });
+        FloatingMenuDecoration {
+            phase: decoration.phase,
+            amplitude: decoration.amplitude,
+            speed: decoration.speed,
+        },
+    )
 }

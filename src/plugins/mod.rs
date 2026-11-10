@@ -2,6 +2,7 @@ pub mod audio;
 pub mod cloud_material;
 pub mod content;
 pub mod lesson_mascot;
+pub mod menu_decoration;
 #[cfg(not(feature = "demo"))]
 pub mod persistence;
 pub mod settings;
@@ -14,6 +15,7 @@ pub use audio::GameAudioPlugin;
 pub use cloud_material::CloudMaterialPlugin;
 pub use content::ContentPlugin;
 pub use lesson_mascot::LessonMascotPlugin;
+pub use menu_decoration::MenuDecorationPlugin;
 #[cfg(not(feature = "demo"))]
 pub use persistence::PersistencePlugin;
 pub use settings::SettingsPlugin;
