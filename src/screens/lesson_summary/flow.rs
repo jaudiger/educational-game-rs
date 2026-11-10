@@ -2,11 +2,11 @@ use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::ui::InteractionDisabled;
 
-use crate::plugins::lesson_mascot::SummaryBalloon;
 use crate::states::AppState;
 use crate::ui::components::ButtonActivated;
 use crate::ui::theme;
 
+use super::SummaryBalloon;
 use super::layout::{SummaryResultCard, SummaryReturnButton};
 use super::theme::{SummaryBackdropDecoration, SummaryCloud, SummaryCurtain};
 

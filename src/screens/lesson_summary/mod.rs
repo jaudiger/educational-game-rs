@@ -9,6 +9,10 @@ use bevy::ui_render::UiMaterialPlugin;
 
 use crate::states::AppState;
 
+#[derive(Component, Reflect, Default)]
+#[require(UiTransform)]
+struct SummaryBalloon;
+
 pub struct LessonSummaryScreenPlugin;
 
 #[derive(SystemSet, Clone, Copy, Debug, Eq, Hash, PartialEq)]

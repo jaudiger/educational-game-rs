@@ -9,19 +9,19 @@ use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::balloon_material::BalloonUiMaterial;
 use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudUiMaterial};
 use crate::plugins::lesson_mascot::{
-    SkyBalloonAssets, create_sky_balloon_assets, spawn_summary_balloon,
+    SkyBalloonAssets, SkyBalloonLayout, create_sky_balloon_assets, sky_balloon_scene,
 };
 use crate::states::AppState;
 use crate::ui::animation::ScreenEntryAnimationDisabled;
 use crate::ui::components::{save_write_failure_notice, standard_button};
 use crate::ui::theme;
 
-use super::LessonSummaryPresentation;
 use super::flow::{SummaryPhase, SummaryScreen};
 use super::theme::{
     SummaryLensFlareMaterial, SummarySunMaterial, SummaryThemeStyle, summary_backdrop,
     summary_curtain, summary_lens_flare,
 };
+use super::{LessonSummaryPresentation, SummaryBalloon};
 
 #[derive(Component, Reflect)]
 #[require(UiTransform)]
@@ -78,6 +78,14 @@ pub(super) fn setup_lesson_summary(
     let sun_material = materials.sun.add(SummarySunMaterial::new());
     let flare_material = materials.flare.add(SummaryLensFlareMaterial::new());
     let balloon_assets: SkyBalloonAssets = create_sky_balloon_assets(&mut materials.balloon);
+    let balloon_layout = SkyBalloonLayout {
+        right: percent(1.0),
+        bottom: percent(7.0),
+        root_width: theme::scaled(160.0),
+        envelope_width: 142.0,
+        basket_width: 93.0,
+        basket_overlap: 9.0,
+    };
     let card = SummaryCardPresentation {
         title: i18n.t(&TranslationKey::SummaryTitle).into_owned(),
         score_label: i18n
@@ -125,7 +133,10 @@ pub(super) fn setup_lesson_summary(
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |content: &mut ChildSpawner| {
-                    spawn_summary_balloon(content, balloon_assets);
+                    let mut balloon = content.spawn_empty();
+                    balloon
+                        .insert(SummaryBalloon)
+                        .queue_apply_scene(sky_balloon_scene(balloon_assets, balloon_layout));
                     content.spawn(summary_card(card, window));
                 })),
             ),
