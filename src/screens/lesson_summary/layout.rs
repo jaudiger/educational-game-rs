@@ -32,12 +32,10 @@ pub(super) struct SummaryReturnButton;
 
 struct SummaryCardPresentation {
     title: String,
-    percentage: String,
-    score: String,
+    score_label: String,
+    score: LessonScore,
     message: String,
     message_color: Color,
-    percentage_value: u32,
-    accent: Color,
     back_label: String,
     save_notice: Option<String>,
 }
@@ -82,19 +80,15 @@ pub(super) fn setup_lesson_summary(
     let balloon_assets: SkyBalloonAssets = create_sky_balloon_assets(&mut materials.balloon);
     let card = SummaryCardPresentation {
         title: i18n.t(&TranslationKey::SummaryTitle).into_owned(),
-        percentage: i18n
-            .t(&TranslationKey::SummaryPercentage(percentage))
-            .into_owned(),
-        score: i18n
+        score_label: i18n
             .t(&TranslationKey::SummaryScore(
                 score.correct_count,
                 score.total_answered,
             ))
             .into_owned(),
+        score: *score,
         message: i18n.t(&message_key).into_owned(),
         message_color,
-        percentage_value: percentage,
-        accent: style.accent,
         back_label: i18n.t(&TranslationKey::Back).into_owned(),
         save_notice: presentation.save_notice.clone(),
     };
@@ -174,11 +168,14 @@ fn summary_card(data: SummaryCardPresentation, window: Entity) -> impl Bundle + 
         ),
         SummaryResultCard,
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            parent.spawn(summary_title(&data.title, window));
-            parent.spawn(summary_percentage(&data.percentage, data.accent, window));
-            parent.spawn(score_progress_bar(data.percentage_value, data.accent));
-            parent.spawn(summary_score(&data.score, window));
-            parent.spawn(summary_message(&data.message, data.message_color, window));
+            parent.spawn(summary_text(&data.title, theme::colors::TEXT_DARK, window));
+            parent.spawn(summary_text(
+                &data.score_label,
+                theme::colors::TEXT_DARK,
+                window,
+            ));
+            parent.spawn(score_progress_bar(data.score));
+            parent.spawn(summary_text(&data.message, data.message_color, window));
             if let Some(notice) = data.save_notice {
                 parent.spawn(save_write_failure_notice(notice, window));
             }
@@ -196,34 +193,7 @@ fn summary_card(data: SummaryCardPresentation, window: Entity) -> impl Bundle + 
     )
 }
 
-fn summary_title(text: &str, window: Entity) -> impl Bundle + use<> {
-    (
-        Text::new(text),
-        theme::typography::text(theme::fonts::HEADING, window),
-        TextColor(theme::colors::TEXT_DARK),
-        TextLayout::justify(Justify::Center),
-    )
-}
-
-fn summary_percentage(text: &str, color: Color, window: Entity) -> impl Bundle + use<> {
-    (
-        Text::new(text),
-        theme::typography::text(theme::fonts::HERO, window),
-        TextColor(color),
-        TextLayout::justify(Justify::Center),
-    )
-}
-
-fn summary_score(text: &str, window: Entity) -> impl Bundle + use<> {
-    (
-        Text::new(text),
-        theme::typography::text(theme::fonts::BODY, window),
-        TextColor(theme::colors::TEXT_DARK),
-        TextLayout::justify(Justify::Center),
-    )
-}
-
-fn summary_message(text: &str, color: Color, window: Entity) -> impl Bundle + use<> {
+fn summary_text(text: &str, color: Color, window: Entity) -> impl Bundle + use<> {
     (
         Text::new(text),
         theme::typography::text(theme::fonts::HEADING, window),
@@ -232,24 +202,43 @@ fn summary_message(text: &str, color: Color, window: Entity) -> impl Bundle + us
     )
 }
 
-fn score_progress_bar(percentage: u32, color: Color) -> impl Bundle + use<> {
+fn score_progress_bar(score: LessonScore) -> impl Bundle + use<> {
+    let (correct_percentage, incorrect_percentage) = score_bar_segments(score);
     (
         Node {
             width: theme::layout::FILL_PARENT,
             height: theme::scaled(14.0),
+            flex_direction: FlexDirection::Row,
             border_radius: BorderRadius::all(percent(50.0)),
             overflow: Overflow::clip(),
             ..default()
         },
         BackgroundColor(theme::colors::ACTIVITY_BADGE),
-        children![(
-            Node {
-                width: percent(f32::from(u8::try_from(percentage.min(100)).unwrap_or(100))),
-                height: theme::layout::FILL_PARENT,
-                border_radius: BorderRadius::all(percent(50.0)),
-                ..default()
-            },
-            BackgroundColor(color),
-        )],
+        children![
+            (
+                Node {
+                    width: percent(f32::from(u8::try_from(correct_percentage).unwrap_or(100))),
+                    height: theme::layout::FILL_PARENT,
+                    ..default()
+                },
+                BackgroundColor(theme::colors::SUCCESS),
+            ),
+            (
+                Node {
+                    width: percent(f32::from(u8::try_from(incorrect_percentage).unwrap_or(100))),
+                    height: theme::layout::FILL_PARENT,
+                    ..default()
+                },
+                BackgroundColor(theme::colors::INCORRECT),
+            ),
+        ],
     )
+}
+
+fn score_bar_segments(score: LessonScore) -> (u32, u32) {
+    if score.total_answered == 0 {
+        return (0, 0);
+    }
+    let correct_percentage = score_percentage(score);
+    (correct_percentage, 100 - correct_percentage)
 }

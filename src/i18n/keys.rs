@@ -41,7 +41,6 @@ pub enum TranslationKey {
     SummaryEncouragement,
     SummaryGood,
     SummaryPerfect,
-    SummaryPercentage(u32),
     SummaryScore(u32, u32),
     SummaryTitle,
 
@@ -133,7 +132,7 @@ impl TranslationKey {
                 SummaryGood               => ("Bon travail !",                             "Good job!"),
                 SummaryPerfect            => ("Parfait ! Bravo !",                         "Perfect! Well done!"),
                 FinishLesson              => ("Terminer la le\u{00e7}on",                  "Finish lesson"),
-                SummaryTitle              => ("R\u{00e9}sum\u{00e9}",                      "Summary"),
+                SummaryTitle              => ("S\u{00e9}rie termin\u{00e9}e !",           "Series complete!"),
                 // Lesson Summary
                 // Theme Exploration
                 Themes                  => ("Th\u{00e9}matiques",                        "Themes"),
@@ -168,13 +167,19 @@ impl TranslationKey {
                 Language::English if *count == 1 => format!("{count} activity").into(),
                 Language::English => format!("{count} activities").into(),
             },
-            Self::SummaryPercentage(pct) => match language {
-                Language::French  => format!("{pct} %").into(),
-                Language::English => format!("{pct}%").into(),
-            },
             Self::SummaryScore(correct, total) => match language {
-                Language::French  => format!("Score : {correct}/{total}").into(),
-                Language::English => format!("Score: {correct}/{total}").into(),
+                Language::French if *correct <= 1 => {
+                    format!("{correct} bonne r\u{00e9}ponse sur {total}").into()
+                }
+                Language::French => {
+                    format!("{correct} bonnes r\u{00e9}ponses sur {total}").into()
+                }
+                Language::English if *correct == 1 => {
+                    format!("{correct} correct answer out of {total}").into()
+                }
+                Language::English => {
+                    format!("{correct} correct answers out of {total}").into()
+                }
             },
             Self::QuestionProgress(current, total) => match language {
                 Language::French  => format!("Question {current}/{total}").into(),

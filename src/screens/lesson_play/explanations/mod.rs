@@ -249,7 +249,7 @@ fn spawn_result_text(
     } else {
         (
             TranslationKey::IncorrectAnswer,
-            theme::colors::ERROR,
+            theme::colors::INCORRECT,
             EaseFunction::CubicOut,
             theme::animation::FEEDBACK_INCORRECT_DURATION,
         )

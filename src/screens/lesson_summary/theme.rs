@@ -133,7 +133,6 @@ pub(super) struct SummaryBackdropDecoration {
 #[derive(Clone, Copy)]
 pub(super) struct SummaryThemeStyle {
     pub(super) background: Color,
-    pub(super) accent: Color,
     pub(super) curtain: Color,
 }
 
@@ -209,7 +208,6 @@ impl SummaryThemeStyle {
     pub(super) const fn sky() -> Self {
         Self {
             background: Color::srgb(0.68, 0.85, 0.96),
-            accent: Color::srgb(0.16, 0.43, 0.72),
             curtain: Color::srgb(0.85, 0.93, 0.98),
         }
     }

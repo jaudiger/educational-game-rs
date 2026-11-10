@@ -186,6 +186,7 @@ pub mod colors {
 
     pub const PRIMARY: Color = Color::srgb(0.2, 0.5, 0.9);
     pub const SECONDARY: Color = Color::srgb(0.95, 0.6, 0.1);
+    pub const INCORRECT: Color = SECONDARY;
     pub const BACK_BUTTON: Color = PRIMARY;
     pub const ACTION_PLAY: Color = Color::srgb(0.3333, 0.5961, 0.8863);
     pub const ACTION_CHOOSE: Color = Color::srgb(0.2588, 0.6549, 0.5490);
