@@ -1,9 +1,9 @@
 use bevy::prelude::*;
-use bevy::render::render_resource::{AsBindGroup, RenderPipelineDescriptor, ShaderType};
+use bevy::render::render_resource::{AsBindGroup, ShaderType};
 use bevy::shader::ShaderRef;
 use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::UiMaterialPlugin;
-use bevy::ui_render::ui_material::{MaterialNode, UiMaterial, UiMaterialKey};
+use bevy::ui_render::ui_material::{MaterialNode, UiMaterial};
 
 const MENU_DECORATION_SHADER_PATH: &str = "shaders/menu_decoration.wgsl";
 const MENU_DECORATION_HOVER_SPEED: f32 = 3.5;
@@ -107,10 +107,6 @@ impl MenuDecorationMaterial {
 impl UiMaterial for MenuDecorationMaterial {
     fn fragment_shader() -> ShaderRef {
         MENU_DECORATION_SHADER_PATH.into()
-    }
-
-    fn specialize(descriptor: &mut RenderPipelineDescriptor, _key: UiMaterialKey<Self>) {
-        descriptor.fragment.as_mut().unwrap().entry_point = Some("menu_decoration_fragment".into());
     }
 }
 

@@ -1,3 +1,4 @@
+use bevy::ecs::system::SystemParam;
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::ui::InteractionDisabled;
@@ -14,7 +15,10 @@ use crate::ui::theme;
 
 use super::LessonSummaryPresentation;
 use super::flow::{SummaryPhase, SummaryScreen};
-use super::theme::{SummaryThemeStyle, summary_backdrop, summary_curtain};
+use super::theme::{
+    SummaryLensFlareMaterial, SummarySunMaterial, SummaryThemeStyle, summary_backdrop,
+    summary_curtain, summary_lens_flare,
+};
 
 #[derive(Component, Reflect)]
 #[require(UiTransform)]
@@ -35,6 +39,13 @@ struct SummaryCardPresentation {
     save_notice: Option<String>,
 }
 
+#[derive(SystemParam)]
+pub(super) struct SummaryMaterials<'w> {
+    clouds: ResMut<'w, Assets<ProceduralCloudUiMaterial>>,
+    sun: ResMut<'w, Assets<SummarySunMaterial>>,
+    flare: ResMut<'w, Assets<SummaryLensFlareMaterial>>,
+}
+
 pub(super) fn setup_lesson_summary(
     mut commands: Commands,
     score: Res<LessonScore>,
@@ -42,7 +53,7 @@ pub(super) fn setup_lesson_summary(
     i18n: Res<I18n>,
     asset_server: Res<AssetServer>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
-    mut cloud_materials: ResMut<Assets<ProceduralCloudUiMaterial>>,
+    mut materials: SummaryMaterials,
 ) {
     let window = *primary_window;
     let percentage = score_percentage(*score);
@@ -59,10 +70,12 @@ pub(super) fn setup_lesson_summary(
         _ => theme::colors::SECONDARY,
     };
     let style = SummaryThemeStyle::sky();
-    let cloud_material = cloud_materials.add(ProceduralCloudUiMaterial::new(
+    let cloud_material = materials.clouds.add(ProceduralCloudUiMaterial::new(
         CloudShapeId::Puffy,
         Color::WHITE,
     ));
+    let sun_material = materials.sun.add(SummarySunMaterial::new());
+    let flare_material = materials.flare.add(SummaryLensFlareMaterial::new());
     let balloon_assets = load_sky_balloon_assets(&asset_server);
     let card = SummaryCardPresentation {
         title: i18n.t(&TranslationKey::SummaryTitle).into_owned(),
@@ -102,7 +115,7 @@ pub(super) fn setup_lesson_summary(
         },
         DespawnOnExit(AppState::LessonSummary),
         children![
-            summary_backdrop(),
+            summary_backdrop(sun_material),
             (
                 Node {
                     position_type: PositionType::Relative,
@@ -119,6 +132,7 @@ pub(super) fn setup_lesson_summary(
                     content.spawn(summary_card(card, window));
                 })),
             ),
+            summary_lens_flare(flare_material),
             summary_curtain(style, cloud_material),
         ],
     ));

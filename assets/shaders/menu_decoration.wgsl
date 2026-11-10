@@ -75,6 +75,6 @@ fn decoration_fragment(input: MenuDecorationInput) -> vec4<f32> {
 }
 
 @fragment
-fn menu_decoration_fragment(input: MenuDecorationInput) -> @location(0) vec4<f32> {
+fn fragment(input: MenuDecorationInput) -> @location(0) vec4<f32> {
     return decoration_fragment(input);
 }

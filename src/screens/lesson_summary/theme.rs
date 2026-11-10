@@ -1,8 +1,118 @@
 use bevy::prelude::*;
-use bevy::ui_render::ui_material::MaterialNode;
+use bevy::render::render_resource::{AsBindGroup, ShaderType};
+use bevy::shader::ShaderRef;
+use bevy::ui::RelativeCursorPosition;
+use bevy::ui_render::ui_material::{MaterialNode, UiMaterial};
+use bevy::window::PrimaryWindow;
 
 use crate::plugins::cloud_material::ProceduralCloudUiMaterial;
 use crate::ui::theme;
+
+const SUMMARY_SUN_SHADER_PATH: &str = "shaders/summary_sun.wgsl";
+const SUMMARY_LENS_FLARE_SHADER_PATH: &str = "shaders/summary_lens_flare.wgsl";
+const SUMMARY_SUN_ART_SIZE: f32 = 152.0;
+const SUMMARY_SUN_NODE_SIZE: f32 = 184.0;
+const SUMMARY_SUN_ART_SCALE: f32 = SUMMARY_SUN_NODE_SIZE / SUMMARY_SUN_ART_SIZE;
+const DEFAULT_GLARE_ANGLE: f32 = -2.356_194_5;
+const DEFAULT_GLARE_STRENGTH: f32 = 0.25;
+const ACTIVE_GLARE_STRENGTH: f32 = 1.0;
+const GLARE_DEAD_ZONE: f32 = 6.0;
+const GLARE_SMOOTHING: f32 = 10.0;
+
+#[derive(Clone, Copy, Debug, Reflect, ShaderType)]
+struct SummarySunUniform {
+    glare: Vec4,
+    geometry: Vec4,
+}
+
+#[derive(Asset, AsBindGroup, Clone, Reflect)]
+pub(super) struct SummarySunMaterial {
+    #[uniform(0)]
+    uniform: SummarySunUniform,
+}
+
+impl SummarySunMaterial {
+    pub(super) fn new() -> Self {
+        let direction = Vec2::new(DEFAULT_GLARE_ANGLE.cos(), DEFAULT_GLARE_ANGLE.sin());
+        Self {
+            uniform: SummarySunUniform {
+                glare: Vec4::new(direction.x, direction.y, DEFAULT_GLARE_STRENGTH, 0.0),
+                geometry: Vec4::new(SUMMARY_SUN_ART_SCALE, 0.0, 0.0, 0.0),
+            },
+        }
+    }
+
+    const fn set_glare(&mut self, direction: Vec2, strength: f32) {
+        self.uniform.glare = Vec4::new(direction.x, direction.y, strength, 0.0);
+    }
+}
+
+#[derive(Clone, Copy, Debug, Reflect, ShaderType)]
+struct SummaryLensFlareUniform {
+    source: Vec4,
+    cursor: Vec4,
+}
+
+#[derive(Asset, AsBindGroup, Clone, Reflect)]
+pub(super) struct SummaryLensFlareMaterial {
+    #[uniform(0)]
+    uniform: SummaryLensFlareUniform,
+}
+
+impl SummaryLensFlareMaterial {
+    pub(super) const fn new() -> Self {
+        Self {
+            uniform: SummaryLensFlareUniform {
+                source: Vec4::ZERO,
+                cursor: Vec4::ZERO,
+            },
+        }
+    }
+
+    const fn set_source(
+        &mut self,
+        position: Vec2,
+        radius: f32,
+        cursor_position: Vec2,
+        strength: f32,
+    ) {
+        self.uniform.source = Vec4::new(position.x, position.y, radius, strength);
+        self.uniform.cursor = Vec4::new(cursor_position.x, cursor_position.y, 0.0, 0.0);
+    }
+}
+
+impl UiMaterial for SummaryLensFlareMaterial {
+    fn fragment_shader() -> ShaderRef {
+        SUMMARY_LENS_FLARE_SHADER_PATH.into()
+    }
+}
+
+#[derive(Component, Reflect)]
+#[require(RelativeCursorPosition)]
+pub(super) struct SummarySunGlare {
+    angle: f32,
+    strength: f32,
+    distance: f32,
+}
+
+impl Default for SummarySunGlare {
+    fn default() -> Self {
+        Self {
+            angle: DEFAULT_GLARE_ANGLE,
+            strength: DEFAULT_GLARE_STRENGTH,
+            distance: 0.0,
+        }
+    }
+}
+
+#[derive(Component, Reflect)]
+pub(super) struct SummaryLensFlare;
+
+impl UiMaterial for SummarySunMaterial {
+    fn fragment_shader() -> ShaderRef {
+        SUMMARY_SUN_SHADER_PATH.into()
+    }
+}
 
 #[derive(Component, Reflect)]
 pub(super) struct SummaryCurtain {
@@ -18,20 +128,6 @@ pub(super) struct SummaryCloud {
 #[require(UiTransform)]
 pub(super) struct SummaryBackdropDecoration {
     pub(super) exit_direction: Vec2,
-}
-
-#[derive(Component, Reflect)]
-#[require(UiTransform)]
-pub(super) struct SummarySunPulse;
-
-#[derive(Component, Reflect)]
-#[require(UiTransform)]
-pub(super) struct SummarySunRays;
-
-#[derive(Component, Reflect)]
-#[require(UiTransform)]
-pub(super) struct SummarySunSparkle {
-    phase: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -119,7 +215,7 @@ impl SummaryThemeStyle {
     }
 }
 
-pub(super) fn summary_backdrop() -> impl Bundle + use<> {
+pub(super) fn summary_backdrop(sun_material: Handle<SummarySunMaterial>) -> impl Bundle + use<> {
     (
         Node {
             position_type: PositionType::Absolute,
@@ -130,315 +226,180 @@ pub(super) fn summary_backdrop() -> impl Bundle + use<> {
             ..default()
         },
         Pickable::IGNORE,
-        children![summary_sun()],
+        children![summary_sun(sun_material)],
     )
 }
 
-fn summary_sun() -> impl Bundle + use<> {
+pub(super) fn summary_lens_flare(
+    material: Handle<SummaryLensFlareMaterial>,
+) -> impl Bundle + use<> {
     (
         Node {
             position_type: PositionType::Absolute,
-            left: percent(80.0),
-            top: percent(7.0),
-            width: theme::scaled(152.0),
-            height: theme::scaled(152.0),
+            left: px(0.0),
+            top: px(0.0),
+            width: theme::layout::FILL_PARENT,
+            height: theme::layout::FILL_PARENT,
             ..default()
         },
-        UiTransform::default(),
+        MaterialNode(material),
+        SummaryLensFlare,
         SummaryBackdropDecoration {
             exit_direction: Vec2::new(1.0, -0.5),
         },
         Pickable::IGNORE,
-        children![sun_pulse()],
     )
 }
 
-fn sun_pulse() -> impl Bundle + use<> {
+fn summary_sun(sun_material: Handle<SummarySunMaterial>) -> impl Bundle + use<> {
     (
         Node {
             position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(0.0),
-            width: theme::layout::FILL_PARENT,
-            height: theme::layout::FILL_PARENT,
+            right: theme::scaled(0.0),
+            top: theme::scaled(0.0),
+            width: theme::scaled(SUMMARY_SUN_NODE_SIZE),
+            height: theme::scaled(SUMMARY_SUN_NODE_SIZE),
             ..default()
         },
-        UiTransform::default(),
-        SummarySunPulse,
+        MaterialNode(sun_material),
+        SummarySunGlare::default(),
+        SummaryBackdropDecoration {
+            exit_direction: Vec2::new(1.0, -0.5),
+        },
         Pickable::IGNORE,
-        Children::spawn(SpawnWith(|parent: &mut ChildSpawner| {
-            parent.spawn(sun_rays());
-            parent.spawn(sun_disc());
-            for sparkle in SUN_SPARKLES {
-                parent.spawn(sun_sparkle(sparkle));
+    )
+}
+
+pub(super) fn update_summary_sun_glare(
+    time: Res<Time>,
+    primary_window: Single<&Window, With<PrimaryWindow>>,
+    mut materials: ResMut<Assets<SummarySunMaterial>>,
+    mut suns: Query<(
+        &RelativeCursorPosition,
+        &ComputedNode,
+        &MaterialNode<SummarySunMaterial>,
+        &mut SummarySunGlare,
+    )>,
+) {
+    let interpolation = 1.0 - (-GLARE_SMOOTHING * time.delta_secs()).exp();
+    let dead_zone_squared = GLARE_DEAD_ZONE * GLARE_DEAD_ZONE;
+
+    for (cursor, node, material_node, mut glare) in &mut suns {
+        let default_distance = node.size().min_element() * 2.5;
+        let local_position = if primary_window.focused {
+            cursor
+                .normalized
+                .map(|normalized| normalized * node.size())
+                .filter(|position| position.is_finite())
+        } else {
+            None
+        };
+        let (target_angle, target_strength, target_distance) = match local_position {
+            Some(position)
+                if (position * node.inverse_scale_factor()).length_squared()
+                    <= dead_zone_squared =>
+            {
+                let distance = if glare.distance > 0.0 {
+                    glare.distance
+                } else {
+                    default_distance
+                };
+                (glare.angle, glare.strength, distance)
             }
-        })),
-    )
-}
-
-#[derive(Clone, Copy)]
-struct SunRaySpec {
-    left: f32,
-    top: f32,
-    width: f32,
-    height: f32,
-    rotation_degrees: f32,
-}
-
-const SUN_RAYS: [SunRaySpec; 8] = [
-    SunRaySpec {
-        left: 48.0,
-        top: 0.0,
-        width: 7.0,
-        height: 21.0,
-        rotation_degrees: 0.0,
-    },
-    SunRaySpec {
-        left: 72.0,
-        top: 8.0,
-        width: 7.0,
-        height: 21.0,
-        rotation_degrees: 45.0,
-    },
-    SunRaySpec {
-        left: 85.0,
-        top: 48.0,
-        width: 21.0,
-        height: 7.0,
-        rotation_degrees: 0.0,
-    },
-    SunRaySpec {
-        left: 72.0,
-        top: 72.0,
-        width: 7.0,
-        height: 21.0,
-        rotation_degrees: -45.0,
-    },
-    SunRaySpec {
-        left: 48.0,
-        top: 85.0,
-        width: 7.0,
-        height: 21.0,
-        rotation_degrees: 0.0,
-    },
-    SunRaySpec {
-        left: 21.0,
-        top: 72.0,
-        width: 7.0,
-        height: 21.0,
-        rotation_degrees: 45.0,
-    },
-    SunRaySpec {
-        left: 0.0,
-        top: 48.0,
-        width: 21.0,
-        height: 7.0,
-        rotation_degrees: 0.0,
-    },
-    SunRaySpec {
-        left: 21.0,
-        top: 8.0,
-        width: 7.0,
-        height: 21.0,
-        rotation_degrees: -45.0,
-    },
-];
-
-fn sun_rays() -> impl Bundle + use<> {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(0.0),
-            width: theme::layout::FILL_PARENT,
-            height: theme::layout::FILL_PARENT,
-            ..default()
-        },
-        UiTransform::default(),
-        SummarySunRays,
-        Pickable::IGNORE,
-        Children::spawn(SpawnIter(SUN_RAYS.into_iter().map(sun_ray))),
-    )
-}
-
-fn sun_ray(spec: SunRaySpec) -> impl Bundle + use<> {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            left: percent(spec.left),
-            top: percent(spec.top),
-            width: theme::scaled(spec.width),
-            height: theme::scaled(spec.height),
-            border_radius: BorderRadius::all(percent(50.0)),
-            ..default()
-        },
-        UiTransform::from_rotation(Rot2::degrees(spec.rotation_degrees)),
-        BackgroundColor(Color::srgb(1.0, 0.65, 0.13)),
-        Pickable::IGNORE,
-    )
-}
-
-fn sun_disc() -> impl Bundle + use<> {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            left: percent(11.0),
-            top: percent(11.0),
-            width: percent(78.0),
-            height: percent(78.0),
-            border_radius: BorderRadius::all(percent(50.0)),
-            ..default()
-        },
-        BackgroundColor(Color::srgba(1.0, 0.57, 0.12, 0.46)),
-        Pickable::IGNORE,
-        children![(
-            Node {
-                position_type: PositionType::Absolute,
-                left: percent(8.0),
-                top: percent(8.0),
-                width: percent(84.0),
-                height: percent(84.0),
-                border_radius: BorderRadius::all(percent(50.0)),
-                ..default()
-            },
-            BackgroundColor(Color::srgb(1.0, 0.65, 0.16)),
-            children![(
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: percent(11.0),
-                    top: percent(11.0),
-                    width: percent(78.0),
-                    height: percent(78.0),
-                    border_radius: BorderRadius::all(percent(50.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(1.0, 0.86, 0.35)),
-                children![(
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: percent(19.0),
-                        top: percent(13.0),
-                        width: percent(30.0),
-                        height: percent(22.0),
-                        border_radius: BorderRadius::all(percent(50.0)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(1.0, 1.0, 0.84, 0.72)),
-                )],
-            )],
-        )],
-    )
-}
-
-#[derive(Clone, Copy)]
-struct SunSparkleSpec {
-    left: f32,
-    top: f32,
-    size: f32,
-    phase: f32,
-}
-
-const SUN_SPARKLES: [SunSparkleSpec; 4] = [
-    SunSparkleSpec {
-        left: 15.0,
-        top: 27.0,
-        size: 17.0,
-        phase: 0.0,
-    },
-    SunSparkleSpec {
-        left: 75.0,
-        top: 26.0,
-        size: 13.0,
-        phase: 1.4,
-    },
-    SunSparkleSpec {
-        left: 23.0,
-        top: 69.0,
-        size: 12.0,
-        phase: 2.8,
-    },
-    SunSparkleSpec {
-        left: 72.0,
-        top: 68.0,
-        size: 17.0,
-        phase: 4.2,
-    },
-];
-
-fn sun_sparkle(spec: SunSparkleSpec) -> impl Bundle + use<> {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            left: percent(spec.left),
-            top: percent(spec.top),
-            width: theme::scaled(spec.size),
-            height: theme::scaled(spec.size),
-            ..default()
-        },
-        UiTransform::default(),
-        SummarySunSparkle { phase: spec.phase },
-        Pickable::IGNORE,
-        children![
-            (
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: percent(42.0),
-                    top: px(0.0),
-                    width: percent(16.0),
-                    height: theme::layout::FILL_PARENT,
-                    border_radius: BorderRadius::all(percent(50.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::WHITE),
-                Pickable::IGNORE,
+            Some(position) => (
+                position.y.atan2(position.x),
+                ACTIVE_GLARE_STRENGTH,
+                position.length(),
             ),
-            (
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(0.0),
-                    top: percent(42.0),
-                    width: theme::layout::FILL_PARENT,
-                    height: percent(16.0),
-                    border_radius: BorderRadius::all(percent(50.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::WHITE),
-                Pickable::IGNORE,
+            None => (
+                DEFAULT_GLARE_ANGLE,
+                DEFAULT_GLARE_STRENGTH,
+                default_distance,
             ),
-        ],
-    )
-}
+        };
 
-pub(super) fn animate_sun_pulse(
-    time: Res<Time>,
-    mut suns: Query<&mut UiTransform, With<SummarySunPulse>>,
-) {
-    let pulse = (time.elapsed_secs() * 0.8).sin();
-    let scale = pulse.mul_add(0.0175, 1.0175);
-    for mut transform in &mut suns {
-        transform.scale = Vec2::splat(scale);
+        let angle_delta = (target_angle - glare.angle + std::f32::consts::PI)
+            .rem_euclid(std::f32::consts::TAU)
+            - std::f32::consts::PI;
+        let angle_change = angle_delta * interpolation;
+        let strength_change = (target_strength - glare.strength) * interpolation;
+        let distance_change = (target_distance - glare.distance) * interpolation;
+        if angle_change.abs() <= f32::EPSILON
+            && strength_change.abs() <= f32::EPSILON
+            && distance_change.abs() <= f32::EPSILON
+        {
+            continue;
+        }
+
+        glare.angle += angle_change;
+        glare.strength += strength_change;
+        glare.distance += distance_change;
+        let direction = Vec2::new(glare.angle.cos(), glare.angle.sin());
+        if (angle_change.abs() > f32::EPSILON || strength_change.abs() > f32::EPSILON)
+            && let Some(mut material) = materials.get_mut(&material_node.0)
+        {
+            material.set_glare(direction, glare.strength);
+        }
     }
 }
 
-pub(super) fn animate_sun_rays(
-    time: Res<Time>,
-    mut rays: Query<&mut UiTransform, With<SummarySunRays>>,
+pub(super) fn update_summary_lens_flare(
+    mut materials: ResMut<Assets<SummaryLensFlareMaterial>>,
+    sun: Single<(&ComputedNode, &UiGlobalTransform, &SummarySunGlare), With<SummarySunGlare>>,
+    flare: Single<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            &MaterialNode<SummaryLensFlareMaterial>,
+        ),
+        With<SummaryLensFlare>,
+    >,
 ) {
-    let angle = (time.elapsed_secs() * 0.7).sin() * 12.0;
-    for mut transform in &mut rays {
-        transform.rotation = Rot2::degrees(angle);
+    let (sun_node, sun_transform, sun_glare) = *sun;
+    let (flare_node, flare_transform, material_node) = *flare;
+    if sun_node.is_empty() || flare_node.is_empty() {
+        return;
     }
-}
+    let Some(inverse_flare_transform) = flare_transform.try_inverse() else {
+        return;
+    };
 
-pub(super) fn animate_sun_sparkles(
-    time: Res<Time>,
-    mut sparkles: Query<(&SummarySunSparkle, &mut UiTransform)>,
-) {
-    let elapsed = time.elapsed_secs();
-    for (sparkle, mut transform) in &mut sparkles {
-        let twinkle = (elapsed.mul_add(2.6, sparkle.phase)).sin();
-        transform.scale = Vec2::splat(twinkle.mul_add(0.25, 0.9));
-        transform.rotation = Rot2::radians(twinkle * 0.12);
+    let source_position = sun_transform.affine().transform_point2(Vec2::ZERO);
+    let source_position = inverse_flare_transform.transform_point2(source_position)
+        / flare_node.size()
+        + Vec2::splat(0.5);
+    let source_radius = sun_node.size().min_element() * 0.5 / SUMMARY_SUN_ART_SCALE;
+    let cursor_offset =
+        Vec2::new(sun_glare.angle.cos(), sun_glare.angle.sin()) * sun_glare.distance;
+    let cursor_position = sun_transform.affine().transform_point2(cursor_offset);
+    let cursor_position = inverse_flare_transform.transform_point2(cursor_position)
+        / flare_node.size()
+        + Vec2::splat(0.5);
+    if !source_position.is_finite()
+        || !cursor_position.is_finite()
+        || !source_radius.is_finite()
+        || source_radius <= 0.0
+    {
+        return;
+    }
+
+    if let Some(mut material) = materials.get_mut(&material_node.0) {
+        let source = material.uniform.source;
+        let cursor = material.uniform.cursor;
+        let position_changed =
+            Vec2::new(source.x, source.y).distance_squared(source_position) > 0.000_001;
+        let cursor_changed =
+            Vec2::new(cursor.x, cursor.y).distance_squared(cursor_position) > 0.000_001;
+        let radius_changed = (source.z - source_radius).abs() > 0.01;
+        let strength_changed = (source.w - sun_glare.strength).abs() > 0.001;
+        if position_changed || cursor_changed || radius_changed || strength_changed {
+            material.set_source(
+                source_position,
+                source_radius,
+                cursor_position,
+                sun_glare.strength,
+            );
+        }
     }
 }
 
