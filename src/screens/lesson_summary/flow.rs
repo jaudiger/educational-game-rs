@@ -10,7 +10,7 @@ use super::SummaryBalloon;
 use super::layout::{SummaryResultCard, SummaryReturnButton};
 use super::theme::{SummaryBackdropDecoration, SummaryCloud, SummaryCurtain};
 
-const REVEAL_DURATION: f32 = 2.4;
+const REVEAL_DURATION: f32 = 3.2;
 const DEPARTURE_DURATION: f32 = 1.6;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Reflect)]
