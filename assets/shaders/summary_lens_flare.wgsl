@@ -48,11 +48,7 @@ fn fragment(input: SummaryLensFlareInput) -> @location(0) vec4<f32> {
     let cursor = flare.cursor.xy * input.size;
     let to_cursor = cursor - source;
     let cursor_distance = length(to_cursor);
-    if cursor_distance <= 1.0 {
-        return vec4<f32>(0.0);
-    }
-
-    let axis = to_cursor / cursor_distance;
+    let axis = to_cursor / max(cursor_distance, 1.0);
     let extension = min(cursor_distance * 0.16, source_radius * 0.8);
     let first_distance = source_radius + extension * 0.25;
     let second_distance = source_radius * 1.55 + extension * 0.6;
@@ -93,5 +89,8 @@ fn fragment(input: SummaryLensFlareInput) -> @location(0) vec4<f32> {
         ghosts,
     );
 
+    if cursor_distance <= 1.0 {
+        return vec4<f32>(0.0);
+    }
     return ghosts;
 }
