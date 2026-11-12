@@ -14,8 +14,8 @@ use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::states::{AppState, InLessonFlow, StateScopedResourceExt};
 use crate::ui::components::{
     ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, MenuBackgroundStyle,
-    action_button_scene, button_base, card_node, icon_button, menu_background, persistence_notice,
-    screen_root, spawn_confirmation_modal, standard_button,
+    action_button_scene, button_base, card_node, icon_button_node, icon_button_with_node,
+    menu_background, persistence_notice, screen_root, spawn_confirmation_modal, standard_button,
 };
 use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::navigation::NavigateTo;
@@ -253,29 +253,21 @@ fn spawn_slot_card(
                 TextColor(theme::colors::TEXT_MUTED),
             ));
 
-            // Delete button (icon_button + absolute positioning override)
             card.spawn((
-                icon_button(
-                    32.0,
-                    6.0,
+                icon_button_with_node(
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: theme::scaled(8.0),
+                        right: theme::scaled(8.0),
+                        ..icon_button_node(32.0, 6.0)
+                    },
                     "X",
                     theme::fonts::SMALL,
                     theme::button_styles::DANGER,
                     window,
                 ),
                 DeleteSlotButton(index),
-            ))
-            .insert(Node {
-                width: theme::scaled(32.0),
-                height: theme::scaled(32.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border_radius: BorderRadius::all(theme::scaled(6.0)),
-                position_type: PositionType::Absolute,
-                top: theme::scaled(8.0),
-                right: theme::scaled(8.0),
-                ..default()
-            });
+            ));
         } else {
             // Empty slot
             card.spawn((

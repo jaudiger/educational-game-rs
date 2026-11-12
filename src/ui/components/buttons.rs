@@ -99,16 +99,38 @@ pub fn icon_button(
     palette: ButtonPalette,
     window: Entity,
 ) -> impl Bundle + use<> {
+    icon_button_with_node(
+        icon_button_node(size, radius),
+        label,
+        font_size,
+        palette,
+        window,
+    )
+}
+
+/// Returns the standard layout for a square icon button.
+pub fn icon_button_node(size: f32, radius: f32) -> Node {
+    Node {
+        width: theme::scaled(size),
+        height: theme::scaled(size),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        border_radius: BorderRadius::all(theme::scaled(radius)),
+        ..default()
+    }
+}
+
+/// Returns a square icon-style button with a caller-provided layout.
+pub fn icon_button_with_node(
+    node: Node,
+    label: &str,
+    font_size: f32,
+    palette: ButtonPalette,
+    window: Entity,
+) -> impl Bundle + use<> {
     (
         button_base(palette),
-        Node {
-            width: theme::scaled(size),
-            height: theme::scaled(size),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            border_radius: BorderRadius::all(theme::scaled(radius)),
-            ..default()
-        },
+        node,
         children![(
             Text::new(label),
             theme::typography::text(font_size, window),

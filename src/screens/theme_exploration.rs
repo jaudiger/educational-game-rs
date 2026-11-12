@@ -188,7 +188,7 @@ struct CardShadowAnim {
     float_amplitude_unavailable: f32,
 }
 
-/// Pre-computed card dimensions used by `card_node_layout` and `insert_card_overlay`.
+/// Pre-computed card dimensions used by exploration card layouts.
 #[derive(Clone, Copy)]
 struct CardDimensions {
     width: f32,
@@ -446,14 +446,13 @@ fn card_node_layout(dims: &CardDimensions) -> Node {
     }
 }
 
-/// Inserts a framed card, its shadow, and its floating animation.
+/// Adds the card border color, shadow, and floating animation.
 #[allow(clippy::cast_precision_loss)]
-fn insert_card_overlay(
+fn insert_card_visuals(
     button: &mut EntityCommands,
     style: ExplorationCardStyle,
     available: bool,
     index: usize,
-    dims: &CardDimensions,
 ) {
     let (border_color, shadow_alpha, amplitude) = if available {
         (
@@ -470,11 +469,6 @@ fn insert_card_overlay(
     };
     let shadow_color = style.colors.shadow_base.with_alpha(shadow_alpha);
     button.insert((
-        Node {
-            border: px(1.0).all(),
-            overflow: Overflow::visible(),
-            ..card_node_layout(dims)
-        },
         BorderColor::all(border_color),
         BoxShadow::new(
             shadow_color,
@@ -511,24 +505,18 @@ fn spawn_theme_button(
     let (bg, text_color) = card_colors(card_style, data.available);
     let palette = exploration_button_palette(bg, text_color, card_style, data.available);
     let dims = card_dimensions(card_style);
+    let mut node = card_node_layout(&dims);
+    if card_style.is_some() {
+        node.border = px(1.0).all();
+        node.row_gap = theme::scaled(2.0);
+        node.padding = UiRect::axes(theme::scaled(12.0), theme::scaled(3.0));
+    }
 
-    let mut button = parent.spawn((
-        button_base(palette),
-        card_node_layout(&dims),
-        ThemeButton(data.id.clone()),
-    ));
+    let mut button = parent.spawn((button_base(palette), node, ThemeButton(data.id.clone())));
     button.remove::<AnimatedButton>();
 
     if let Some(style) = card_style {
-        insert_card_overlay(&mut button, style, data.available, index, &dims);
-        button.insert(Node {
-            border: px(1.0).all(),
-            flex_direction: FlexDirection::Column,
-            row_gap: theme::scaled(2.0),
-            padding: UiRect::axes(theme::scaled(12.0), theme::scaled(3.0)),
-            justify_content: JustifyContent::Center,
-            ..card_node_layout(&dims)
-        });
+        insert_card_visuals(&mut button, style, data.available, index);
     }
     if auto_focus {
         button.insert(AutoFocus);
@@ -686,16 +674,20 @@ fn spawn_lesson_button(
 ) {
     let (background, _) = card_colors(card_style, true);
     let dims = card_dimensions(card_style);
+    let mut node = Node {
+        border: px(1.0).all(),
+        ..card_node_layout(&dims)
+    };
+    if card_style.is_some() {
+        node.overflow = Overflow::visible();
+    }
     let mut card = parent.spawn((
-        Node {
-            border: px(1.0).all(),
-            ..card_node_layout(&dims)
-        },
+        node,
         BackgroundColor(background),
         BorderColor::all(theme::colors::INPUT_BORDER),
     ));
     if let Some(style) = card_style {
-        insert_card_overlay(&mut card, style, true, index, &dims);
+        insert_card_visuals(&mut card, style, true, index);
     }
     card.with_children(|contents| {
         spawn_lesson_heading(contents, data, theme::colors::TEXT_DARK, window, card_style);
