@@ -1,5 +1,4 @@
 use super::theme;
-use crate::states::AppState;
 use crate::ui::components::PointerHovered;
 use bevy::curve::Curve;
 use bevy::curve::easing::{EaseFunction, EasingCurve};
@@ -10,7 +9,7 @@ pub struct UiAnimationPlugin;
 
 impl Plugin for UiAnimationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(auto_screen_entry_animation).add_systems(
+        app.add_observer(start_screen_entry_animation).add_systems(
             Update,
             (
                 tick_animate_scale,
@@ -30,8 +29,9 @@ pub struct AnimatedButton;
 #[derive(Component, Reflect, Default, Clone)]
 pub struct ButtonScaleAnimationDisabled;
 
-#[derive(Component, Reflect, Default, Clone)]
-pub struct ScreenEntryAnimationDisabled;
+/// Opts a UI screen root into the entry animation.
+#[derive(Component, Reflect, Default, Clone, Copy)]
+pub struct ScreenEntryAnimationOptIn;
 
 /// One-shot scale animation via `UiTransform`.
 /// Self-removes when complete.
@@ -201,18 +201,12 @@ fn animate_button_hover(mut commands: Commands, query: AnimatedButtonQuery<'_, '
     }
 }
 
-/// Observer that auto-inserts a `ScreenEntryAnimation` on every entity that
-/// gets a `DespawnOnExit<AppState>` component added (i.e. screen roots).
-fn auto_screen_entry_animation(
-    trigger: On<Add<DespawnOnExit<AppState>>>,
+/// Adds entry animation components to explicitly opted-in UI roots.
+fn start_screen_entry_animation(
+    trigger: On<Add<ScreenEntryAnimationOptIn>>,
     mut commands: Commands,
-    disabled: Query<(), With<ScreenEntryAnimationDisabled>>,
 ) {
     let entity = trigger.event_target();
-    if disabled.contains(entity) {
-        return;
-    }
-
     commands.entity(entity).insert((
         ScreenEntryAnimation {
             y_curve: EasingCurve::new(

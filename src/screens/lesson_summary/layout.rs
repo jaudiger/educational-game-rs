@@ -12,7 +12,6 @@ use crate::plugins::lesson_mascot::{
     SkyBalloonAssets, SkyBalloonLayout, create_sky_balloon_assets, sky_balloon_scene,
 };
 use crate::states::AppState;
-use crate::ui::animation::ScreenEntryAnimationDisabled;
 use crate::ui::components::{save_write_failure_notice, standard_button};
 use crate::ui::theme;
 
@@ -113,7 +112,6 @@ pub(super) fn setup_lesson_summary(
         },
         BackgroundColor(style.background),
         TabGroup::new(0),
-        ScreenEntryAnimationDisabled,
         SummaryScreen {
             phase: SummaryPhase::Revealing,
             elapsed: 0.0,

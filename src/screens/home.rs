@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use crate::states::AppState;
+use crate::ui::animation::ScreenEntryAnimationOptIn;
 use crate::ui::components::{MenuBackgroundStyle, menu_background, screen_root, standard_button};
 use crate::ui::navigation::NavigateTo;
 use crate::ui::theme;
@@ -43,6 +44,7 @@ pub fn setup_home(
 
     commands.spawn((
         screen_root(px(0.0)),
+        ScreenEntryAnimationOptIn,
         DespawnOnExit(AppState::Home),
         children![
             menu_background(MenuBackgroundStyle::new(0.48)),

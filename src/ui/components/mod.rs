@@ -61,14 +61,8 @@ pub struct PointerHovered(pub bool);
 ///
 /// Provides a centered column filling the entire viewport, with the game
 /// background color and keyboard-navigation support (`TabGroup`).
-/// Compose via tuple with `DespawnOnExit`, `children![]`, and optional markers:
-/// ```ignore
-/// commands.spawn((
-///     screen_root(px(0.0)),
-///     DespawnOnExit(AppState::Home),
-///     children![...],
-/// ));
-/// ```
+/// Add `ScreenEntryAnimationOptIn` to roots that should use the entry animation,
+/// alongside `DespawnOnExit` and their child hierarchy.
 pub fn screen_root(horizontal_padding: Val) -> impl Bundle {
     screen_root_with_node(
         Node {

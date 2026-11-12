@@ -12,6 +12,7 @@ use crate::plugins::balloon_material::BalloonUiMaterial;
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
 use crate::questions::QuestionRoot;
 use crate::states::AppState;
+use crate::ui::animation::ScreenEntryAnimationOptIn;
 use crate::ui::components::icon_button;
 use crate::ui::theme::{self, GameImages};
 
@@ -137,6 +138,7 @@ pub fn setup_lesson_play(
                 visual_box: VisualBox::BorderBox,
                 ..default()
             },
+            ScreenEntryAnimationOptIn,
             DespawnOnExit(AppState::LessonPlay),
             TabGroup::new(0),
         ))

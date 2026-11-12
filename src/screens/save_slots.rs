@@ -12,6 +12,7 @@ use crate::data::{
 };
 use crate::i18n::{I18n, ProductionTranslationKey, TranslationKey};
 use crate::states::{AppState, InLessonFlow, StateScopedResourceExt};
+use crate::ui::animation::ScreenEntryAnimationOptIn;
 use crate::ui::components::{
     ButtonActivated, ConfirmationDialogAction, ConfirmationDialogActionEvent, MenuBackgroundStyle,
     action_button_scene, button_base, card_node, icon_button_node, icon_button_with_node,
@@ -141,6 +142,7 @@ fn spawn_save_slots_ui(
     commands
         .spawn((
             screen_root(theme::scaled(theme::spacing::LARGE)),
+            ScreenEntryAnimationOptIn,
             DespawnOnExit(AppState::SaveSlots),
             SaveSlotsRoot,
         ))

@@ -10,6 +10,7 @@ use crate::data::progress::{ExplorationTheme, Language};
 use crate::data::{GameSettings, GameSettingsMut};
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::AppState;
+use crate::ui::animation::ScreenEntryAnimationOptIn;
 use crate::ui::components::{
     MenuBackgroundStyle, checkbox_scene, menu_background, radio_button_muted_scene,
     radio_button_scene, screen_root, slider_scene, standard_button,
@@ -207,6 +208,7 @@ fn spawn_settings_ui(
     commands
         .spawn((
             screen_root(px(0.0)),
+            ScreenEntryAnimationOptIn,
             DespawnOnExit(AppState::Settings),
             SettingsRoot,
         ))

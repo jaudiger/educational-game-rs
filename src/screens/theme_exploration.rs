@@ -9,7 +9,7 @@ use crate::data::{
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::states::{AppState, ExplorationView, InLessonFlow, StateScopedResourceExt};
-use crate::ui::animation::{AnimatedButton, FloatingCard};
+use crate::ui::animation::{AnimatedButton, FloatingCard, ScreenEntryAnimationOptIn};
 use crate::ui::components::{
     ButtonActivated, HoverTooltip, button_base, screen_root, standard_button,
 };
@@ -274,6 +274,7 @@ pub fn setup_themes(
 
     let mut root = commands.spawn((
         screen_root(theme::scaled(theme::spacing::LARGE)),
+        ScreenEntryAnimationOptIn,
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),
@@ -615,6 +616,7 @@ pub fn setup_theme_lessons(
     let card_style = ExplorationCardStyle::for_exploration_theme(settings.exploration_theme);
     let mut root = commands.spawn((
         screen_root(theme::scaled(theme::spacing::LARGE)),
+        ScreenEntryAnimationOptIn,
         ExplorationScreenRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ActivitySelection),

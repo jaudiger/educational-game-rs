@@ -12,7 +12,7 @@ use crate::i18n::{I18n, TranslationKey};
 use crate::screens::activity_categories::activity_category_label;
 use crate::screens::activity_level::activity_level_badge;
 use crate::states::{AppState, ExplorationView, InLessonFlow};
-use crate::ui::animation::FloatingCard;
+use crate::ui::animation::{FloatingCard, ScreenEntryAnimationOptIn};
 use crate::ui::components::{
     ButtonActivated, button_base, disclosure_chevron, disclosure_chevron_transform,
     list_separator_border, screen_root_with_node, standard_button,
@@ -240,6 +240,7 @@ fn spawn_activity_selection_screen(
             },
             theme::scaled(theme::spacing::LARGE),
         ),
+        ScreenEntryAnimationOptIn,
         ActivitySelectionRoot,
         DespawnOnExit(AppState::ThemeExploration),
         DespawnOnEnter(ExplorationView::ThemeLessons),
