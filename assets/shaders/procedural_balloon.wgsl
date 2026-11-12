@@ -1,5 +1,7 @@
 struct BalloonUniform {
     part_id: u32,
+    flame_intensity: f32,
+    cord_endpoints: array<vec4<f32>, 2>,
 }
 
 struct MeshBalloonInput {
@@ -13,6 +15,7 @@ struct UiBalloonInput {
 
 const BALLOON_ENVELOPE: u32 = 0u;
 const BALLOON_BASKET: u32 = 1u;
+const BALLOON_FLAME: u32 = 2u;
 const BASKET_OUTER_MAX_HALF_WIDTH: f32 = 54.0;
 const BASKET_OUTER_TOP_HALF_WIDTH: f32 = 37.0;
 const BASKET_OUTER_HALF_HEIGHT: f32 = 34.0;
@@ -67,7 +70,32 @@ fn capsule_distance(point: vec2<f32>, start: vec2<f32>, end: vec2<f32>, radius: 
     return segment_distance(point, start, end) - radius;
 }
 
-fn envelope_color(point: vec2<f32>) -> vec4<f32> {
+
+fn cord_sag(start: vec2<f32>, end: vec2<f32>) -> f32 {
+    let rest_length = 62.0;
+    let slack = clamp(1.0 - length(end - start) / rest_length, 0.0, 1.0);
+    return slack * 5.0;
+}
+
+fn curved_cord_distance(
+    point: vec2<f32>,
+    start: vec2<f32>,
+    end: vec2<f32>,
+    bend: f32,
+) -> f32 {
+    var distance = 10000.0;
+    var previous = start;
+    for (var index = 1u; index <= 6u; index += 1u) {
+        let fraction = f32(index) / 6.0;
+        let curve = start + (end - start) * fraction
+            + vec2<f32>(0.0, bend * 4.0 * fraction * (1.0 - fraction));
+        distance = min(distance, segment_distance(point, previous, curve));
+        previous = curve;
+    }
+    return distance;
+}
+
+fn envelope_color(point: vec2<f32>, cord_endpoints: array<vec4<f32>, 2>) -> vec4<f32> {
     let body_distance = envelope_distance(point);
     let body_coverage = edge_coverage(body_distance);
     let inner_coverage = edge_coverage(body_distance + 5.0);
@@ -111,12 +139,32 @@ fn envelope_color(point: vec2<f32>) -> vec4<f32> {
     let rope_color = color_from_srgb(vec3<f32>(107.0, 79.0, 18.0));
     let rope_distance = min(
         min(
-            capsule_distance(point, vec2<f32>(94.0, 257.0), vec2<f32>(80.0, 318.0), 1.7),
-            capsule_distance(point, vec2<f32>(107.0, 258.0), vec2<f32>(104.0, 318.0), 1.5),
+            curved_cord_distance(
+                point,
+                vec2<f32>(94.0, 257.0),
+                cord_endpoints[0].xy,
+                cord_sag(vec2<f32>(94.0, 257.0), cord_endpoints[0].xy),
+            ) - 1.7,
+            curved_cord_distance(
+                point,
+                vec2<f32>(107.0, 258.0),
+                cord_endpoints[0].zw,
+                cord_sag(vec2<f32>(107.0, 258.0), cord_endpoints[0].zw),
+            ) - 1.5,
         ),
         min(
-            capsule_distance(point, vec2<f32>(149.0, 258.0), vec2<f32>(152.0, 318.0), 1.5),
-            capsule_distance(point, vec2<f32>(162.0, 257.0), vec2<f32>(176.0, 318.0), 1.7),
+            curved_cord_distance(
+                point,
+                vec2<f32>(149.0, 258.0),
+                cord_endpoints[1].xy,
+                cord_sag(vec2<f32>(149.0, 258.0), cord_endpoints[1].xy),
+            ) - 1.5,
+            curved_cord_distance(
+                point,
+                vec2<f32>(162.0, 257.0),
+                cord_endpoints[1].zw,
+                cord_sag(vec2<f32>(162.0, 257.0), cord_endpoints[1].zw),
+            ) - 1.7,
         ),
     );
     let rope_coverage = edge_coverage(rope_distance);
@@ -254,22 +302,48 @@ fn basket_color(point: vec2<f32>) -> vec4<f32> {
     return vec4<f32>(basket, alpha);
 }
 
-fn balloon_fragment(uv: vec2<f32>, part_id: u32) -> vec4<f32> {
-    if part_id == BALLOON_ENVELOPE {
-        return envelope_color(uv * vec2<f32>(256.0, 320.0));
+fn flame_distance(point: vec2<f32>) -> f32 {
+    let progress = clamp((point.y - 5.0) / 70.0, 0.0, 1.0);
+    let width = 23.0 * pow(max(sin(PI * progress), 0.0), 0.72);
+    let horizontal = abs(point.x - 32.0) - width;
+    let vertical = max(5.0 - point.y, point.y - 75.0);
+    return max(horizontal, vertical);
+}
+
+fn flame_color(point: vec2<f32>, intensity: f32) -> vec4<f32> {
+    let flame_coverage = edge_coverage(flame_distance(point));
+    let core_point = vec2<f32>((point.x - 32.0) * 1.6 + 32.0, point.y);
+    let core_coverage = edge_coverage(flame_distance(core_point));
+    let outer = color_from_srgb(vec3<f32>(244.0, 73.0, 22.0));
+    let inner = color_from_srgb(vec3<f32>(255.0, 178.0, 35.0));
+    let core = color_from_srgb(vec3<f32>(255.0, 239.0, 153.0));
+    let color = mix(mix(outer, inner, core_coverage), core, core_coverage * 0.7);
+    let alpha = flame_coverage * intensity;
+    if alpha <= 0.0001 {
+        return vec4<f32>(0.0);
     }
-    if part_id == BALLOON_BASKET {
+    return vec4<f32>(color, alpha);
+}
+
+fn balloon_fragment(uv: vec2<f32>, balloon: BalloonUniform) -> vec4<f32> {
+    if balloon.part_id == BALLOON_ENVELOPE {
+        return envelope_color(uv * vec2<f32>(256.0, 320.0), balloon.cord_endpoints);
+    }
+    if balloon.part_id == BALLOON_BASKET {
         return basket_color(uv * vec2<f32>(128.0, 80.0));
+    }
+    if balloon.part_id == BALLOON_FLAME {
+        return flame_color(uv * vec2<f32>(64.0, 80.0), balloon.flame_intensity);
     }
     return vec4<f32>(0.0);
 }
 
 @fragment
 fn balloon_mesh_fragment(input: MeshBalloonInput) -> @location(0) vec4<f32> {
-    return balloon_fragment(input.uv, mesh_balloon.part_id);
+    return balloon_fragment(input.uv, mesh_balloon);
 }
 
 @fragment
 fn balloon_ui_fragment(input: UiBalloonInput) -> @location(0) vec4<f32> {
-    return balloon_fragment(input.uv, ui_balloon.part_id);
+    return balloon_fragment(input.uv, ui_balloon);
 }

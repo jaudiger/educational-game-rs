@@ -4,11 +4,16 @@
 //! scene can also be reused by other screens, which provide their own layout and
 //! own any screen-specific markers or transitions.
 
+use bevy::asset::AssetEventSystems;
 use bevy::prelude::*;
 use bevy::scene::{EntityCommandsSceneExt, Scene, SceneComponent, bsn};
+use bevy::ui::{UiGlobalTransform, UiSystems};
+use bevy::ui_render::ui_material::MaterialNode;
 
 use crate::data::ExplorationTheme;
-use crate::plugins::balloon_material::{BalloonPart, BalloonUiMaterial};
+use crate::plugins::balloon_material::{
+    BALLOON_BASKET_CORD_ATTACHMENTS, BalloonFlame, BalloonPart, BalloonUiMaterial,
+};
 use crate::states::ActiveLesson;
 use crate::ui::theme;
 
@@ -20,6 +25,13 @@ impl Plugin for LessonMascotPlugin {
         app.add_systems(
             Update,
             (animate_swaying_envelope, animate_pulled_basket).run_if(in_state(ActiveLesson)),
+        )
+        .add_systems(
+            PostUpdate,
+            update_ui_balloon_cords
+                .after(UiSystems::Layout)
+                .before(AssetEventSystems)
+                .run_if(in_state(ActiveLesson)),
         );
     }
 }
@@ -34,6 +46,9 @@ struct SwayingEnvelope;
 #[derive(Component, Clone, Default, Reflect)]
 struct PulledBasket;
 
+#[derive(Component, Clone, Default, Reflect)]
+struct BalloonEnvelopeVisual;
+
 #[derive(SceneComponent, Default, Clone, Reflect)]
 #[scene(SkyBalloonMascotProps)]
 struct SkyBalloonMascot;
@@ -42,13 +57,15 @@ struct SkyBalloonMascot;
 struct SkyBalloonMascotProps {
     envelope_material: Handle<BalloonUiMaterial>,
     basket_material: Handle<BalloonUiMaterial>,
+    flame_material: Handle<BalloonUiMaterial>,
     layout: SkyBalloonLayout,
 }
 
 #[derive(Clone)]
 pub struct SkyBalloonAssets {
-    envelope_material: Handle<BalloonUiMaterial>,
-    basket_material: Handle<BalloonUiMaterial>,
+    envelope: Handle<BalloonUiMaterial>,
+    basket: Handle<BalloonUiMaterial>,
+    flame: Handle<BalloonUiMaterial>,
 }
 
 #[derive(Clone, Copy)]
@@ -120,8 +137,9 @@ pub fn spawn_lesson_mascot(
 
 pub fn create_sky_balloon_assets(materials: &mut Assets<BalloonUiMaterial>) -> SkyBalloonAssets {
     SkyBalloonAssets {
-        envelope_material: materials.add(BalloonUiMaterial::new(BalloonPart::Envelope)),
-        basket_material: materials.add(BalloonUiMaterial::new(BalloonPart::Basket)),
+        envelope: materials.add(BalloonUiMaterial::new(BalloonPart::Envelope)),
+        basket: materials.add(BalloonUiMaterial::new(BalloonPart::Basket)),
+        flame: materials.add(BalloonUiMaterial::new(BalloonPart::Flame)),
     }
 }
 
@@ -144,8 +162,9 @@ fn spawn_sky_balloon_mascot(
 pub fn sky_balloon_scene(assets: SkyBalloonAssets, layout: SkyBalloonLayout) -> impl Scene {
     bsn! {
         @SkyBalloonMascot {
-            @envelope_material: {assets.envelope_material},
-            @basket_material: {assets.basket_material},
+            @envelope_material: {assets.envelope},
+            @basket_material: {assets.basket},
+            @flame_material: {assets.flame},
             @layout: {layout},
         }
     }
@@ -156,6 +175,8 @@ impl SkyBalloonMascot {
         let layout = props.layout;
         let envelope_height = BalloonPart::Envelope.height_for_width(layout.envelope_width);
         let basket_height = BalloonPart::Basket.height_for_width(layout.basket_width);
+        let flame_height = envelope_height * 0.16;
+        let flame_width = flame_height * 0.8;
 
         bsn! {
             Node {
@@ -172,7 +193,27 @@ impl SkyBalloonMascot {
                     width: theme::scaled(layout.envelope_width),
                     height: theme::scaled(envelope_height),
                 }
-                MaterialNode<BalloonUiMaterial>({props.envelope_material})
+                Children [
+                    BalloonFlame
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: theme::scaled(layout.envelope_width.mul_add(0.5, -flame_width * 0.5)),
+                        bottom: theme::scaled(layout.basket_overlap + 4.0),
+                        width: theme::scaled(flame_width),
+                        height: theme::scaled(flame_height),
+                    }
+                    MaterialNode<BalloonUiMaterial>({props.flame_material})
+                    --
+                    BalloonEnvelopeVisual
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(0.0),
+                        top: px(0.0),
+                        width: percent(100.0),
+                        height: percent(100.0),
+                    }
+                    MaterialNode<BalloonUiMaterial>({props.envelope_material})
+                ]
                 --
                 PulledBasket
                 Node {
@@ -184,6 +225,74 @@ impl SkyBalloonMascot {
             ]
         }
     }
+}
+
+fn update_ui_balloon_cords(
+    mut materials: ResMut<Assets<BalloonUiMaterial>>,
+    envelopes: Query<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            &MaterialNode<BalloonUiMaterial>,
+        ),
+        With<BalloonEnvelopeVisual>,
+    >,
+    baskets: Query<(&ComputedNode, &UiGlobalTransform), With<PulledBasket>>,
+) {
+    let Ok((envelope_node, envelope_transform, material_node)) = envelopes.single() else {
+        return;
+    };
+    let Ok((basket_node, basket_transform)) = baskets.single() else {
+        return;
+    };
+    let Some(endpoints) = ui_cord_endpoints(
+        envelope_node.size(),
+        envelope_transform,
+        basket_node.size(),
+        basket_transform,
+    ) else {
+        return;
+    };
+
+    if let Some(mut material) = materials.get_mut(&material_node.0) {
+        material.set_cord_endpoints(endpoints);
+    }
+}
+
+fn ui_cord_endpoints(
+    envelope_size: Vec2,
+    envelope_transform: &UiGlobalTransform,
+    basket_size: Vec2,
+    basket_transform: &UiGlobalTransform,
+) -> Option<[Vec4; 2]> {
+    if !envelope_size.is_finite()
+        || !basket_size.is_finite()
+        || envelope_size.min_element() <= f32::EPSILON
+        || basket_size.min_element() <= f32::EPSILON
+    {
+        return None;
+    }
+
+    let inverse_envelope = envelope_transform.try_inverse()?;
+    let basket_canvas = BalloonPart::Basket.canvas();
+    let mut points = [Vec2::ZERO; 4];
+    for (point, attachment) in points.iter_mut().zip(BALLOON_BASKET_CORD_ATTACHMENTS) {
+        let basket_local = Vec2::new(
+            (attachment.x / basket_canvas.x - 0.5) * basket_size.x,
+            (attachment.y / basket_canvas.y - 0.5) * basket_size.y,
+        );
+        let world_point = basket_transform.transform_point2(basket_local);
+        let envelope_local = inverse_envelope.transform_point2(world_point);
+        *point = Vec2::new(
+            (envelope_local.x / envelope_size.x).mul_add(256.0, 128.0),
+            (envelope_local.y / envelope_size.y).mul_add(320.0, 160.0),
+        );
+    }
+
+    Some([
+        Vec4::new(points[0].x, points[0].y, points[1].x, points[1].y),
+        Vec4::new(points[2].x, points[2].y, points[3].x, points[3].y),
+    ])
 }
 
 /// Applies a gentle pendular sway to the balloon envelope.

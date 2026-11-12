@@ -27,7 +27,15 @@ impl Plugin for BalloonMaterialPlugin {
 pub enum BalloonPart {
     Envelope = 0,
     Basket = 1,
+    Flame = 2,
 }
+
+pub const BALLOON_BASKET_CORD_ATTACHMENTS: [Vec2; 4] = [
+    Vec2::new(28.0, 10.0),
+    Vec2::new(48.0, 10.0),
+    Vec2::new(80.0, 10.0),
+    Vec2::new(100.0, 10.0),
+];
 
 impl BalloonPart {
     const fn id(self) -> u32 {
@@ -38,6 +46,7 @@ impl BalloonPart {
         match self {
             Self::Envelope => Vec2::new(256.0, 320.0),
             Self::Basket => Vec2::new(128.0, 80.0),
+            Self::Flame => Vec2::new(64.0, 80.0),
         }
     }
 
@@ -50,12 +59,21 @@ impl BalloonPart {
 #[derive(Clone, Copy, Debug, Default, Reflect, ShaderType)]
 struct BalloonUniform {
     part_id: u32,
+    flame_intensity: f32,
+    cord_endpoints: [Vec4; 2],
 }
 
 #[derive(Asset, AsBindGroup, Clone, Reflect)]
 pub struct BalloonMaterial {
     #[uniform(0)]
     uniform: BalloonUniform,
+}
+
+#[derive(Component, Clone, Default, Reflect)]
+pub struct BalloonFlame;
+
+impl BalloonFlame {
+    pub const BASE_INTENSITY: f32 = 0.4;
 }
 
 #[derive(Asset, AsBindGroup, Clone, Reflect)]
@@ -67,15 +85,47 @@ pub struct BalloonUiMaterial {
 impl BalloonMaterial {
     pub const fn new(part: BalloonPart) -> Self {
         Self {
-            uniform: BalloonUniform { part_id: part.id() },
+            uniform: BalloonUniform::new(part),
         }
+    }
+
+    pub const fn set_flame_intensity(&mut self, intensity: f32) {
+        self.uniform.flame_intensity = intensity.clamp(0.0, 1.0);
+    }
+
+    pub const fn set_cord_endpoints(&mut self, endpoints: [Vec4; 2]) {
+        self.uniform.cord_endpoints = endpoints;
     }
 }
 
 impl BalloonUiMaterial {
     pub const fn new(part: BalloonPart) -> Self {
         Self {
-            uniform: BalloonUniform { part_id: part.id() },
+            uniform: BalloonUniform::new(part),
+        }
+    }
+
+    pub const fn set_flame_intensity(&mut self, intensity: f32) {
+        self.uniform.flame_intensity = intensity.clamp(0.0, 1.0);
+    }
+
+    pub const fn set_cord_endpoints(&mut self, endpoints: [Vec4; 2]) {
+        self.uniform.cord_endpoints = endpoints;
+    }
+}
+
+impl BalloonUniform {
+    const fn new(part: BalloonPart) -> Self {
+        Self {
+            part_id: part.id(),
+            flame_intensity: match part {
+                BalloonPart::Flame => BalloonFlame::BASE_INTENSITY,
+                BalloonPart::Envelope | BalloonPart::Basket => 0.0,
+            },
+            cord_endpoints: [
+                Vec4::new(80.0, 318.0, 107.0, 318.0),
+                Vec4::new(149.0, 318.0, 176.0, 318.0),
+            ],
         }
     }
 }

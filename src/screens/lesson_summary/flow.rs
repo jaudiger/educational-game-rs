@@ -1,7 +1,9 @@
 use bevy::input_focus::AutoFocus;
 use bevy::prelude::*;
 use bevy::ui::InteractionDisabled;
+use bevy::ui_render::ui_material::MaterialNode;
 
+use crate::plugins::balloon_material::{BalloonFlame, BalloonUiMaterial};
 use crate::states::AppState;
 use crate::ui::components::ButtonActivated;
 use crate::ui::theme;
@@ -90,6 +92,8 @@ pub(super) fn tick_summary_reveal(
 pub(super) fn tick_summary_departure(
     time: Res<Time>,
     mut screen: Single<&mut SummaryScreen>,
+    mut balloon_materials: ResMut<Assets<BalloonUiMaterial>>,
+    flames: Query<&MaterialNode<BalloonUiMaterial>, With<BalloonFlame>>,
     mut animated_elements: ParamSet<(
         Query<(&mut UiTransform, &ComputedUiRenderTargetInfo), With<SummaryBalloon>>,
         Query<(
@@ -108,6 +112,14 @@ pub(super) fn tick_summary_departure(
     screen.elapsed = (screen.elapsed + time.delta_secs()).min(DEPARTURE_DURATION);
     let linear_progress = screen.elapsed / DEPARTURE_DURATION;
     let progress = ease_in_out(linear_progress);
+    for flame in &flames {
+        if let Some(mut material) = balloon_materials.get_mut(&flame.0) {
+            material.set_flame_intensity(
+                (1.0 - BalloonFlame::BASE_INTENSITY)
+                    .mul_add(progress, BalloonFlame::BASE_INTENSITY),
+            );
+        }
+    }
 
     {
         for (mut transform, target) in &mut animated_elements.p0() {

@@ -5,7 +5,9 @@ use bevy::window::{CursorOptions, PrimaryWindow};
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
-use crate::plugins::balloon_material::{BalloonMaterial, BalloonPart};
+use crate::plugins::balloon_material::{
+    BALLOON_BASKET_CORD_ATTACHMENTS, BalloonFlame, BalloonMaterial, BalloonPart,
+};
 use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudMaterial};
 use crate::states::AppState;
 
@@ -24,6 +26,7 @@ pub(super) fn register(app: &mut App) {
             Update,
             (
                 animate_balloon_system,
+                animate_cursor_flame_system.after(super::follow_pointer_system),
                 spawn_cloud_puffs_system.after(super::follow_pointer_system),
                 animate_cloud_puffs_system,
             )
@@ -36,11 +39,28 @@ pub(super) fn register(app: &mut App) {
 #[require(Transform, Visibility)]
 struct BalloonEnvelope {
     base_y: f32,
+    #[reflect(ignore)]
+    material: Handle<BalloonMaterial>,
 }
 
 #[derive(Component, Reflect)]
 #[require(Transform, Visibility)]
 struct BalloonBasket;
+
+#[derive(Component, Reflect)]
+struct CursorFlameMotion {
+    last_position: Option<Vec2>,
+    intensity: f32,
+}
+
+impl Default for CursorFlameMotion {
+    fn default() -> Self {
+        Self {
+            last_position: None,
+            intensity: BalloonFlame::BASE_INTENSITY,
+        }
+    }
+}
 
 #[derive(Component, Reflect)]
 struct CloudPuffSpawner {
@@ -81,6 +101,11 @@ fn setup_balloon_cursor(
     let basket_mesh = meshes.add(Rectangle::new(basket_canvas.x, basket_canvas.y));
     let envelope_material = balloon_materials.add(BalloonMaterial::new(BalloonPart::Envelope));
     let basket_material = balloon_materials.add(BalloonMaterial::new(BalloonPart::Basket));
+    let flame_material = balloon_materials.add(BalloonMaterial::new(BalloonPart::Flame));
+    let flame_mesh = meshes.add(Rectangle::new(
+        BalloonPart::Flame.canvas().x,
+        BalloonPart::Flame.canvas().y,
+    ));
 
     let puff_shapes = CloudShapeId::ALL.to_vec();
     let puff_meshes = puff_shapes
@@ -97,6 +122,7 @@ fn setup_balloon_cursor(
     commands.spawn((
         PointerCursor,
         TouchCursorState::default(),
+        CursorFlameMotion::default(),
         cursor_layer.clone(),
         CloudPuffSpawner {
             timer: Timer::from_seconds(1.6, TimerMode::Repeating),
@@ -107,16 +133,28 @@ fn setup_balloon_cursor(
             (
                 BalloonEnvelope {
                     base_y: ENVELOPE_BASE_Y,
+                    material: envelope_material.clone(),
                 },
                 Transform::from_xyz(0.0, ENVELOPE_BASE_Y, 1.0)
                     .with_scale(Vec3::splat(ENVELOPE_SCALE)),
-                children![(
-                    Mesh2d(envelope_mesh),
-                    MeshMaterial2d(envelope_material),
-                    Transform::from_xyz(0.0, envelope_canvas.y * 0.5, 0.0),
-                    Pickable::IGNORE,
-                    cursor_layer.clone(),
-                )],
+                children![
+                    (
+                        BalloonFlame,
+                        Mesh2d(flame_mesh),
+                        MeshMaterial2d(flame_material),
+                        Transform::from_xyz(0.0, (33.0 - ENVELOPE_BASE_Y) / ENVELOPE_SCALE, -0.1,)
+                            .with_scale(Vec3::splat(0.2 / ENVELOPE_SCALE)),
+                        Pickable::IGNORE,
+                        cursor_layer.clone(),
+                    ),
+                    (
+                        Mesh2d(envelope_mesh),
+                        MeshMaterial2d(envelope_material),
+                        Transform::from_xyz(0.0, envelope_canvas.y * 0.5, 0.0),
+                        Pickable::IGNORE,
+                        cursor_layer.clone(),
+                    ),
+                ],
             ),
             (
                 BalloonBasket,
@@ -127,7 +165,7 @@ fn setup_balloon_cursor(
                     MeshMaterial2d(basket_material),
                     Transform::from_xyz(0.0, -basket_canvas.y * 0.5, 0.0),
                     Pickable::IGNORE,
-                    cursor_layer,
+                    cursor_layer.clone(),
                 )],
             ),
         ],
@@ -142,20 +180,76 @@ fn cleanup_cloud_puffs(mut commands: Commands, puff_query: Query<Entity, With<Cl
 
 fn animate_balloon_system(
     time: Res<Time>,
-    mut envelope_query: Query<(&BalloonEnvelope, &mut Transform), Without<BalloonBasket>>,
-    mut basket_query: Query<&mut Transform, (With<BalloonBasket>, Without<BalloonEnvelope>)>,
+    envelope: Single<(&BalloonEnvelope, &mut Transform), Without<BalloonBasket>>,
+    basket: Single<&mut Transform, (With<BalloonBasket>, Without<BalloonEnvelope>)>,
+    mut materials: ResMut<Assets<BalloonMaterial>>,
 ) {
     let elapsed = time.elapsed_secs();
+    let (envelope, mut envelope_transform) = envelope.into_inner();
+    let mut basket_transform = basket.into_inner();
 
-    for (envelope, mut transform) in &mut envelope_query {
-        transform.rotation = Quat::from_rotation_z((elapsed * 1.5).sin() * 0.08);
-        transform.translation.y = (elapsed * 1.2).sin().mul_add(3.0, envelope.base_y);
+    envelope_transform.rotation = Quat::from_rotation_z((elapsed * 1.5).sin() * 0.08);
+    envelope_transform.translation.y = (elapsed * 1.2).sin().mul_add(3.0, envelope.base_y);
+    basket_transform.rotation = Quat::from_rotation_z(((elapsed - 0.3) * 1.5).sin() * 0.06);
+    basket_transform.translation.y = ((elapsed - 0.3) * 1.2).sin().mul_add(3.0, BASKET_OFFSET_Y);
+
+    let endpoints = world_cord_endpoints(&envelope_transform, &basket_transform);
+    if let Some(mut material) = materials.get_mut(&envelope.material) {
+        material.set_cord_endpoints(endpoints);
+    }
+}
+
+fn world_cord_endpoints(envelope: &Transform, basket: &Transform) -> [Vec4; 2] {
+    let inverse_envelope = envelope.compute_affine().inverse();
+    let basket_transform = basket.compute_affine();
+    let basket_canvas = BalloonPart::Basket.canvas();
+    let mut points = [Vec2::ZERO; 4];
+    for (point, attachment) in points.iter_mut().zip(BALLOON_BASKET_CORD_ATTACHMENTS) {
+        let basket_endpoint = basket_transform.transform_point3(Vec3::new(
+            basket_canvas.x.mul_add(-0.5, attachment.x),
+            -attachment.y,
+            0.0,
+        ));
+        let envelope_local = inverse_envelope.transform_point3(basket_endpoint);
+        *point = Vec2::new(128.0 + envelope_local.x, 320.0 - envelope_local.y);
     }
 
-    for mut transform in &mut basket_query {
-        transform.rotation = Quat::from_rotation_z(((elapsed - 0.3) * 1.5).sin() * 0.06);
-        transform.translation.y = ((elapsed - 0.3) * 1.2).sin().mul_add(3.0, BASKET_OFFSET_Y);
+    [
+        Vec4::new(points[0].x, points[0].y, points[1].x, points[1].y),
+        Vec4::new(points[2].x, points[2].y, points[3].x, points[3].y),
+    ]
+}
+
+fn animate_cursor_flame_system(
+    time: Res<Time>,
+    cursor: Single<(&Transform, &Visibility, &mut CursorFlameMotion), With<PointerCursor>>,
+    flame: Single<&MeshMaterial2d<BalloonMaterial>, With<BalloonFlame>>,
+    mut materials: ResMut<Assets<BalloonMaterial>>,
+) {
+    let (transform, visibility, mut motion) = cursor.into_inner();
+    let position = transform.translation.truncate();
+    let speed = motion.last_position.map_or(0.0, |previous| {
+        position.distance(previous) / time.delta_secs().max(0.001)
+    });
+    motion.last_position = Some(position);
+    let speed = if *visibility == Visibility::Visible {
+        speed
+    } else {
+        0.0
+    };
+    motion.intensity = smooth_flame_intensity(motion.intensity, speed, time.delta_secs());
+
+    if let Some(mut material) = materials.get_mut(&flame.0) {
+        material.set_flame_intensity(motion.intensity);
     }
+}
+
+fn smooth_flame_intensity(current: f32, speed: f32, delta: f32) -> f32 {
+    let movement = ((speed - 12.0) / 220.0).clamp(0.0, 1.0);
+    let target =
+        (1.0 - BalloonFlame::BASE_INTENSITY).mul_add(movement, BalloonFlame::BASE_INTENSITY);
+    let smoothing = 1.0 - (-12.0 * delta.max(0.0)).exp();
+    (target - current).mul_add(smoothing, current)
 }
 
 fn spawn_cloud_puffs_system(
