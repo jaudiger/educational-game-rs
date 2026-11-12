@@ -94,14 +94,17 @@ struct SoundEffect;
 /// Drives a fade-in on a per-entity basis.
 #[derive(Component, Reflect)]
 struct FadeIn {
-    /// Target linear volume.
+    start: f32,
     target: f32,
+    elapsed: f32,
 }
 
-/// Drives a fade-out on a per-entity basis. The entity is despawned
-/// once volume reaches near-silence.
+/// Drives a fade-out over the configured duration.
 #[derive(Component, Reflect)]
-struct FadeOut;
+struct FadeOut {
+    start: f32,
+    elapsed: f32,
+}
 
 /// Triggered when a button click sound should play.
 #[derive(Event)]
@@ -112,27 +115,18 @@ pub struct GameAudioPlugin;
 
 impl Plugin for GameAudioPlugin {
     fn build(&self, app: &mut App) {
-        // Preload assets at startup.
         app.add_systems(Startup, preload_audio_assets);
-
-        // Register music transition systems for every AppState variant.
-        app.add_systems(OnEnter(AppState::Home), on_state_enter_music);
-        app.add_systems(OnEnter(AppState::SaveSlots), on_state_enter_music);
-        app.add_systems(OnEnter(AppState::Settings), on_state_enter_music);
-        app.add_systems(OnEnter(AppState::ThemeExploration), on_state_enter_music);
-        app.add_systems(OnEnter(AppState::LessonPlay), on_state_enter_music);
-        app.add_systems(OnEnter(AppState::LessonSummary), on_state_enter_music);
-
-        // Fade systems run every frame.
-        app.add_systems(Update, (fade_in_system, fade_out_system));
-
-        // Sync music volume when settings change.
         app.add_systems(
             Update,
-            sync_music_volume.run_if(resource_changed::<GameSettings>),
+            (
+                update_music_for_state.run_if(state_changed::<AppState>),
+                sync_music_volume.run_if(resource_changed::<GameSettings>),
+                fade_in_system,
+                fade_out_system,
+            )
+                .chain(),
         );
 
-        // Button click detection.
         app.add_systems(Update, detect_button_clicks);
 
         // Observers for one-shot sounds.
@@ -160,41 +154,37 @@ fn preload_audio_assets(mut commands: Commands, asset_server: Res<AssetServer>) 
     commands.insert_resource(AudioAssets { music, sfx });
 }
 
-/// Called on every `AppState` enter. Compares the desired track with
-/// [`CurrentMusic`] and either no-ops (same track) or crossfades.
-fn on_state_enter_music(
+/// Starts music for the current state and crossfades away from the previous track.
+fn update_music_for_state(
     mut commands: Commands,
     state: Res<State<AppState>>,
     settings: Res<GameSettings>,
-    audio_assets: Option<Res<AudioAssets>>,
+    audio_assets: Res<AudioAssets>,
     current_music: Option<Res<CurrentMusic>>,
-    music_query: Query<Entity, With<BackgroundMusic>>,
+    music_query: Query<(Entity, Option<&AudioSink>), With<BackgroundMusic>>,
 ) {
     let track = music_for_state(**state);
-
-    // If the desired track is the same as the current one, do nothing.
-    if let Some(ref current) = current_music
-        && track == current.0
+    if current_music
+        .as_ref()
+        .is_some_and(|current| current.0 == track)
     {
         return;
     }
+    let Some(handle) = audio_assets.music.get(&track) else {
+        return;
+    };
 
-    // Fade out any existing background music.
-    for entity in &music_query {
+    for (entity, sink) in &music_query {
+        let start = sink.map_or(0.0, |sink| sink.volume().to_linear());
         commands
             .entity(entity)
             .remove::<BackgroundMusic>()
             .remove::<FadeIn>()
-            .insert(FadeOut);
+            .insert(FadeOut {
+                start,
+                elapsed: 0.0,
+            });
     }
-
-    // Spawn new track only if assets are loaded.
-    let Some(assets) = audio_assets else {
-        return;
-    };
-    let Some(handle) = assets.music.get(&track) else {
-        return;
-    };
 
     commands.spawn((
         AudioPlayer::new(handle.clone()),
@@ -205,47 +195,47 @@ fn on_state_enter_music(
         },
         BackgroundMusic,
         FadeIn {
+            start: 0.0,
             target: settings.music_volume * track.volume_multiplier(),
+            elapsed: 0.0,
         },
     ));
-
     commands.insert_resource(CurrentMusic(track));
 }
 
-/// Gradually increases volume toward [`FadeIn::target`], then removes the
-/// component.
+/// Fades music in over the configured duration.
 fn fade_in_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &mut AudioSink, &FadeIn)>,
+    mut query: Query<(Entity, &mut AudioSink, &mut FadeIn)>,
     time: Res<Time>,
 ) {
-    for (entity, mut sink, fade) in &mut query {
-        let target = Volume::Linear(fade.target);
-        let new_volume = sink
-            .volume()
-            .fade_towards(target, time.delta_secs() / FADE_DURATION);
-        sink.set_volume(new_volume);
+    for (entity, mut sink, mut fade) in &mut query {
+        fade.elapsed = (fade.elapsed + time.delta_secs()).min(FADE_DURATION);
+        let progress = fade.elapsed / FADE_DURATION;
+        let volume = (fade.target - fade.start).mul_add(progress, fade.start);
+        sink.set_volume(Volume::Linear(volume));
 
-        if new_volume.to_linear() >= fade.target - 0.001 {
-            sink.set_volume(target);
+        if fade.elapsed >= FADE_DURATION {
+            sink.set_volume(Volume::Linear(fade.target));
             commands.entity(entity).remove::<FadeIn>();
         }
     }
 }
 
-/// Gradually decreases volume toward silence, then despawns the entity.
+/// Fades music out over the configured duration, then despawns its player.
 fn fade_out_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &mut AudioSink), With<FadeOut>>,
+    mut query: Query<(Entity, Option<&mut AudioSink>, &mut FadeOut)>,
     time: Res<Time>,
 ) {
-    for (entity, mut sink) in &mut query {
-        let new_volume = sink
-            .volume()
-            .fade_towards(Volume::SILENT, time.delta_secs() / FADE_DURATION);
-        sink.set_volume(new_volume);
+    for (entity, sink, mut fade) in &mut query {
+        fade.elapsed = (fade.elapsed + time.delta_secs()).min(FADE_DURATION);
+        let progress = fade.elapsed / FADE_DURATION;
+        if let Some(mut sink) = sink {
+            sink.set_volume(Volume::Linear(fade.start * (1.0 - progress)));
+        }
 
-        if new_volume.to_linear() < 0.001 {
+        if fade.elapsed >= FADE_DURATION {
             commands.entity(entity).despawn();
         }
     }
@@ -258,7 +248,7 @@ fn detect_button_clicks(mut commands: Commands, mut activations: MessageReader<B
     }
 }
 
-/// Observer: plays the correct/incorrect SFX when an answer is submitted.
+/// Plays the correct or incorrect SFX when an answer is submitted.
 fn on_answer_submitted(
     event: On<AnswerSubmitted>,
     mut commands: Commands,
@@ -269,61 +259,62 @@ fn on_answer_submitted(
         AnswerResult::Correct => SfxKind::Correct,
         AnswerResult::Incorrect => SfxKind::Incorrect,
     };
-
-    let Some(handle) = audio_assets.sfx.get(&kind) else {
-        return;
-    };
-
-    commands.spawn((
-        AudioPlayer::new(handle.clone()),
-        PlaybackSettings {
-            mode: PlaybackMode::Despawn,
-            volume: Volume::Linear(settings.sfx_volume),
-            ..default()
-        },
-        SoundEffect,
-    ));
+    spawn_sfx(&mut commands, &audio_assets, kind, settings.sfx_volume);
 }
 
-/// Observer: plays the click SFX.
+/// Plays the click SFX.
 fn on_play_click_sound(
     _event: On<PlayClickSound>,
     mut commands: Commands,
     settings: Res<GameSettings>,
     audio_assets: Res<AudioAssets>,
 ) {
-    let Some(handle) = audio_assets.sfx.get(&SfxKind::Click) else {
+    spawn_sfx(
+        &mut commands,
+        &audio_assets,
+        SfxKind::Click,
+        settings.sfx_volume,
+    );
+}
+
+fn spawn_sfx(commands: &mut Commands, assets: &AudioAssets, kind: SfxKind, volume: f32) {
+    let Some(handle) = assets.sfx.get(&kind) else {
         return;
     };
-
     commands.spawn((
         AudioPlayer::new(handle.clone()),
         PlaybackSettings {
             mode: PlaybackMode::Despawn,
-            volume: Volume::Linear(settings.sfx_volume),
+            volume: Volume::Linear(volume),
             ..default()
         },
         SoundEffect,
     ));
 }
 
-/// Keeps the volume of currently playing background music in sync with
-/// `GameSettings::music_volume`, including tracks that are still fading in.
+/// Keeps the volume of active music in sync with the user's setting.
 fn sync_music_volume(
     settings: Res<GameSettings>,
     current_music: Option<Res<CurrentMusic>>,
-    mut query: Query<(&mut AudioSink, Option<&mut FadeIn>), With<BackgroundMusic>>,
+    mut fading_query: Query<(&mut FadeIn, Option<&AudioSink>), With<BackgroundMusic>>,
+    mut steady_query: Query<&mut AudioSink, (With<BackgroundMusic>, Without<FadeIn>)>,
 ) {
     let multiplier = current_music
         .as_ref()
-        .map_or(1.0, |cm| cm.0.volume_multiplier());
+        .map_or(1.0, |current| current.0.volume_multiplier());
     let target = settings.music_volume * multiplier;
-    for (mut sink, fade_in) in &mut query {
-        if let Some(mut fade_in) = fade_in {
-            fade_in.target = target;
+
+    for (mut fade, sink) in &mut fading_query {
+        if (fade.target - target).abs() <= f32::EPSILON {
             continue;
         }
-        let target = Volume::Linear(target);
+        fade.start = sink.map_or(0.0, |sink| sink.volume().to_linear());
+        fade.target = target;
+        fade.elapsed = 0.0;
+    }
+
+    let target = Volume::Linear(target);
+    for mut sink in &mut steady_query {
         if sink.volume() != target {
             sink.set_volume(target);
         }
