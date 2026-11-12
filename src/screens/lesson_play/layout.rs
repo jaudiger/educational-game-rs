@@ -10,11 +10,12 @@ use crate::data::{
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::balloon_material::BalloonUiMaterial;
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
+use crate::plugins::question_background::{QuestionBackgroundAssets, spawn_question_background};
 use crate::questions::QuestionRoot;
 use crate::states::AppState;
 use crate::ui::animation::ScreenEntryAnimationOptIn;
 use crate::ui::components::icon_button;
-use crate::ui::theme::{self, GameImages};
+use crate::ui::theme;
 
 use super::{ProgressText, QuitLessonButton};
 
@@ -73,7 +74,7 @@ fn fit_content_to_available_height(
 #[allow(clippy::too_many_arguments)]
 pub fn setup_lesson_play(
     mut commands: Commands,
-    images: Res<GameImages>,
+    mut background_assets: QuestionBackgroundAssets,
     mut balloon_materials: ResMut<Assets<BalloonUiMaterial>>,
     selected_lesson: Res<SelectedLesson>,
     launch_selection: Option<Res<LessonLaunchSelection>>,
@@ -82,11 +83,11 @@ pub fn setup_lesson_play(
     active_theme: Res<ActiveTheme>,
     i18n: Res<I18n>,
     planning_input: Res<LessonPlanningInput>,
-    primary_window: Single<Entity, With<PrimaryWindow>>,
+    primary_window: Single<(Entity, &Window), With<PrimaryWindow>>,
     mut next_app_state: ResMut<NextState<AppState>>,
     settings: Res<GameSettings>,
 ) {
-    let window = *primary_window;
+    let (window, primary_window) = *primary_window;
     if rejected_launch.is_some() {
         return;
     }
@@ -117,6 +118,12 @@ pub fn setup_lesson_play(
         session.questions.len(),
     ));
     commands.insert_resource(session);
+    spawn_question_background(
+        &mut commands,
+        &mut background_assets,
+        window,
+        Vec2::new(primary_window.width(), primary_window.height()),
+    );
 
     commands
         .spawn((
@@ -130,12 +137,6 @@ pub fn setup_lesson_play(
                 justify_content: JustifyContent::FlexStart,
                 row_gap: theme::scaled(theme::spacing::LARGE),
                 padding: theme::scaled(theme::spacing::LARGE).all(),
-                ..default()
-            },
-            ImageNode {
-                image: images.question_background.clone(),
-                image_mode: NodeImageMode::Stretch,
-                visual_box: VisualBox::BorderBox,
                 ..default()
             },
             ScreenEntryAnimationOptIn,

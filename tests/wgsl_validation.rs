@@ -1,32 +1,57 @@
 const SHADERS: &[(&str, &str, &[&str])] = &[
     (
-        "menu_decoration.wgsl",
-        include_str!("../assets/shaders/menu_decoration.wgsl"),
+        "ui_shape.wgsl",
+        include_str!("../assets/shaders/ui_shape.wgsl"),
         &["fragment"],
     ),
     (
-        "procedural_balloon.wgsl",
-        include_str!("../assets/shaders/procedural_balloon.wgsl"),
+        "landscape.wgsl",
+        include_str!("../assets/shaders/landscape.wgsl"),
+        &["fragment"],
+    ),
+    (
+        "tree.wgsl",
+        include_str!("../assets/shaders/tree.wgsl"),
+        &["fragment"],
+    ),
+    (
+        "flower.wgsl",
+        include_str!("../assets/shaders/flower.wgsl"),
+        &["fragment"],
+    ),
+    (
+        "grass.wgsl",
+        include_str!("../assets/shaders/grass.wgsl"),
+        &["fragment"],
+    ),
+    (
+        "stone.wgsl",
+        include_str!("../assets/shaders/stone.wgsl"),
+        &["fragment"],
+    ),
+    (
+        "balloon.wgsl",
+        include_str!("../assets/shaders/balloon.wgsl"),
         &["balloon_mesh_fragment", "balloon_ui_fragment"],
     ),
     (
-        "procedural_cloud.wgsl",
-        include_str!("../assets/shaders/procedural_cloud.wgsl"),
+        "cloud.wgsl",
+        include_str!("../assets/shaders/cloud.wgsl"),
         &["cloud_mesh_fragment", "cloud_ui_fragment"],
     ),
     (
-        "procedural_cursor.wgsl",
-        include_str!("../assets/shaders/procedural_cursor.wgsl"),
+        "cursor.wgsl",
+        include_str!("../assets/shaders/cursor.wgsl"),
         &["cursor_mesh_fragment"],
     ),
     (
-        "summary_lens_flare.wgsl",
-        include_str!("../assets/shaders/summary_lens_flare.wgsl"),
+        "sun_lens_flare.wgsl",
+        include_str!("../assets/shaders/sun_lens_flare.wgsl"),
         &["fragment"],
     ),
     (
-        "summary_sun.wgsl",
-        include_str!("../assets/shaders/summary_sun.wgsl"),
+        "sun.wgsl",
+        include_str!("../assets/shaders/sun.wgsl"),
         &["fragment"],
     ),
 ];

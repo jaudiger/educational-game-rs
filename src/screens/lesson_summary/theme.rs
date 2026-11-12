@@ -1,15 +1,12 @@
 use bevy::prelude::*;
-use bevy::render::render_resource::{AsBindGroup, ShaderType};
-use bevy::shader::ShaderRef;
 use bevy::ui::RelativeCursorPosition;
-use bevy::ui_render::ui_material::{MaterialNode, UiMaterial};
+use bevy::ui_render::ui_material::MaterialNode;
 use bevy::window::PrimaryWindow;
 
-use crate::plugins::cloud_material::ProceduralCloudUiMaterial;
+use crate::plugins::cloud_material::CloudUiMaterial;
+use crate::plugins::sun_material::{SunLensFlareMaterial, SunMaterial};
 use crate::ui::theme;
 
-const SUMMARY_SUN_SHADER_PATH: &str = "shaders/summary_sun.wgsl";
-const SUMMARY_LENS_FLARE_SHADER_PATH: &str = "shaders/summary_lens_flare.wgsl";
 const SUMMARY_SUN_ART_SIZE: f32 = 152.0;
 const SUMMARY_SUN_NODE_SIZE: f32 = 184.0;
 const SUMMARY_SUN_ART_SCALE: f32 = SUMMARY_SUN_NODE_SIZE / SUMMARY_SUN_ART_SIZE;
@@ -19,72 +16,9 @@ const ACTIVE_GLARE_STRENGTH: f32 = 1.0;
 const GLARE_DEAD_ZONE: f32 = 6.0;
 const GLARE_SMOOTHING: f32 = 10.0;
 
-#[derive(Clone, Copy, Debug, Reflect, ShaderType)]
-struct SummarySunUniform {
-    glare: Vec4,
-    geometry: Vec4,
-}
-
-#[derive(Asset, AsBindGroup, Clone, Reflect)]
-pub(super) struct SummarySunMaterial {
-    #[uniform(0)]
-    uniform: SummarySunUniform,
-}
-
-impl SummarySunMaterial {
-    pub(super) fn new() -> Self {
-        let direction = Vec2::new(DEFAULT_GLARE_ANGLE.cos(), DEFAULT_GLARE_ANGLE.sin());
-        Self {
-            uniform: SummarySunUniform {
-                glare: Vec4::new(direction.x, direction.y, DEFAULT_GLARE_STRENGTH, 0.0),
-                geometry: Vec4::new(SUMMARY_SUN_ART_SCALE, 0.0, 0.0, 0.0),
-            },
-        }
-    }
-
-    const fn set_glare(&mut self, direction: Vec2, strength: f32) {
-        self.uniform.glare = Vec4::new(direction.x, direction.y, strength, 0.0);
-    }
-}
-
-#[derive(Clone, Copy, Debug, Reflect, ShaderType)]
-struct SummaryLensFlareUniform {
-    source: Vec4,
-    cursor: Vec4,
-}
-
-#[derive(Asset, AsBindGroup, Clone, Reflect)]
-pub(super) struct SummaryLensFlareMaterial {
-    #[uniform(0)]
-    uniform: SummaryLensFlareUniform,
-}
-
-impl SummaryLensFlareMaterial {
-    pub(super) const fn new() -> Self {
-        Self {
-            uniform: SummaryLensFlareUniform {
-                source: Vec4::ZERO,
-                cursor: Vec4::ZERO,
-            },
-        }
-    }
-
-    const fn set_source(
-        &mut self,
-        position: Vec2,
-        radius: f32,
-        cursor_position: Vec2,
-        strength: f32,
-    ) {
-        self.uniform.source = Vec4::new(position.x, position.y, radius, strength);
-        self.uniform.cursor = Vec4::new(cursor_position.x, cursor_position.y, 0.0, 0.0);
-    }
-}
-
-impl UiMaterial for SummaryLensFlareMaterial {
-    fn fragment_shader() -> ShaderRef {
-        SUMMARY_LENS_FLARE_SHADER_PATH.into()
-    }
+pub(super) fn create_sun_material() -> SunMaterial {
+    let direction = Vec2::new(DEFAULT_GLARE_ANGLE.cos(), DEFAULT_GLARE_ANGLE.sin());
+    SunMaterial::new(direction, DEFAULT_GLARE_STRENGTH, SUMMARY_SUN_ART_SCALE)
 }
 
 #[derive(Component, Reflect)]
@@ -107,12 +41,6 @@ impl Default for SummarySunGlare {
 
 #[derive(Component, Reflect)]
 pub(super) struct SummaryLensFlare;
-
-impl UiMaterial for SummarySunMaterial {
-    fn fragment_shader() -> ShaderRef {
-        SUMMARY_SUN_SHADER_PATH.into()
-    }
-}
 
 #[derive(Component, Reflect)]
 pub(super) struct SummaryCurtain {
@@ -213,7 +141,7 @@ impl SummaryThemeStyle {
     }
 }
 
-pub(super) fn summary_backdrop(sun_material: Handle<SummarySunMaterial>) -> impl Bundle + use<> {
+pub(super) fn summary_backdrop(sun_material: Handle<SunMaterial>) -> impl Bundle + use<> {
     (
         Node {
             position_type: PositionType::Absolute,
@@ -228,9 +156,7 @@ pub(super) fn summary_backdrop(sun_material: Handle<SummarySunMaterial>) -> impl
     )
 }
 
-pub(super) fn summary_lens_flare(
-    material: Handle<SummaryLensFlareMaterial>,
-) -> impl Bundle + use<> {
+pub(super) fn summary_lens_flare(material: Handle<SunLensFlareMaterial>) -> impl Bundle + use<> {
     (
         Node {
             position_type: PositionType::Absolute,
@@ -249,7 +175,7 @@ pub(super) fn summary_lens_flare(
     )
 }
 
-fn summary_sun(sun_material: Handle<SummarySunMaterial>) -> impl Bundle + use<> {
+fn summary_sun(sun_material: Handle<SunMaterial>) -> impl Bundle + use<> {
     (
         Node {
             position_type: PositionType::Absolute,
@@ -271,11 +197,11 @@ fn summary_sun(sun_material: Handle<SummarySunMaterial>) -> impl Bundle + use<> 
 pub(super) fn update_summary_sun_glare(
     time: Res<Time>,
     primary_window: Single<&Window, With<PrimaryWindow>>,
-    mut materials: ResMut<Assets<SummarySunMaterial>>,
+    mut materials: ResMut<Assets<SunMaterial>>,
     mut suns: Query<(
         &RelativeCursorPosition,
         &ComputedNode,
-        &MaterialNode<SummarySunMaterial>,
+        &MaterialNode<SunMaterial>,
         &mut SummarySunGlare,
     )>,
 ) {
@@ -342,13 +268,13 @@ pub(super) fn update_summary_sun_glare(
 }
 
 pub(super) fn update_summary_lens_flare(
-    mut materials: ResMut<Assets<SummaryLensFlareMaterial>>,
+    mut materials: ResMut<Assets<SunLensFlareMaterial>>,
     sun: Single<(&ComputedNode, &UiGlobalTransform, &SummarySunGlare), With<SummarySunGlare>>,
     flare: Single<
         (
             &ComputedNode,
             &UiGlobalTransform,
-            &MaterialNode<SummaryLensFlareMaterial>,
+            &MaterialNode<SunLensFlareMaterial>,
         ),
         With<SummaryLensFlare>,
     >,
@@ -382,14 +308,12 @@ pub(super) fn update_summary_lens_flare(
     }
 
     if let Some(mut material) = materials.get_mut(&material_node.0) {
-        let source = material.uniform.source;
-        let cursor = material.uniform.cursor;
-        let position_changed =
-            Vec2::new(source.x, source.y).distance_squared(source_position) > 0.000_001;
+        let (previous_position, previous_radius, previous_strength) = material.source();
+        let position_changed = previous_position.distance_squared(source_position) > 0.000_001;
         let cursor_changed =
-            Vec2::new(cursor.x, cursor.y).distance_squared(cursor_position) > 0.000_001;
-        let radius_changed = (source.z - source_radius).abs() > 0.01;
-        let strength_changed = (source.w - sun_glare.strength).abs() > 0.001;
+            material.cursor_position().distance_squared(cursor_position) > 0.000_001;
+        let radius_changed = (previous_radius - source_radius).abs() > 0.01;
+        let strength_changed = (previous_strength - sun_glare.strength).abs() > 0.001;
         if position_changed || cursor_changed || radius_changed || strength_changed {
             material.set_source(
                 source_position,
@@ -403,7 +327,7 @@ pub(super) fn update_summary_lens_flare(
 
 pub(super) fn summary_curtain(
     style: SummaryThemeStyle,
-    cloud_material: Handle<ProceduralCloudUiMaterial>,
+    cloud_material: Handle<CloudUiMaterial>,
 ) -> impl Bundle + use<> {
     (
         Node {
@@ -429,7 +353,7 @@ pub(super) fn summary_curtain(
 
 fn summary_reveal_shape(
     spec: RevealShapeSpec,
-    cloud_material: Handle<ProceduralCloudUiMaterial>,
+    cloud_material: Handle<CloudUiMaterial>,
 ) -> impl Bundle + use<> {
     (
         Node {

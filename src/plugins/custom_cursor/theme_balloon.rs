@@ -8,7 +8,7 @@ use crate::data::{ExplorationTheme, GameSettings};
 use crate::plugins::balloon_material::{
     BALLOON_BASKET_CORD_ATTACHMENTS, BalloonFlame, BalloonMaterial, BalloonPart,
 };
-use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudMaterial};
+use crate::plugins::cloud_material::{CloudMaterial, CloudShapeId};
 use crate::states::AppState;
 
 use super::{
@@ -256,7 +256,7 @@ fn spawn_cloud_puffs_system(
     time: Res<Time>,
     mut commands: Commands,
     mut spawner_query: Query<(&mut CloudPuffSpawner, &Transform, &Visibility)>,
-    mut materials: ResMut<Assets<ProceduralCloudMaterial>>,
+    mut materials: ResMut<Assets<CloudMaterial>>,
 ) {
     let mut rng = rand::rng();
 
@@ -269,7 +269,7 @@ fn spawn_cloud_puffs_system(
 
         let shape_index = rng.random_range(0..spawner.puff_shapes.len());
         let shape_id = spawner.puff_shapes[shape_index];
-        let material = materials.add(ProceduralCloudMaterial::new(
+        let material = materials.add(CloudMaterial::new(
             shape_id,
             shape_id.canvas(),
             Color::srgba(1.0, 1.0, 1.0, 0.35),
@@ -302,9 +302,9 @@ fn animate_cloud_puffs_system(
         Entity,
         &mut CloudPuff,
         &mut Transform,
-        &MeshMaterial2d<ProceduralCloudMaterial>,
+        &MeshMaterial2d<CloudMaterial>,
     )>,
-    mut materials: ResMut<Assets<ProceduralCloudMaterial>>,
+    mut materials: ResMut<Assets<CloudMaterial>>,
 ) {
     let dt = time.delta_secs();
     let elapsed = time.elapsed_secs();

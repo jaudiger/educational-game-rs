@@ -7,7 +7,7 @@ use bevy::sprite_render::{
     AlphaMode2d, Material2d, Material2dKey, Material2dPipeline, Material2dPlugin,
 };
 
-const CURSOR_SHADER_PATH: &str = "shaders/procedural_cursor.wgsl";
+const CURSOR_SHADER_PATH: &str = "shaders/cursor.wgsl";
 
 pub struct CursorMaterialPlugin;
 

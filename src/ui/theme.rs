@@ -86,13 +86,7 @@ pub struct GameFonts {
     pub regular: Handle<Font>,
 }
 
-/// Preloaded image handles shared across the entire UI.
-#[derive(Resource, Reflect)]
-pub struct GameImages {
-    pub question_background: Handle<Image>,
-}
-
-/// Loads shared font and image assets, sets up the default-font override
+/// Loads the shared font, sets up the default-font override
 /// observer, and registers widget update systems.
 pub struct ThemePlugin;
 
@@ -100,12 +94,8 @@ impl Plugin for ThemePlugin {
     fn build(&self, app: &mut App) {
         let asset_server = app.world().resource::<AssetServer>();
         let font_handle: Handle<Font> = asset_server.load("fonts/FiraMono-Regular.ttf");
-        let question_bg: Handle<Image> = asset_server.load("ui/question-background.png");
         app.insert_resource(GameFonts {
             regular: font_handle,
-        });
-        app.insert_resource(GameImages {
-            question_background: question_bg,
         });
         app.add_observer(override_default_font);
         app.add_observer(scale_font_on_add);

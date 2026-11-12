@@ -1,4 +1,4 @@
-use crate::plugins::menu_decoration::{MenuDecorationShape, MenuDecorationVisual};
+use crate::plugins::ui_shape::{UiShapeKind, UiShapeVisual};
 use crate::ui::animation::FloatingMenuDecoration;
 use crate::ui::theme;
 use bevy::prelude::*;
@@ -35,7 +35,7 @@ struct Decoration {
     horizontal: HorizontalAnchor,
     vertical: VerticalAnchor,
     color: Color,
-    shape: MenuDecorationShape,
+    shape: UiShapeKind,
     radius: Val,
     phase: f32,
     amplitude: f32,
@@ -49,7 +49,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Left(Val::Percent(-8.0)),
         vertical: VerticalAnchor::Top(Val::Percent(5.0)),
         color: theme::colors::PASTEL_BLUE,
-        shape: MenuDecorationShape::Ellipse,
+        shape: UiShapeKind::Ellipse,
         radius: Val::Percent(50.0),
         phase: 0.0,
         amplitude: 12.0,
@@ -61,7 +61,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Right(Val::Percent(-5.0)),
         vertical: VerticalAnchor::Top(Val::Percent(-6.0)),
         color: theme::colors::PASTEL_PEACH,
-        shape: MenuDecorationShape::RoundedRectangle,
+        shape: UiShapeKind::RoundedRectangle,
         radius: Val::Px(72.0),
         phase: std::f32::consts::PI,
         amplitude: 14.0,
@@ -73,7 +73,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Left(Val::Percent(12.0)),
         vertical: VerticalAnchor::Bottom(Val::Percent(-12.0)),
         color: theme::colors::PASTEL_LAVENDER,
-        shape: MenuDecorationShape::RoundedRectangle,
+        shape: UiShapeKind::RoundedRectangle,
         radius: Val::Px(54.0),
         phase: 0.8,
         amplitude: 11.0,
@@ -85,7 +85,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Right(Val::Percent(-8.0)),
         vertical: VerticalAnchor::Bottom(Val::Percent(7.0)),
         color: theme::colors::PASTEL_MINT,
-        shape: MenuDecorationShape::Ellipse,
+        shape: UiShapeKind::Ellipse,
         radius: Val::Percent(50.0),
         phase: 2.4,
         amplitude: 13.0,
@@ -97,7 +97,7 @@ const DECORATIONS: [Decoration; 5] = [
         horizontal: HorizontalAnchor::Left(Val::Percent(-4.0)),
         vertical: VerticalAnchor::Top(Val::Percent(43.0)),
         color: theme::colors::PASTEL_PEACH,
-        shape: MenuDecorationShape::Ellipse,
+        shape: UiShapeKind::Ellipse,
         radius: Val::Percent(50.0),
         phase: 4.0,
         amplitude: 10.0,
@@ -145,7 +145,7 @@ fn decoration_bundle(decoration: Decoration, style: MenuBackgroundStyle) -> impl
             border_radius: BorderRadius::all(decoration.radius),
             ..default()
         },
-        MenuDecorationVisual::new(decoration.shape, decoration.color, style.opacity()),
+        UiShapeVisual::new(decoration.shape, decoration.color, style.opacity()),
         Pickable::IGNORE,
         FloatingMenuDecoration {
             phase: decoration.phase,

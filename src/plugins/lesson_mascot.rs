@@ -81,8 +81,8 @@ pub struct SkyBalloonLayout {
 impl Default for SkyBalloonLayout {
     fn default() -> Self {
         Self {
-            right: percent(8.0),
-            bottom: percent(47.0),
+            right: percent(6.0),
+            bottom: percent(37.0),
             root_width: Val::Auto,
             envelope_width: SKY_ENVELOPE_WIDTH,
             basket_width: SKY_BASKET_WIDTH,
@@ -116,7 +116,7 @@ const BOB_FREQUENCY: f32 = 0.8;
 /// Spawns the lesson mascot for the current [`ExplorationTheme`].
 ///
 /// Called during lesson play screen setup. The mascot is absolutely
-/// positioned on the background (middle-right, at the grass level) and
+/// positioned on the background (middle-right, at the meadow level) and
 /// must be spawned **before** the top bar and question container so that
 /// it renders behind them in z-order. The card's semi-transparent overlay
 /// lets the mascot show through.
@@ -147,7 +147,7 @@ pub fn create_sky_balloon_assets(materials: &mut Assets<BalloonUiMaterial>) -> S
 ///
 /// The balloon reuses the procedural cursor design in UI material nodes. It
 /// is absolutely positioned in the middle-right area of the background,
-/// resting on the painted grass. The envelope gently sways while the
+/// resting on the painted meadow. The envelope gently sways while the
 /// basket follows with a dephased pull.
 fn spawn_sky_balloon_mascot(
     parent: &mut ChildSpawnerCommands,

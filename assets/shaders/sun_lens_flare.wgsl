@@ -1,14 +1,14 @@
-struct SummaryLensFlareUniform {
+struct SunLensFlareUniform {
     source: vec4<f32>,
     cursor: vec4<f32>,
 }
 
-struct SummaryLensFlareInput {
+struct SunLensFlareInput {
     @location(0) uv: vec2<f32>,
     @location(4) @interpolate(flat) size: vec2<f32>,
 }
 
-@group(1) @binding(0) var<uniform> flare: SummaryLensFlareUniform;
+@group(1) @binding(0) var<uniform> flare: SunLensFlareUniform;
 
 fn lens_ghost(
     point: vec2<f32>,
@@ -37,7 +37,7 @@ fn over(top: vec4<f32>, bottom: vec4<f32>) -> vec4<f32> {
 }
 
 @fragment
-fn fragment(input: SummaryLensFlareInput) -> @location(0) vec4<f32> {
+fn fragment(input: SunLensFlareInput) -> @location(0) vec4<f32> {
     let source_radius = flare.source.z;
     if source_radius <= 0.0 {
         return vec4<f32>(0.0);

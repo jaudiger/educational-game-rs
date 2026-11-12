@@ -47,8 +47,8 @@ impl Plugin for SharedGamePlugin {
     fn build(&self, app: &mut App) {
         use crate::plugins::{
             BalloonMaterialPlugin, CloudMaterialPlugin, CursorMaterialPlugin, CustomCursorPlugin,
-            GameAudioPlugin, LessonMascotPlugin, MenuDecorationPlugin, SettingsPlugin,
-            SkyBackgroundPlugin,
+            GameAudioPlugin, LessonMascotPlugin, SceneryMaterialsPlugin, SettingsPlugin,
+            SkyBackgroundPlugin, SunMaterialPlugin, UiShapePlugin,
         };
         use crate::questions::{
             FractionComparisonPlugin, FractionIdentificationPlugin, FractionVisualizationPlugin,
@@ -65,6 +65,7 @@ impl Plugin for SharedGamePlugin {
         };
 
         app.add_plugins(BalloonMaterialPlugin)
+            .add_plugins((SceneryMaterialsPlugin, SunMaterialPlugin))
             .init_state::<AppState>()
             .add_computed_state::<InLessonFlow>()
             .add_computed_state::<ActiveLesson>()
@@ -78,7 +79,7 @@ impl Plugin for SharedGamePlugin {
                 FocusNavigationPlugin,
                 GameAudioPlugin,
                 LessonMascotPlugin,
-                MenuDecorationPlugin,
+                UiShapePlugin,
                 NavigationPlugin,
                 PointerInteractionPlugin,
                 ResponsiveLayoutPlugin,

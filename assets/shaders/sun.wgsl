@@ -4,17 +4,17 @@ struct Globals {
     frame_count: u32,
 }
 
-struct SummarySunUniform {
+struct SunUniform {
     glare: vec4<f32>,
     geometry: vec4<f32>,
 }
 
-struct SummarySunInput {
+struct SunInput {
     @location(0) uv: vec2<f32>,
 }
 
 @group(0) @binding(1) var<uniform> globals: Globals;
-@group(1) @binding(0) var<uniform> sun: SummarySunUniform;
+@group(1) @binding(0) var<uniform> sun: SunUniform;
 
 const TAU: f32 = 6.28318530718;
 
@@ -64,7 +64,7 @@ fn sparkle_coverage(
 }
 
 @fragment
-fn fragment(input: SummarySunInput) -> @location(0) vec4<f32> {
+fn fragment(input: SunInput) -> @location(0) vec4<f32> {
     let time = globals.time;
     let pulse = 1.0 + sin(time * 0.8) * 0.01;
     let point = (input.uv - vec2<f32>(0.5)) * 2.0 * sun.geometry.x / pulse;

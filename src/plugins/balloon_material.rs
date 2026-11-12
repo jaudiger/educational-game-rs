@@ -9,7 +9,7 @@ use bevy::sprite_render::{
 use bevy::ui_render::UiMaterialPlugin;
 use bevy::ui_render::ui_material::{UiMaterial, UiMaterialKey};
 
-const BALLOON_SHADER_PATH: &str = "shaders/procedural_balloon.wgsl";
+const BALLOON_SHADER_PATH: &str = "shaders/balloon.wgsl";
 
 pub struct BalloonMaterialPlugin;
 

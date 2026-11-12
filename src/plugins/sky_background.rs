@@ -13,7 +13,7 @@ use bevy::window::PrimaryWindow;
 use rand::RngExt;
 
 use crate::data::{ExplorationTheme, GameSettings};
-use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudMaterial};
+use crate::plugins::cloud_material::{CloudMaterial, CloudShapeId};
 use crate::states::AppState;
 
 /// Renders an animated sky background with parallax clouds.
@@ -172,7 +172,7 @@ fn setup_sky_background(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ProceduralCloudMaterial>>,
+    mut materials: ResMut<Assets<CloudMaterial>>,
     settings: Res<GameSettings>,
     window: Single<&Window, With<PrimaryWindow>>,
 ) {
@@ -232,7 +232,7 @@ fn setup_sky_background(
                     half_width: cloud_half_w,
                 },
                 Mesh2d(cloud_meshes[shape_index].clone()),
-                MeshMaterial2d(materials.add(ProceduralCloudMaterial::new(
+                MeshMaterial2d(materials.add(CloudMaterial::new(
                     shape_id,
                     canvas,
                     Color::srgba(1.0, 1.0, 1.0, layer.opacity),

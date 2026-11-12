@@ -9,15 +9,15 @@ use bevy::sprite_render::{
 use bevy::ui_render::UiMaterialPlugin;
 use bevy::ui_render::ui_material::{UiMaterial, UiMaterialKey};
 
-const CLOUD_SHADER_PATH: &str = "shaders/procedural_cloud.wgsl";
+const CLOUD_SHADER_PATH: &str = "shaders/cloud.wgsl";
 
 pub struct CloudMaterialPlugin;
 
 impl Plugin for CloudMaterialPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
-            Material2dPlugin::<ProceduralCloudMaterial>::default(),
-            UiMaterialPlugin::<ProceduralCloudUiMaterial>::default(),
+            Material2dPlugin::<CloudMaterial>::default(),
+            UiMaterialPlugin::<CloudUiMaterial>::default(),
         ));
     }
 }
@@ -53,18 +53,18 @@ struct CloudUniform {
 }
 
 #[derive(Asset, AsBindGroup, Clone, Reflect)]
-pub struct ProceduralCloudMaterial {
+pub struct CloudMaterial {
     #[uniform(0)]
     uniform: CloudUniform,
 }
 
 #[derive(Asset, AsBindGroup, Clone, Reflect)]
-pub struct ProceduralCloudUiMaterial {
+pub struct CloudUiMaterial {
     #[uniform(0)]
     uniform: CloudUniform,
 }
 
-impl ProceduralCloudMaterial {
+impl CloudMaterial {
     pub fn new(shape_id: CloudShapeId, canvas: Vec2, color: Color) -> Self {
         Self {
             uniform: CloudUniform {
@@ -81,7 +81,7 @@ impl ProceduralCloudMaterial {
     }
 }
 
-impl Material2d for ProceduralCloudMaterial {
+impl Material2d for CloudMaterial {
     fn fragment_shader() -> ShaderRef {
         CLOUD_SHADER_PATH.into()
     }
@@ -101,7 +101,7 @@ impl Material2d for ProceduralCloudMaterial {
     }
 }
 
-impl ProceduralCloudUiMaterial {
+impl CloudUiMaterial {
     pub fn new(shape_id: CloudShapeId, color: Color) -> Self {
         Self {
             uniform: CloudUniform {
@@ -114,7 +114,7 @@ impl ProceduralCloudUiMaterial {
     }
 }
 
-impl UiMaterial for ProceduralCloudUiMaterial {
+impl UiMaterial for CloudUiMaterial {
     fn fragment_shader() -> ShaderRef {
         CLOUD_SHADER_PATH.into()
     }

@@ -7,19 +7,17 @@ use bevy::window::PrimaryWindow;
 use crate::data::LessonScore;
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::balloon_material::BalloonUiMaterial;
-use crate::plugins::cloud_material::{CloudShapeId, ProceduralCloudUiMaterial};
+use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
 use crate::plugins::lesson_mascot::{
     SkyBalloonAssets, SkyBalloonLayout, create_sky_balloon_assets, sky_balloon_scene,
 };
+use crate::plugins::sun_material::{SunLensFlareMaterial, SunMaterial};
 use crate::states::AppState;
 use crate::ui::components::{save_write_failure_notice, standard_button};
 use crate::ui::theme;
 
 use super::flow::{SummaryPhase, SummaryScreen};
-use super::theme::{
-    SummaryLensFlareMaterial, SummarySunMaterial, SummaryThemeStyle, summary_backdrop,
-    summary_curtain, summary_lens_flare,
-};
+use super::theme::{SummaryThemeStyle, summary_backdrop, summary_curtain, summary_lens_flare};
 use super::{LessonSummaryPresentation, SummaryBalloon};
 
 #[derive(Component, Reflect)]
@@ -41,9 +39,9 @@ struct SummaryCardPresentation {
 
 #[derive(SystemParam)]
 pub(super) struct SummaryMaterials<'w> {
-    clouds: ResMut<'w, Assets<ProceduralCloudUiMaterial>>,
-    sun: ResMut<'w, Assets<SummarySunMaterial>>,
-    flare: ResMut<'w, Assets<SummaryLensFlareMaterial>>,
+    clouds: ResMut<'w, Assets<CloudUiMaterial>>,
+    sun: ResMut<'w, Assets<SunMaterial>>,
+    flare: ResMut<'w, Assets<SunLensFlareMaterial>>,
     balloon: ResMut<'w, Assets<BalloonUiMaterial>>,
 }
 
@@ -70,12 +68,11 @@ pub(super) fn setup_lesson_summary(
         _ => theme::colors::SECONDARY,
     };
     let style = SummaryThemeStyle::sky();
-    let cloud_material = materials.clouds.add(ProceduralCloudUiMaterial::new(
-        CloudShapeId::Puffy,
-        Color::WHITE,
-    ));
-    let sun_material = materials.sun.add(SummarySunMaterial::new());
-    let flare_material = materials.flare.add(SummaryLensFlareMaterial::new());
+    let cloud_material = materials
+        .clouds
+        .add(CloudUiMaterial::new(CloudShapeId::Puffy, Color::WHITE));
+    let sun_material = materials.sun.add(super::theme::create_sun_material());
+    let flare_material = materials.flare.add(SunLensFlareMaterial::new());
     let balloon_assets: SkyBalloonAssets = create_sky_balloon_assets(&mut materials.balloon);
     let balloon_layout = SkyBalloonLayout {
         right: percent(1.0),
