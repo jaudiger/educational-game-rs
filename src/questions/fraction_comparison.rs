@@ -141,16 +141,14 @@ fn spawn_choice_buttons(
     i18n: &I18n,
     window: Entity,
 ) {
+    let equal_label = i18n.t(&TranslationKey::EqualAmount);
     super::spawn_choice_grid(parent, 3, |cell, index| {
         let (label, answer) = match index {
-            0 => (name_a.to_owned(), ComparisonAnswer::A),
-            1 => (name_b.to_owned(), ComparisonAnswer::B),
-            _ => (
-                i18n.t(&TranslationKey::EqualAmount).into_owned(),
-                ComparisonAnswer::Equal,
-            ),
+            0 => (name_a, ComparisonAnswer::A),
+            1 => (name_b, ComparisonAnswer::B),
+            _ => (equal_label.as_ref(), ComparisonAnswer::Equal),
         };
-        let mut command = cell.spawn(comparison_button(&label, answer, window));
+        let mut command = cell.spawn(comparison_button(label, answer, window));
         if index == 0 {
             command.insert(AutoFocus);
         }

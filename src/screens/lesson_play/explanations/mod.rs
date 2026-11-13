@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
@@ -21,11 +23,11 @@ use self::renderer::spawn_explanation_text;
 
 mod renderer;
 
-enum FeedbackExplanation {
+enum FeedbackExplanation<'a> {
     Hidden,
     Visible {
-        text: LocalizedExplanation,
-        visual: Option<ExplanationVisual>,
+        text: &'a LocalizedExplanation,
+        visual: Option<Cow<'a, ExplanationVisual>>,
     },
 }
 
@@ -108,11 +110,11 @@ pub(super) fn setup_feedback_ui(
     });
 }
 
-fn build_feedback_explanation(
+fn build_feedback_explanation<'a>(
     show_explanation: bool,
-    definition: &QuestionInstance,
+    definition: &'a QuestionInstance,
     response: &QuestionResponse,
-) -> FeedbackExplanation {
+) -> FeedbackExplanation<'a> {
     let text = localized_explanation(definition);
     for issue in text.validation_issues() {
         bevy::log::warn!("Invalid localized explanation: {issue}");
@@ -126,31 +128,31 @@ fn build_feedback_explanation(
     }
 }
 
-fn localized_explanation(definition: &QuestionInstance) -> LocalizedExplanation {
+const fn localized_explanation(definition: &QuestionInstance) -> &LocalizedExplanation {
     match definition {
-        QuestionInstance::Mcq(d) => d.explanation.clone(),
-        QuestionInstance::FractionVisualization(d) => d.explanation.clone(),
-        QuestionInstance::FractionComparison(d) => d.explanation.clone(),
-        QuestionInstance::FractionIdentification(d) => d.definition.explanation.clone(),
-        QuestionInstance::NumericInput(d) => d.explanation.clone(),
+        QuestionInstance::Mcq(d) => &d.explanation,
+        QuestionInstance::FractionVisualization(d) => &d.explanation,
+        QuestionInstance::FractionComparison(d) => &d.explanation,
+        QuestionInstance::FractionIdentification(d) => &d.definition.explanation,
+        QuestionInstance::NumericInput(d) => &d.explanation,
     }
 }
 
-fn explanation_visual(
-    definition: &QuestionInstance,
+fn explanation_visual<'a>(
+    definition: &'a QuestionInstance,
     response: &QuestionResponse,
-) -> Option<ExplanationVisual> {
+) -> Option<Cow<'a, ExplanationVisual>> {
     match definition {
-        QuestionInstance::Mcq(d) => d.explanation_visual.clone(),
-        QuestionInstance::FractionComparison(d) => d.explanation_visual.clone(),
-        QuestionInstance::FractionIdentification(d) => Some(d.explanation_visual()),
+        QuestionInstance::Mcq(d) => d.explanation_visual.as_ref().map(Cow::Borrowed),
+        QuestionInstance::FractionComparison(d) => d.explanation_visual.as_ref().map(Cow::Borrowed),
+        QuestionInstance::FractionIdentification(d) => Some(Cow::Owned(d.explanation_visual())),
         QuestionInstance::FractionVisualization(d) => match response {
             QuestionResponse::FractionVisualization { colored_parts } => {
-                Some(d.feedback_visual(colored_parts.clone()))
+                Some(Cow::Owned(d.feedback_visual(colored_parts.clone())))
             }
             _ => None,
         },
-        QuestionInstance::NumericInput(d) => d.explanation_visual.clone(),
+        QuestionInstance::NumericInput(d) => d.explanation_visual.as_ref().map(Cow::Borrowed),
     }
 }
 
@@ -159,7 +161,7 @@ fn spawn_feedback_content(
     i18n: &I18n,
     is_correct: bool,
     presentation: &FeedbackPresentation,
-    explanation: &FeedbackExplanation,
+    explanation: &FeedbackExplanation<'_>,
     window: Entity,
     images: &mut Assets<Image>,
 ) {
@@ -199,7 +201,7 @@ fn spawn_feedback_content(
 fn spawn_explanation_section(
     parent: &mut ChildSpawnerCommands,
     i18n: &I18n,
-    explanation: &FeedbackExplanation,
+    explanation: &FeedbackExplanation<'_>,
     is_correct: bool,
     window: Entity,
     images: &mut Assets<Image>,

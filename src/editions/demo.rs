@@ -94,9 +94,12 @@ fn prepare_demo_themes(
                 id: theme.id.clone(),
                 available: theme.available,
                 title_text: theme.title.get(i18n.language).to_owned(),
-                coming_soon_text: i18n
-                    .t(&crate::i18n::TranslationKey::ComingSoon)
-                    .into_owned(),
+                coming_soon_text: if theme.available {
+                    String::new()
+                } else {
+                    i18n.t(&crate::i18n::TranslationKey::ComingSoon)
+                        .into_owned()
+                },
                 progress_text: None,
                 track_progress: false,
             })
@@ -114,6 +117,7 @@ fn prepare_demo_theme_lessons(
         *presentation = ThemeLessonsPresentation::default();
         return;
     };
+    let actions = lesson_launch_actions(&i18n);
     *presentation = ThemeLessonsPresentation {
         available: true,
         title: theme.title.get(i18n.language).to_owned(),
@@ -128,7 +132,7 @@ fn prepare_demo_theme_lessons(
                 title_text: lesson.title.get(i18n.language).to_owned(),
                 best_percent_text: None,
                 track_progress: false,
-                actions: lesson_launch_actions(&i18n).into(),
+                actions: actions.to_vec(),
             })
             .collect(),
     };

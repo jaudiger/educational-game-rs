@@ -48,8 +48,8 @@ pub(super) fn handle_slice_toggle(
     mut images: ResMut<Assets<Image>>,
     mut selection: ResMut<FractionVisualizationSelection>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    for entity in activated_entities {
+    for event in activations.read() {
+        let entity = event.0;
         if let Ok((slice, mut style)) = slice_query.get_mut(entity) {
             let Some(colored) = selection.0.toggle(slice.index) else {
                 continue;
@@ -92,16 +92,16 @@ pub(super) fn handle_validate(
     mut responses: MessageWriter<QuestionResponseSubmitted>,
     selection: Res<FractionVisualizationSelection>,
 ) {
-    for entity in activations.read().map(|event| event.0) {
-        if !validate_query.contains(entity) {
-            continue;
-        }
+    let should_submit = activations
+        .read()
+        .any(|event| validate_query.contains(event.0));
+    activations.clear();
+    if should_submit {
         submit_response(
             &mut responses,
             QuestionResponse::FractionVisualization {
                 colored_parts: selection.0.clone(),
             },
         );
-        return;
     }
 }

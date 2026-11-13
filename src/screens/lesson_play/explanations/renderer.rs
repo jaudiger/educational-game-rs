@@ -11,7 +11,7 @@ use crate::ui::theme;
 use super::super::visuals::PV_ZERO_COLOR;
 
 enum Segment<'a> {
-    Text(String),
+    Text(&'a str),
     Value(&'a ExplanationValue),
 }
 
@@ -23,6 +23,10 @@ pub(super) fn spawn_explanation_text(
     window: Entity,
 ) {
     let text = explanation.text.get(language);
+    if explanation.placeholders.is_empty() || !text.contains('{') {
+        spawn_response_text(parent, text, font_size, theme::colors::TEXT_DARK, window);
+        return;
+    }
     let mut segments = parse_segments(text, &explanation.placeholders);
     if !segments
         .iter()
@@ -54,10 +58,9 @@ pub(super) fn spawn_explanation_text(
                             spawn_words(row, text, font_size, window);
                         }
                         Segment::Value(value) => {
-                            let value = (*value).clone();
                             let (leading, trailing) = &punctuation[index];
                             if leading.is_empty() && trailing.is_empty() {
-                                spawn_value(row, &value, language, font_size, window);
+                                spawn_value(row, value, language, font_size, window);
                             } else {
                                 row.spawn(Node {
                                     flex_direction: FlexDirection::Row,
@@ -75,7 +78,7 @@ pub(super) fn spawn_explanation_text(
                                             window,
                                         );
                                     }
-                                    spawn_value(group, &value, language, font_size, window);
+                                    spawn_value(group, value, language, font_size, window);
                                     if !trailing.is_empty() {
                                         spawn_text(
                                             group,
@@ -95,16 +98,19 @@ pub(super) fn spawn_explanation_text(
     });
 }
 
-fn parse_segments<'a>(text: &str, placeholders: &'a [ExplanationPlaceholder]) -> Vec<Segment<'a>> {
+fn parse_segments<'a>(
+    text: &'a str,
+    placeholders: &'a [ExplanationPlaceholder],
+) -> Vec<Segment<'a>> {
     let mut segments = Vec::new();
     let mut rest = text;
     while let Some(open) = rest.find('{') {
         if open > 0 {
-            segments.push(Segment::Text(rest[..open].to_owned()));
+            segments.push(Segment::Text(&rest[..open]));
         }
         let tail = &rest[open + 1..];
         let Some(close) = tail.find('}') else {
-            segments.push(Segment::Text(rest[open..].to_owned()));
+            segments.push(Segment::Text(&rest[open..]));
             return segments;
         };
         let name = &tail[..close];
@@ -114,12 +120,12 @@ fn parse_segments<'a>(text: &str, placeholders: &'a [ExplanationPlaceholder]) ->
         {
             segments.push(Segment::Value(&placeholder.value));
         } else {
-            segments.push(Segment::Text(rest[open..open + close + 2].to_owned()));
+            segments.push(Segment::Text(&rest[open..open + close + 2]));
         }
         rest = &tail[close + 1..];
     }
     if !rest.is_empty() {
-        segments.push(Segment::Text(rest.to_owned()));
+        segments.push(Segment::Text(rest));
     }
     segments
 }
@@ -212,8 +218,8 @@ const fn role_color(role: ExplanationColorRole) -> Color {
     }
 }
 
-fn attach_value_punctuation(segments: &mut [Segment<'_>]) -> Vec<(String, String)> {
-    let mut punctuation = vec![(String::new(), String::new()); segments.len()];
+fn attach_value_punctuation<'a>(segments: &mut [Segment<'a>]) -> Vec<(&'a str, &'a str)> {
+    let mut punctuation = vec![("", ""); segments.len()];
     for (index, attachment) in punctuation.iter_mut().enumerate() {
         if matches!(segments.get(index), Some(Segment::Value(_))) {
             *attachment = (
@@ -225,12 +231,12 @@ fn attach_value_punctuation(segments: &mut [Segment<'_>]) -> Vec<(String, String
     punctuation
 }
 
-fn take_trailing_punctuation(segments: &mut [Segment<'_>], index: usize) -> String {
+fn take_trailing_punctuation<'a>(segments: &mut [Segment<'a>], index: usize) -> &'a str {
     let Some(Segment::Text(text)) = index
         .checked_sub(1)
         .and_then(|previous| segments.get_mut(previous))
     else {
-        return String::new();
+        return "";
     };
     let length = text
         .chars()
@@ -238,19 +244,23 @@ fn take_trailing_punctuation(segments: &mut [Segment<'_>], index: usize) -> Stri
         .take_while(|character| is_explanation_punctuation(*character))
         .map(char::len_utf8)
         .sum::<usize>();
-    text.drain(text.len() - length..).collect()
+    let (body, punctuation) = text.split_at(text.len() - length);
+    *text = body;
+    punctuation
 }
 
-fn take_leading_punctuation(segments: &mut [Segment<'_>], index: usize) -> String {
+fn take_leading_punctuation<'a>(segments: &mut [Segment<'a>], index: usize) -> &'a str {
     let Some(Segment::Text(text)) = segments.get_mut(index) else {
-        return String::new();
+        return "";
     };
     let length = text
         .chars()
         .take_while(|character| is_explanation_punctuation(*character))
         .map(char::len_utf8)
         .sum::<usize>();
-    text.drain(..length).collect()
+    let (punctuation, body) = text.split_at(length);
+    *text = body;
+    punctuation
 }
 
 fn is_valid_placeholder_name(name: &str) -> bool {

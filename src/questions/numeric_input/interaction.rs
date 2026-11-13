@@ -23,9 +23,10 @@ pub(super) fn handle_numeric_input(
     mut display_query: Query<&mut Text, With<KeypadDisplay>>,
     mut responses: MessageWriter<QuestionResponseSubmitted>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let mut value_changed = false;
-    for entity in activated_entities {
+    let mut response = None;
+    for event in activations.read() {
+        let entity = event.0;
         if let Ok(digit_btn) = digit_query.get(entity) {
             value_changed |= append_digit(&mut state.value, digit_btn.0);
         } else if delete_query.contains(entity) {
@@ -34,11 +35,16 @@ pub(super) fn handle_numeric_input(
             let Ok(typed) = state.value.parse::<u32>() else {
                 continue;
             };
-            submit_response(&mut responses, QuestionResponse::NumericInput(typed));
-            return;
+            response = Some(QuestionResponse::NumericInput(typed));
+            break;
         }
     }
+    activations.clear();
 
+    if let Some(response) = response {
+        submit_response(&mut responses, response);
+        return;
+    }
     if value_changed {
         for mut text in &mut display_query {
             (**text).clone_from(&state.value);

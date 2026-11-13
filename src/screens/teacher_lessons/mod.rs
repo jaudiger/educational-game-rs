@@ -124,6 +124,7 @@ fn rebuild_lessons_ui(
     let TeacherView::Lessons = &state.view else {
         return;
     };
+    let show_config_controls = *resources.app_state.get() == AppState::ThemeExploration;
     let tree_specs = tree::build_tree_specs(
         &resources.content.themes,
         &ts.ctx.save_data,
@@ -131,7 +132,7 @@ fn rebuild_lessons_ui(
         ts.i18n.language,
         &resources.themes,
         &resources.lessons,
-        &resources.exercise_groups,
+        show_config_controls.then_some(&resources.exercise_groups),
     );
     spawn_lesson_tree_root(
         &mut commands,
@@ -141,7 +142,7 @@ fn rebuild_lessons_ui(
             language: ts.i18n.language,
             status: *resources.status,
             active_tab: state.view.tab(),
-            show_config_controls: *resources.app_state.get() == AppState::ThemeExploration,
+            show_config_controls,
             scroll_position,
             tree_specs,
         },

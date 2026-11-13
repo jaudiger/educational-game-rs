@@ -12,15 +12,14 @@ pub(super) fn handle_comparison_click(
     query: Query<&ComparisonChoice>,
     mut responses: MessageWriter<QuestionResponseSubmitted>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    for entity in activated_entities {
-        let Ok(choice) = query.get(entity) else {
-            continue;
-        };
-        submit_response(
-            &mut responses,
-            QuestionResponse::FractionComparison(choice.answer),
-        );
-        return;
+    let response = activations.read().find_map(|event| {
+        query
+            .get(event.0)
+            .ok()
+            .map(|choice| QuestionResponse::FractionComparison(choice.answer))
+    });
+    activations.clear();
+    if let Some(response) = response {
+        submit_response(&mut responses, response);
     }
 }

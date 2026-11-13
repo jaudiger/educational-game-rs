@@ -206,12 +206,25 @@ fn setup_sky_background(
         meshes.add(Rectangle::new(canvas.x, canvas.y))
     });
 
+    let cloud_materials = CLOUD_LAYERS
+        .iter()
+        .map(|layer| {
+            CloudShapeId::ALL.map(|shape_id| {
+                materials.add(CloudMaterial::new(
+                    shape_id,
+                    shape_id.canvas(),
+                    Color::srgba(1.0, 1.0, 1.0, layer.opacity),
+                ))
+            })
+        })
+        .collect::<Vec<_>>();
+
     // --- Spawn cloud sprites across parallax layers ---
     let mut rng = rand::rng();
     let half_w = win_w / 2.0;
     let half_h = win_h / 2.0;
 
-    for layer in CLOUD_LAYERS {
+    for (layer_index, layer) in CLOUD_LAYERS.iter().enumerate() {
         for _ in 0..layer.count {
             let shape_index = rng.random_range(0..CloudShapeId::ALL.len());
             let shape_id = CloudShapeId::ALL[shape_index];
@@ -232,11 +245,7 @@ fn setup_sky_background(
                     half_width: cloud_half_w,
                 },
                 Mesh2d(cloud_meshes[shape_index].clone()),
-                MeshMaterial2d(materials.add(CloudMaterial::new(
-                    shape_id,
-                    canvas,
-                    Color::srgba(1.0, 1.0, 1.0, layer.opacity),
-                ))),
+                MeshMaterial2d(cloud_materials[layer_index][shape_index].clone()),
                 Transform::from_xyz(x, y, layer.z).with_scale(Vec3::splat(scale)),
                 DespawnOnExit(AppState::ThemeExploration),
             ));
@@ -261,9 +270,15 @@ fn resize_gradient_to_viewport(
     let win_w = window.width();
     let win_h = window.height();
 
+    let scale_x = win_w / 2.0;
+    let scale_y = win_h / grad_h;
     for mut transform in &mut gradient {
-        transform.scale.x = win_w / 2.0;
-        transform.scale.y = win_h / grad_h;
+        if transform.scale.x.to_bits() != scale_x.to_bits() {
+            transform.scale.x = scale_x;
+        }
+        if transform.scale.y.to_bits() != scale_y.to_bits() {
+            transform.scale.y = scale_y;
+        }
     }
 }
 

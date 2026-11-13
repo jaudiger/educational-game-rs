@@ -35,6 +35,8 @@ fn equalize_choice_button_widths(
     children: Query<&Children>,
     text_layouts: Query<(&Text, &TextLayoutInfo)>,
     mut buttons: Query<(&ComputedNode, &mut Node), With<EqualChoiceWidthButton>>,
+    mut choices: Local<Vec<Entity>>,
+    mut pending: Local<Vec<Entity>>,
 ) {
     for (rows, target, computed_group, mut group) in &mut groups {
         let logical_vmin = target.logical_size().min_element();
@@ -48,11 +50,11 @@ fn equalize_choice_button_widths(
             continue;
         }
 
-        let choices = choice_buttons(rows, &children);
+        choice_buttons(rows, &children, &mut choices);
         if choices.is_empty()
-            || !choices
-                .iter()
-                .all(|button| choice_text_layout_ready(*button, &children, &text_layouts))
+            || !choices.iter().all(|button| {
+                choice_text_layout_ready(*button, &children, &text_layouts, &mut pending)
+            })
         {
             continue;
         }
@@ -92,21 +94,28 @@ fn equalize_choice_button_widths(
     }
 }
 
-fn choice_buttons(rows: &Children, children: &Query<&Children>) -> Vec<Entity> {
-    rows.iter()
-        .filter_map(|row| children.get(row).ok())
-        .flat_map(Children::iter)
-        .filter_map(|cell| children.get(cell).ok())
-        .flat_map(Children::iter)
-        .collect()
+fn choice_buttons(rows: &Children, children: &Query<&Children>, choices: &mut Vec<Entity>) {
+    choices.clear();
+    for row in rows.iter() {
+        let Ok(cells) = children.get(row) else {
+            continue;
+        };
+        for cell in cells.iter() {
+            if let Ok(buttons) = children.get(cell) {
+                choices.extend(buttons.iter());
+            }
+        }
+    }
 }
 
 fn choice_text_layout_ready(
     button: Entity,
     children: &Query<&Children>,
     text_layouts: &Query<(&Text, &TextLayoutInfo)>,
+    pending: &mut Vec<Entity>,
 ) -> bool {
-    let mut pending = vec![button];
+    pending.clear();
+    pending.push(button);
     let mut found_text = false;
 
     while let Some(entity) = pending.pop() {

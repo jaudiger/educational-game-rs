@@ -74,8 +74,7 @@ fn record_persisted_answer(
         return;
     };
 
-    let lesson_id = lesson_id.to_owned();
-    let exercise_id = question.exercise_id.clone();
+    let exercise_id = question.exercise_id.as_str();
     let slot_index = player_session.slot_index;
     let is_correct = matches!(last_answer, AnswerResult::Correct);
 
@@ -88,8 +87,8 @@ fn record_persisted_answer(
         apply_answer(
             data,
             target,
-            &lesson_id,
-            &exercise_id,
+            lesson_id,
+            exercise_id,
             is_correct,
             answered_at.as_secs(),
         )

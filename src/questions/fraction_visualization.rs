@@ -64,8 +64,6 @@ fn spawn_fraction_vis_ui(
         return;
     };
     let parts = FractionParts::uncolored(def.denominator);
-    commands.insert_resource(FractionVisualizationSelection(parts.clone()));
-
     commands.entity(*container).with_children(|parent| {
         parent
             .spawn((FractionVisualizationRoot, QuestionRoot))
@@ -102,6 +100,7 @@ fn spawn_fraction_vis_ui(
                 });
             });
     });
+    commands.insert_resource(FractionVisualizationSelection(parts));
 }
 
 fn spawn_validate_button(parent: &mut ChildSpawnerCommands, i18n: &I18n, window: Entity) {

@@ -52,9 +52,8 @@ fn spawn_numeric_input_ui(
         return;
     };
 
-    let prompt_text = def.prompt.get(i18n.language).to_owned();
+    let prompt_text = def.prompt.get(i18n.language);
     let hide_visual = question.hide_optional_visual;
-    let question_visual = def.question_visual.clone();
 
     commands.entity(*container).with_children(|parent| {
         parent
@@ -67,10 +66,10 @@ fn spawn_numeric_input_ui(
             ))
             .with_children(|root| {
                 super::spawn_question_card(root, |card| {
-                    super::spawn_question_prompt(card, &prompt_text, window);
+                    super::spawn_question_prompt(card, prompt_text, window);
                     if !hide_visual
                         && let Some(QuestionVisual::MultiplicationGrid { rows, cols }) =
-                            &question_visual
+                            def.question_visual.as_ref()
                     {
                         super::spawn_question_visuals(
                             card,

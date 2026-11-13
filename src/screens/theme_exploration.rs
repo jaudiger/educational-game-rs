@@ -265,10 +265,7 @@ pub fn setup_themes(
     }
 
     let window = *primary_window;
-    let title = presentation.title.clone();
-    let back_label = presentation.back_label.clone();
-    let notice = presentation.notice.clone();
-    let themes = presentation.themes.clone();
+    let themes = &presentation.themes;
     let back_destination = presentation.back_destination;
     let card_style = ExplorationCardStyle::for_exploration_theme(settings.exploration_theme);
 
@@ -281,7 +278,7 @@ pub fn setup_themes(
     ));
     root.with_children(|parent| {
         let mut title_cmd = parent.spawn((
-            Text::new(title),
+            Text::new(presentation.title.as_str()),
             theme::typography::text(theme::fonts::TITLE, window),
             TextColor(theme::colors::TEXT_DARK),
         ));
@@ -291,7 +288,10 @@ pub fn setup_themes(
                 offset: Vec2::new(0.0, 2.0),
             });
         }
-        parent.spawn(inline_exploration_notice(notice, window));
+        parent.spawn(inline_exploration_notice(
+            presentation.notice.as_deref(),
+            window,
+        ));
         layout::spawn_collection(
             parent,
             themes.len(),
@@ -309,7 +309,7 @@ pub fn setup_themes(
         );
         parent.spawn((
             standard_button(
-                &back_label,
+                &presentation.back_label,
                 theme::button_styles::BACK,
                 theme::scaled(theme::sizes::BUTTON_WIDTH),
                 window,
@@ -323,7 +323,7 @@ pub fn setup_themes(
     }
 }
 
-fn inline_exploration_notice(notice: Option<String>, window: Entity) -> impl Bundle + use<> {
+fn inline_exploration_notice(notice: Option<&str>, window: Entity) -> impl Bundle + use<> {
     let display = if notice.is_some() {
         Display::Flex
     } else {
@@ -545,11 +545,11 @@ fn spawn_theme_button(
             });
         }
         if data.available && data.track_progress {
-            let progress_text = data.progress_text.clone().unwrap_or_default();
+            let progress_text = data.progress_text.as_deref().unwrap_or_default();
             let visible = !progress_text.is_empty();
             contents.spawn((
                 card_text(
-                    &progress_text,
+                    progress_text,
                     theme::fonts::SMALL,
                     theme::colors::TEXT_DARK,
                     window,
@@ -608,10 +608,7 @@ pub fn setup_theme_lessons(
     }
 
     let window = *primary_window;
-    let title = presentation.title.clone();
-    let back_label = presentation.back_label.clone();
-    let notice = presentation.notice.clone();
-    let lessons = presentation.lessons.clone();
+    let lessons = &presentation.lessons;
     let clear_launch_context = presentation.clear_launch_context;
     let card_style = ExplorationCardStyle::for_exploration_theme(settings.exploration_theme);
     let mut root = commands.spawn((
@@ -623,7 +620,7 @@ pub fn setup_theme_lessons(
     ));
     root.with_children(|parent| {
         let mut title_cmd = parent.spawn((
-            Text::new(title),
+            Text::new(presentation.title.as_str()),
             theme::typography::text(theme::fonts::TITLE, window),
             TextColor(theme::colors::TEXT_DARK),
         ));
@@ -633,7 +630,10 @@ pub fn setup_theme_lessons(
                 offset: Vec2::new(0.0, 2.0),
             });
         }
-        parent.spawn(inline_exploration_notice(notice, window));
+        parent.spawn(inline_exploration_notice(
+            presentation.notice.as_deref(),
+            window,
+        ));
         layout::spawn_collection(
             parent,
             lessons.len(),
@@ -651,7 +651,7 @@ pub fn setup_theme_lessons(
         );
         parent.spawn((
             standard_button(
-                &back_label,
+                &presentation.back_label,
                 theme::button_styles::BACK,
                 theme::scaled(theme::sizes::BUTTON_WIDTH),
                 window,
@@ -747,11 +747,11 @@ fn spawn_lesson_heading(
         });
     }
     if data.track_progress {
-        let progress = data.best_percent_text.clone().unwrap_or_default();
+        let progress = data.best_percent_text.as_deref().unwrap_or_default();
         let visible = !progress.is_empty();
         contents.spawn((
             card_text(
-                &progress,
+                progress,
                 theme::fonts::SMALL,
                 theme::colors::TEXT_DARK,
                 window,

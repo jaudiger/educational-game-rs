@@ -211,7 +211,10 @@ fn animate_lesson_cursor_system(
         {
             animation.click_timer = None;
         }
-        transform.scale = Vec3::splat(hover_scale + click_growth);
+        let scale = Vec3::splat(hover_scale + click_growth);
+        if transform.scale != scale {
+            transform.scale = scale;
+        }
     }
 }
 

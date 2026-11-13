@@ -169,24 +169,17 @@ fn spawn_rich_text(
     window: Entity,
     alignment: TextBlockAlignment,
 ) {
+    if !text.contains('/') {
+        spawn_plain_text(parent, text, font_size, text_color, window, alignment);
+        return;
+    }
     let segments = parse_fraction_segments(text);
     let has_fraction = segments
         .iter()
         .any(|segment| matches!(segment, TextSegment::Fraction(_, _)));
 
     if !has_fraction {
-        spawn_text_block(parent, |block| {
-            block.spawn((
-                Text::new(text),
-                Node {
-                    width: theme::layout::FILL_PARENT,
-                    ..default()
-                },
-                theme::typography::text(font_size, window),
-                TextColor(text_color),
-                TextLayout::justify(alignment.text_justify()),
-            ));
-        });
+        spawn_plain_text(parent, text, font_size, text_color, window, alignment);
         return;
     }
 
@@ -212,11 +205,33 @@ fn spawn_rich_text(
 
 /// If the segment after `current` is a Plain segment whose first word is
 /// trailing punctuation, return that word.
-fn find_trailing_punct(segments: &[TextSegment], current: usize) -> Option<String> {
+fn spawn_plain_text(
+    parent: &mut ChildSpawnerCommands,
+    text: &str,
+    font_size: f32,
+    text_color: Color,
+    window: Entity,
+    alignment: TextBlockAlignment,
+) {
+    spawn_text_block(parent, |block| {
+        block.spawn((
+            Text::new(text),
+            Node {
+                width: theme::layout::FILL_PARENT,
+                ..default()
+            },
+            theme::typography::text(font_size, window),
+            TextColor(text_color),
+            TextLayout::justify(alignment.text_justify()),
+        ));
+    });
+}
+
+fn find_trailing_punct(segments: &[TextSegment], current: usize) -> Option<&str> {
     if let Some(TextSegment::Plain(s)) = segments.get(current + 1) {
         let word = s.split_whitespace().next()?;
         if is_trailing_punctuation(word) {
-            return Some(word.to_owned());
+            return Some(word);
         }
     }
     None
@@ -300,7 +315,7 @@ fn spawn_segments(
                 if let Some(punct) = find_trailing_punct(segments, i) {
                     skip_first_word = true;
                     spawn_fraction_with_punct(
-                        row, *n, *d, &punct, font_size, text_color, window, gap,
+                        row, *n, *d, punct, font_size, text_color, window, gap,
                     );
                 } else {
                     row.spawn(stacked_fraction(

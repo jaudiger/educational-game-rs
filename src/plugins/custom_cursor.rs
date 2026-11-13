@@ -187,21 +187,25 @@ fn follow_pointer_system(
 
     let cursor_position = touch_state.cursor_position(mouse_moved, window.cursor_position());
     if !window.focused {
-        *visibility = Visibility::Hidden;
+        visibility.set_if_neq(Visibility::Hidden);
         return;
     }
 
     let Some(cursor_position) = cursor_position else {
-        *visibility = Visibility::Hidden;
+        visibility.set_if_neq(Visibility::Hidden);
         return;
     };
-    *visibility = Visibility::Visible;
+    visibility.set_if_neq(Visibility::Visible);
 
     let (camera, camera_transform) = *camera_data;
     let Ok(world_pos) = camera.viewport_to_world_2d(camera_transform, cursor_position) else {
         return;
     };
 
-    transform.translation.x = world_pos.x;
-    transform.translation.y = world_pos.y;
+    if transform.translation.x.to_bits() != world_pos.x.to_bits() {
+        transform.translation.x = world_pos.x;
+    }
+    if transform.translation.y.to_bits() != world_pos.y.to_bits() {
+        transform.translation.y = world_pos.y;
+    }
 }

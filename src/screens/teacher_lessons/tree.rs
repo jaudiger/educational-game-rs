@@ -110,7 +110,7 @@ pub(super) fn build_tree_specs(
     language: Language,
     theme_disclosures: &ThemeDisclosureState,
     lesson_disclosures: &LessonDisclosureState,
-    exercise_disclosures: &ExerciseGroupDisclosureState,
+    exercise_disclosures: Option<&ExerciseGroupDisclosureState>,
 ) -> Vec<ThemeTreeSpec> {
     let class_save = session
         .and_then(|player_session| save_data.class_slots.get(player_session.slot_index))
@@ -127,19 +127,31 @@ pub(super) fn build_tree_specs(
                     .map(|lesson| {
                         let existing_config =
                             class_save.and_then(|save| save.lesson_configs.get(&lesson.id));
-                        let exercises =
-                            config::build_exercise_configs(lesson, language, existing_config);
+                        let (has_custom_config, groups) = exercise_disclosures.map_or_else(
+                            || (false, Vec::new()),
+                            |exercise_disclosures| {
+                                let exercises = config::build_exercise_configs(
+                                    lesson,
+                                    language,
+                                    existing_config,
+                                );
+                                (
+                                    lesson_has_custom_config(lesson, existing_config),
+                                    config::build_exercise_groups(
+                                        &lesson.id,
+                                        exercises,
+                                        &i18n,
+                                        exercise_disclosures,
+                                    ),
+                                )
+                            },
+                        );
                         LessonTreeRowSpec {
                             lesson_id: lesson.id.clone(),
                             title: lesson.title.clone(),
-                            has_custom_config: lesson_has_custom_config(lesson, existing_config),
+                            has_custom_config,
                             expanded: lesson_disclosures.is_expanded(&lesson.id),
-                            groups: config::build_exercise_groups(
-                                &lesson.id,
-                                &exercises,
-                                &i18n,
-                                exercise_disclosures,
-                            ),
+                            groups,
                         }
                     })
                     .collect::<Vec<_>>()

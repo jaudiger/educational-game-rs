@@ -155,7 +155,7 @@ pub(super) fn build_exercise_configs(
 
 pub(super) fn build_exercise_groups(
     lesson_id: &str,
-    exercises: &[ExerciseConfigData],
+    exercises: Vec<ExerciseConfigData>,
     i18n: &I18n,
     disclosures: &ExerciseGroupDisclosureState,
 ) -> Vec<ExerciseGroupData> {
@@ -164,16 +164,7 @@ pub(super) fn build_exercise_groups(
         exercises_by_type
             .entry(exercise.exercise_type)
             .or_default()
-            .push(ExerciseConfigData {
-                id: exercise.id.clone(),
-                exercise_type: exercise.exercise_type,
-                catalog_label: exercise.catalog_label.clone(),
-                school_level: exercise.school_level,
-                count: exercise.count,
-                has_visual: exercise.has_visual,
-                show_visual: exercise.show_visual,
-                default_show_visual: exercise.default_show_visual,
-            });
+            .push(exercise);
     }
     let mut exercise_groups = exercises_by_type.into_iter().collect::<Vec<_>>();
     exercise_groups.sort_by_key(|(exercise_type, _)| exercise_type_sort_order(*exercise_type));
@@ -292,7 +283,7 @@ fn exercise_group_bundle(group: ExerciseGroupData, window: Entity) -> impl Bundl
                 },
                 Children::spawn(SpawnWith(move |items: &mut ChildSpawner| {
                     for exercise in exercises {
-                        spawn_exercise_counter_row(items, &lesson_id, &exercise, window);
+                        spawn_exercise_counter_row(items, &lesson_id, exercise, window);
                     }
                 })),
             ));
@@ -338,10 +329,9 @@ pub(super) fn handle_exercise_group_disclosure(
 fn spawn_exercise_counter_row(
     parent: &mut ChildSpawner,
     lesson_id: &str,
-    exercise: &ExerciseConfigData,
+    exercise: ExerciseConfigData,
     window: Entity,
 ) {
-    let exercise = exercise.clone();
     let catalog_label = exercise.catalog_label.clone();
     let school_level = exercise.school_level;
     let lesson_id = lesson_id.to_owned();
@@ -455,11 +445,12 @@ pub(super) fn handle_count_change(
     mut persistence: SaveDataMut<'_>,
     session: Option<Res<PlayerSession>>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Some(session) = session else {
+        activations.clear();
         return;
     };
-    for entity in activated_entities {
+    for event in activations.read() {
+        let entity = event.0;
         let Ok(button) = buttons.get(entity) else {
             continue;
         };
@@ -491,8 +482,8 @@ pub(super) fn handle_count_change(
         {
             continue;
         }
-        let lesson_id = button.lesson_id.clone();
-        let exercise_id = button.exercise_id.clone();
+        let lesson_id = button.lesson_id.as_str();
+        let exercise_id = button.exercise_id.as_str();
         let count_text_entity = button.count_text;
         persistence.update(PersistenceAction::TeacherLessonConfig, |data| {
             if let Some(class_save) = data
@@ -500,7 +491,7 @@ pub(super) fn handle_count_change(
                 .get_mut(session.slot_index)
                 .and_then(Option::as_mut)
             {
-                set_exercise_count(class_save, &lesson_id, &exercise_id, new_count);
+                set_exercise_count(class_save, lesson_id, exercise_id, new_count);
             }
         });
         if let Ok(mut text) = count_texts.get_mut(count_text_entity) {
@@ -556,11 +547,12 @@ pub(super) fn handle_visual_toggle(
     mut persistence: SaveDataMut<'_>,
     session: Option<Res<PlayerSession>>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Some(session) = session else {
+        activations.clear();
         return;
     };
-    for entity in activated_entities {
+    for event in activations.read() {
+        let entity = event.0;
         let Ok(button) = buttons.get(entity) else {
             continue;
         };
@@ -578,8 +570,8 @@ pub(super) fn handle_visual_toggle(
             .and_then(|config| config.show_visuals.get(&button.exercise_id).copied())
             .unwrap_or(button.default_show_visual);
         let new_visual = !current_visual;
-        let lesson_id = button.lesson_id.clone();
-        let exercise_id = button.exercise_id.clone();
+        let lesson_id = button.lesson_id.as_str();
+        let exercise_id = button.exercise_id.as_str();
         let default_show_visual = button.default_show_visual;
         persistence.update(PersistenceAction::TeacherLessonConfig, |data| {
             if let Some(class_save) = data
@@ -589,8 +581,8 @@ pub(super) fn handle_visual_toggle(
             {
                 set_exercise_visual(
                     class_save,
-                    &lesson_id,
-                    &exercise_id,
+                    lesson_id,
+                    exercise_id,
                     default_show_visual,
                     new_visual,
                 );
@@ -654,14 +646,16 @@ pub(super) fn handle_reset_click(
     content: Res<ContentLibrary>,
     teacher: TeacherScreenParam<'_, '_>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Ok(window) = teacher.teacher.window.single() else {
+        activations.clear();
         return;
     };
     let Ok(camera) = teacher.teacher.camera.single() else {
+        activations.clear();
         return;
     };
-    for entity in activated_entities {
+    for event in activations.read() {
+        let entity = event.0;
         let Ok(button) = buttons.get(entity) else {
             continue;
         };

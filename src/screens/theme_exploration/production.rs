@@ -44,7 +44,11 @@ pub fn prepare_themes(
                 id: theme.id.clone(),
                 available: theme.available,
                 title_text: theme.title.get(i18n.language).to_owned(),
-                coming_soon_text: i18n.t(&TranslationKey::ComingSoon).into_owned(),
+                coming_soon_text: if theme.available {
+                    String::new()
+                } else {
+                    i18n.t(&TranslationKey::ComingSoon).into_owned()
+                },
                 progress_text: (completed > 0).then(|| {
                     i18n.t(&ProductionTranslationKey::LessonsCompleted(
                         completed, total,

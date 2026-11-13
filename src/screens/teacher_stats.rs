@@ -390,11 +390,6 @@ impl ScoreTotals {
     }
 }
 
-#[derive(Clone, Copy, Default)]
-struct DerivedTypeScore {
-    totals: ScoreTotals,
-}
-
 /// Pre-computed data for a single exercise type score row.
 #[derive(Clone)]
 struct TypeScoreRow {
@@ -454,8 +449,8 @@ fn score_row(
     lesson_id: &str,
     exercise_id: &str,
     score: Option<&crate::data::save::QuestionScore>,
-    content: &ContentLibrary,
-    language: Language,
+    catalog_label: &str,
+    school_level: Option<SchoolLevel>,
 ) -> ExerciseScoreRow {
     let totals = score.map_or_else(ScoreTotals::default, |score| ScoreTotals {
         correct: u128::from(score.correct_count()),
@@ -463,8 +458,8 @@ fn score_row(
     });
     let (score_text, score_color) = totals.display();
     ExerciseScoreRow {
-        catalog_label: catalog_label(lesson_id, exercise_id, content, language),
-        school_level: school_level(lesson_id, exercise_id, content),
+        catalog_label: catalog_label.to_owned(),
+        school_level,
         score_text,
         score_color,
         lesson_id: lesson_id.to_owned(),
@@ -472,26 +467,10 @@ fn score_row(
     }
 }
 
-/// Derives the exercise category from each catalog entry in the lesson.
-fn aggregate_type_scores(
-    lesson: &Lesson,
-    progress: Option<&LessonProgress>,
-) -> HashMap<QuestionType, DerivedTypeScore> {
-    let mut totals: HashMap<QuestionType, DerivedTypeScore> = HashMap::new();
-    for exercise in &lesson.questions {
-        let exercise_type = exercise.definition.question_type();
-        let score = progress.and_then(|progress| progress.question_scores.get(&exercise.id));
-        let row_totals = score.map_or_else(ScoreTotals::default, |score| ScoreTotals {
-            correct: u128::from(score.correct_count()),
-            total: u128::from(score.total_count()),
-        });
-        totals
-            .entry(exercise_type)
-            .or_default()
-            .totals
-            .add(row_totals);
-    }
-    totals
+#[derive(Default)]
+struct DerivedTypeScore {
+    totals: ScoreTotals,
+    exercise_rows: Vec<ExerciseScoreRow>,
 }
 
 fn exercise_type_for_id(lesson: &Lesson, exercise_id: &str) -> Option<QuestionType> {
@@ -525,25 +504,6 @@ fn catalog_label(
         )
 }
 
-fn school_level(
-    lesson_id: &str,
-    exercise_id: &str,
-    content: &ContentLibrary,
-) -> Option<SchoolLevel> {
-    content
-        .themes
-        .iter()
-        .flat_map(|theme| &theme.lessons)
-        .find(|lesson| lesson.id == lesson_id)
-        .and_then(|lesson| {
-            lesson
-                .questions
-                .iter()
-                .find(|exercise| exercise.id == exercise_id)
-        })
-        .map(|exercise| exercise.school_level)
-}
-
 fn lesson_label(lesson_id: &str, content: &ContentLibrary, i18n: &I18n) -> String {
     content
         .themes
@@ -560,36 +520,44 @@ fn lesson_label(lesson_id: &str, content: &ContentLibrary, i18n: &I18n) -> Strin
 fn collect_lesson_type_rows(
     lesson: &Lesson,
     progress: Option<&LessonProgress>,
-    content: &ContentLibrary,
     i18n: &I18n,
 ) -> (Vec<TypeScoreRow>, Vec<ExerciseScoreRow>) {
-    let totals = aggregate_type_scores(lesson, progress);
-    let mut exercise_rows: HashMap<QuestionType, Vec<ExerciseScoreRow>> = HashMap::new();
+    let mut totals: HashMap<QuestionType, DerivedTypeScore> = HashMap::new();
     for exercise in &lesson.questions {
         let exercise_type = exercise.definition.question_type();
         let score = progress.and_then(|progress| progress.question_scores.get(&exercise.id));
-        exercise_rows
-            .entry(exercise_type)
-            .or_default()
-            .push(score_row(
-                &lesson.id,
-                &exercise.id,
-                score,
-                content,
-                i18n.language,
-            ));
+        let row = score_row(
+            &lesson.id,
+            &exercise.id,
+            score,
+            exercise.catalog_label.get(i18n.language),
+            Some(exercise.school_level),
+        );
+        let entry = totals.entry(exercise_type).or_default();
+        if let Some(score) = score {
+            entry.totals.add(ScoreTotals {
+                correct: u128::from(score.correct_count()),
+                total: u128::from(score.total_count()),
+            });
+        }
+        entry.exercise_rows.push(row);
     }
 
+    let known_exercise_ids: HashSet<&str> = lesson
+        .questions
+        .iter()
+        .map(|exercise| exercise.id.as_str())
+        .collect();
     let mut unclassified_rows = Vec::new();
     if let Some(progress) = progress {
         for (exercise_id, score) in &progress.question_scores {
-            if exercise_type_for_id(lesson, exercise_id).is_none() {
+            if !known_exercise_ids.contains(exercise_id.as_str()) {
                 unclassified_rows.push(score_row(
                     &lesson.id,
                     exercise_id,
                     Some(score),
-                    content,
-                    i18n.language,
+                    exercise_id,
+                    None,
                 ));
             }
         }
@@ -597,13 +565,13 @@ fn collect_lesson_type_rows(
     unclassified_rows.sort_by(|left, right| left.exercise_id.cmp(&right.exercise_id));
 
     let mut types: Vec<_> = totals.into_iter().collect();
-    types.sort_by_key(|(exercise_type, _)| format!("{exercise_type:?}"));
+    types.sort_by_key(|(exercise_type, _)| exercise_type_sort_order(*exercise_type));
     let rows = types
         .into_iter()
-        .map(|(exercise_type, total)| {
-            let (score_text, score_color) = total.totals.display();
-            let mut exercises = exercise_rows.remove(&exercise_type).unwrap_or_default();
-            exercises.sort_by(|left, right| left.exercise_id.cmp(&right.exercise_id));
+        .map(|(exercise_type, mut data)| {
+            let (score_text, score_color) = data.totals.display();
+            data.exercise_rows
+                .sort_by(|left, right| left.exercise_id.cmp(&right.exercise_id));
             TypeScoreRow {
                 type_label: activity_category_label(exercise_type, i18n),
                 score_text,
@@ -611,11 +579,21 @@ fn collect_lesson_type_rows(
                 lesson_id: lesson.id.clone(),
                 exercise_type,
                 details_expanded: false,
-                exercise_rows: exercises,
+                exercise_rows: data.exercise_rows,
             }
         })
         .collect();
     (rows, unclassified_rows)
+}
+
+const fn exercise_type_sort_order(exercise_type: QuestionType) -> u8 {
+    match exercise_type {
+        QuestionType::Comparison => 0,
+        QuestionType::Identification => 1,
+        QuestionType::Mcq => 2,
+        QuestionType::NumericInput => 3,
+        QuestionType::Visualization => 4,
+    }
 }
 
 fn precompute_stats(
@@ -641,7 +619,7 @@ fn precompute_stats(
                         theme_totals.add(lesson_totals);
                         let (total_score, total_color) = lesson_totals.display();
                         let (mut type_rows, unclassified_rows) =
-                            collect_lesson_type_rows(lesson, lesson_progress, content, i18n);
+                            collect_lesson_type_rows(lesson, lesson_progress, i18n);
                         for type_row in &mut type_rows {
                             type_row.details_expanded =
                                 disclosures.is_expanded(&StatsDisclosureTarget::Type(
@@ -776,7 +754,7 @@ fn spawn_theme_section(parent: &mut ChildSpawner, data: ThemeStatsData, window: 
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
-                    for lesson in &lessons {
+                    for lesson in lessons {
                         spawn_lesson_section(details, lesson, window);
                     }
                 })),
@@ -819,8 +797,7 @@ fn spawn_unavailable_theme_header(
     ));
 }
 
-fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, window: Entity) {
-    let lesson = lesson.clone();
+fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: LessonStatsData, window: Entity) {
     parent.spawn((
         Node {
             flex_direction: FlexDirection::Column,
@@ -832,8 +809,8 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
             spawn_lesson_header(section, &lesson, window);
             let details_target = StatsDisclosureTarget::Lesson(lesson.lesson_id.clone());
             let details_expanded = lesson.details_expanded;
-            let type_rows = lesson.type_rows.clone();
-            let unclassified_rows = lesson.unclassified_rows.clone();
+            let type_rows = lesson.type_rows;
+            let unclassified_rows = lesson.unclassified_rows;
             section.spawn((
                 StatsDisclosurePanel(details_target),
                 Node {
@@ -852,10 +829,10 @@ fn spawn_lesson_section(parent: &mut ChildSpawner, lesson: &LessonStatsData, win
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
-                    for type_row in &type_rows {
+                    for type_row in type_rows {
                         spawn_type_row(details, type_row, window);
                     }
-                    for exercise_row in &unclassified_rows {
+                    for exercise_row in unclassified_rows {
                         spawn_exercise_row(details, exercise_row, window);
                     }
                 })),
@@ -887,7 +864,7 @@ fn spawn_lesson_header(parent: &mut ChildSpawner, lesson: &LessonStatsData, wind
     ));
 }
 
-fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: Entity) {
+fn spawn_type_row(parent: &mut ChildSpawner, type_row: TypeScoreRow, window: Entity) {
     let lesson_id = type_row.lesson_id.clone();
     let exercise_type = type_row.exercise_type;
     let target = StatsDisclosureTarget::Type(lesson_id.clone(), exercise_type);
@@ -901,7 +878,7 @@ fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: En
         expanded: type_row.details_expanded,
     };
     let details_expanded = type_row.details_expanded;
-    let exercise_rows = type_row.exercise_rows.clone();
+    let exercise_rows = type_row.exercise_rows;
 
     parent.spawn((
         Node {
@@ -930,7 +907,7 @@ fn spawn_type_row(parent: &mut ChildSpawner, type_row: &TypeScoreRow, window: En
                     ..default()
                 },
                 Children::spawn(SpawnWith(move |details: &mut ChildSpawner| {
-                    for exercise_row in &exercise_rows {
+                    for exercise_row in exercise_rows {
                         spawn_exercise_row(details, exercise_row, window);
                     }
                 })),
@@ -1006,16 +983,16 @@ fn handle_stats_disclosure(
     }
 }
 
-fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: &ExerciseScoreRow, window: Entity) {
+fn spawn_exercise_row(parent: &mut ChildSpawner, exercise_row: ExerciseScoreRow, window: Entity) {
     parent.spawn((
         teacher_list_exercise_row(),
         Children::spawn(SpawnWith({
-            let label = exercise_row.catalog_label.clone();
-            let score = exercise_row.score_text.clone();
+            let label = exercise_row.catalog_label;
+            let score = exercise_row.score_text;
             let school_level = exercise_row.school_level;
             let color = exercise_row.score_color;
-            let lesson_id = exercise_row.lesson_id.clone();
-            let exercise_id = exercise_row.exercise_id.clone();
+            let lesson_id = exercise_row.lesson_id;
+            let exercise_id = exercise_row.exercise_id;
             move |row: &mut ChildSpawner| {
                 row.spawn(teacher_list_truncated_label(
                     label,
@@ -1059,31 +1036,38 @@ fn handle_reset_click(
     teacher: TeacherWindowParam<'_, '_>,
     teacher_state: Query<&TeacherWindowState, With<TeacherWindow>>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
     let Some(ref session) = ctx.session else {
+        activations.clear();
         return;
     };
     let Some(ref class_save) = ctx.save_data.class_slots[session.slot_index] else {
+        activations.clear();
         return;
     };
     let Ok(state) = teacher_state.single() else {
+        activations.clear();
         return;
     };
     let TeacherView::StudentStats { student_index } = &state.view else {
+        activations.clear();
         return;
     };
     let student_index = *student_index;
     if class_save.students.get(student_index).is_none() {
+        activations.clear();
         return;
     }
     let Ok(window) = teacher.window.single() else {
+        activations.clear();
         return;
     };
     let Ok(camera) = teacher.camera.single() else {
+        activations.clear();
         return;
     };
 
-    for entity in activated_entities {
+    for event in activations.read() {
+        let entity = event.0;
         let Ok(reset_btn) = query.get(entity) else {
             continue;
         };
@@ -1232,11 +1216,9 @@ fn handle_return_to_list(
     query: Query<(), With<ReturnToListButton>>,
     mut states: Query<&mut TeacherWindowState, With<TeacherWindow>>,
 ) {
-    let activated_entities: Vec<Entity> = activations.read().map(|event| event.0).collect();
-    if !activated_entities
-        .iter()
-        .any(|entity| query.contains(*entity))
-    {
+    let found = activations.read().any(|event| query.contains(event.0));
+    activations.clear();
+    if !found {
         return;
     }
     if let Ok(mut state) = states.single_mut() {
