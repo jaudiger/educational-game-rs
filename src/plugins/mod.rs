@@ -8,6 +8,7 @@ pub mod flower_material;
 pub mod grass_material;
 pub mod landscape_material;
 pub mod lesson_mascot;
+pub mod lesson_motion;
 #[cfg(not(feature = "demo"))]
 pub mod persistence;
 pub mod question_background;
@@ -28,6 +29,7 @@ pub use content::ContentPlugin;
 pub use cursor_material::CursorMaterialPlugin;
 pub use custom_cursor::CustomCursorPlugin;
 pub use lesson_mascot::LessonMascotPlugin;
+pub use lesson_motion::LessonMotionPlugin;
 #[cfg(not(feature = "demo"))]
 pub use persistence::PersistencePlugin;
 pub use question_background::QuestionBackgroundPlugin;

@@ -14,6 +14,7 @@ struct LandscapeUniform {
 
 const SKY: u32 = 0u;
 const MEADOW: u32 = 1u;
+const RIDGE: u32 = 2u;
 
 @group(1) @binding(0) var<uniform> landscape: LandscapeUniform;
 
@@ -37,15 +38,20 @@ fn path_width(y: f32) -> f32 {
     );
 }
 
-fn sky_fragment(input: LandscapeInput) -> vec4<f32> {
-    let x = (input.uv.x - 0.5) * input.size.x / max(input.size.y, 0.001);
-    let y = input.uv.y;
-    let sky = mix(
+fn sky_color(y: f32) -> vec3<f32> {
+    return mix(
         vec3<f32>(0.36, 0.67, 0.86),
         vec3<f32>(0.76, 0.87, 0.94),
         smoothstep(0.02, 0.62, y),
     );
+}
 
+fn sky_fragment(input: LandscapeInput) -> vec4<f32> {
+    return vec4<f32>(sky_color(input.uv.y), 1.0);
+}
+
+fn ridge_fragment(input: LandscapeInput) -> vec4<f32> {
+    let y = input.uv.y;
     let ridge_center = 0.75;
     let ridge_half_width = select(0.14, 0.13, input.uv.x < ridge_center);
     let ridge_offset = (input.uv.x - ridge_center) / ridge_half_width;
@@ -53,8 +59,8 @@ fn sky_fragment(input: LandscapeInput) -> vec4<f32> {
     let ridge = 0.315 - ridge_height;
     let ridge_strength = smoothstep(0.0, 0.18, 1.0 - abs(ridge_offset));
     let ridge_coverage = coverage(ridge - y) * ridge_strength;
-    let color = mix(sky, vec3<f32>(0.48, 0.60, 0.66), ridge_coverage * 0.7);
-    return vec4<f32>(color, 1.0);
+    let color = mix(sky_color(y), vec3<f32>(0.48, 0.60, 0.66), 0.7);
+    return vec4<f32>(color, ridge_coverage);
 }
 
 fn meadow_fragment(input: LandscapeInput) -> vec4<f32> {
@@ -97,6 +103,9 @@ fn fragment(input: LandscapeInput) -> @location(0) vec4<f32> {
         }
         case MEADOW: {
             return meadow_fragment(input);
+        }
+        case RIDGE: {
+            return ridge_fragment(input);
         }
         default: {
             return vec4<f32>(0.0);

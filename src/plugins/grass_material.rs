@@ -9,6 +9,7 @@ const GRASS_SHADER_PATH: &str = "shaders/grass.wgsl";
 struct GrassUniform {
     primary: LinearRgba,
     secondary: LinearRgba,
+    motion: Vec4,
 }
 
 #[derive(Asset, AsBindGroup, Clone, Reflect)]
@@ -23,8 +24,13 @@ impl GrassMaterial {
             uniform: GrassUniform {
                 primary: primary.to_linear(),
                 secondary: secondary.to_linear(),
+                motion: Vec4::ZERO,
             },
         }
+    }
+
+    pub fn set_bend(&mut self, displacement: f32) {
+        self.uniform.motion.x = displacement;
     }
 }
 

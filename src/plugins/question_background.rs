@@ -1,18 +1,26 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
+use bevy::ui::UiSystems;
 use bevy::ui_render::ui_material::{MaterialNode, UiMaterial};
 use bevy::window::WindowResized;
 
 use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
 use crate::ui::theme;
 
+use crate::plugins::lesson_motion::{LessonMotionSet, LessonWind, smooth_motion_fade};
+
 use crate::plugins::flower_material::FlowerMaterial;
 use crate::plugins::grass_material::GrassMaterial;
 use crate::plugins::landscape_material::{LandscapeLayer, LandscapeMaterial, PathGeometry};
 use crate::plugins::stone_material::{STONE_HALF_WIDTH_RATIO, StoneMaterial};
 use crate::plugins::tree_material::TreeMaterial;
+use crate::states::AppState;
 
 const PATH_GEOMETRY: PathGeometry = PathGeometry::DEFAULT;
+const CLOUD_DRIFT_SPEED_DESIGN_PX_PER_SECOND: f32 = 15.0;
+const CLOUD_MOTION_FADE_SECONDS: f32 = 2.0;
+const FLOWER_BEND_AMOUNT: f32 = 0.0375;
+const GRASS_BEND_AMOUNT: f32 = 0.075;
 
 pub struct QuestionBackgroundPlugin;
 
@@ -31,14 +39,40 @@ impl Plugin for QuestionBackgroundPlugin {
         app.add_systems(
             Update,
             (update_path_stone_positions, update_tree_positions)
-                .run_if(in_state(crate::states::AppState::LessonPlay)),
+                .run_if(in_state(AppState::LessonPlay)),
+        )
+        .add_systems(
+            Update,
+            animate_question_vegetation
+                .after(LessonMotionSet::AdvanceWind)
+                .run_if(in_state(AppState::LessonPlay)),
+        )
+        .add_systems(
+            PostUpdate,
+            animate_question_clouds
+                .after(UiSystems::Propagate)
+                .before(UiSystems::Layout)
+                .run_if(in_state(AppState::LessonPlay)),
         );
     }
 }
 
-#[derive(Component, Clone, Copy, Default, Reflect)]
+#[derive(Component, Clone, Copy, Reflect)]
 #[require(UiTransform)]
-pub struct QuestionBackgroundCloud;
+pub struct QuestionBackgroundCloud {
+    center_x_percent: f32,
+    canvas_width_design_px: f32,
+    placement_scale: f32,
+    speed_design_px_per_second: f32,
+    offset_design_px: f32,
+    age_seconds: f32,
+}
+
+#[derive(Component, Reflect)]
+struct QuestionLandscapeMaterials {
+    flower_materials: [Handle<FlowerMaterial>; 3],
+    grass_material: Handle<GrassMaterial>,
+}
 
 #[derive(Clone, Copy)]
 struct VisualPlacement {
@@ -76,7 +110,7 @@ struct CloudPlacement {
     scale: f32,
 }
 
-const CLOUDS: [CloudPlacement; 8] = [
+const CLOUDS: [CloudPlacement; 12] = [
     CloudPlacement {
         shape: CloudShapeId::Puffy,
         center_x: 9.0,
@@ -124,6 +158,30 @@ const CLOUDS: [CloudPlacement; 8] = [
         center_x: 96.0,
         center_y: 6.0,
         scale: 0.28,
+    },
+    CloudPlacement {
+        shape: CloudShapeId::Puffy,
+        center_x: 17.0,
+        center_y: 22.0,
+        scale: 0.30,
+    },
+    CloudPlacement {
+        shape: CloudShapeId::Elongated,
+        center_x: 46.0,
+        center_y: 9.0,
+        scale: 0.30,
+    },
+    CloudPlacement {
+        shape: CloudShapeId::Puffy,
+        center_x: 75.0,
+        center_y: 23.0,
+        scale: 0.28,
+    },
+    CloudPlacement {
+        shape: CloudShapeId::Elongated,
+        center_x: 94.0,
+        center_y: 14.0,
+        scale: 0.25,
     },
 ];
 
@@ -450,6 +508,7 @@ struct ResponsiveTreePosition {
 
 struct BackgroundMaterials {
     sky: Handle<LandscapeMaterial>,
+    ridge: Handle<LandscapeMaterial>,
     meadow: Handle<LandscapeMaterial>,
     background_tree: Handle<TreeMaterial>,
     midground_tree: Handle<TreeMaterial>,
@@ -463,12 +522,28 @@ struct BackgroundMaterials {
     stone: Handle<StoneMaterial>,
 }
 
+impl QuestionLandscapeMaterials {
+    fn new(materials: &BackgroundMaterials) -> Self {
+        Self {
+            flower_materials: [
+                materials.gold_flower.clone(),
+                materials.pink_flower.clone(),
+                materials.lavender_flower.clone(),
+            ],
+            grass_material: materials.grass.clone(),
+        }
+    }
+}
+
 impl BackgroundMaterials {
     fn new(assets: &mut QuestionBackgroundAssets) -> Self {
         Self {
             sky: assets
                 .landscape
                 .add(LandscapeMaterial::new(LandscapeLayer::Sky)),
+            ridge: assets
+                .landscape
+                .add(LandscapeMaterial::new(LandscapeLayer::Ridge)),
             meadow: assets
                 .landscape
                 .add(LandscapeMaterial::new(LandscapeLayer::Meadow)),
@@ -540,12 +615,20 @@ pub fn spawn_question_background(
     viewport_size: Vec2,
 ) {
     let materials = BackgroundMaterials::new(assets);
+    let motion = QuestionLandscapeMaterials::new(&materials);
     commands.spawn((
         full_screen_material_bundle(materials.sky.clone()),
+        motion,
         GlobalZIndex(-1),
         Pickable::IGNORE,
         DespawnOnExit(crate::states::AppState::LessonPlay),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+            spawn_clouds(parent, &materials);
+            parent.spawn((
+                full_screen_material_bundle(materials.ridge.clone()),
+                ZIndex(-1),
+                Pickable::IGNORE,
+            ));
             spawn_trees(
                 parent,
                 &materials,
@@ -565,7 +648,6 @@ pub fn spawn_question_background(
                 viewport_size,
                 TreeBand::Midground,
             );
-            spawn_clouds(parent, &materials);
             spawn_flowers(parent, &materials);
             spawn_grass_tufts(parent, &materials);
             spawn_path_stones(parent, &materials, window, viewport_size);
@@ -601,19 +683,37 @@ fn spawn_clouds(parent: &mut ChildSpawner, materials: &BackgroundMaterials) {
             CloudShapeId::Elongated => materials.elongated_cloud.clone(),
         };
         let canvas = cloud.shape.canvas();
+        let placement = VisualPlacement::new(
+            cloud.center_x,
+            cloud.center_y,
+            canvas.x,
+            canvas.y,
+            cloud.scale,
+        );
+        let motion = QuestionBackgroundCloud {
+            center_x_percent: cloud.center_x,
+            canvas_width_design_px: canvas.x,
+            placement_scale: cloud.scale,
+            speed_design_px_per_second: CLOUD_DRIFT_SPEED_DESIGN_PX_PER_SECOND,
+            offset_design_px: 0.0,
+            age_seconds: 0.0,
+        };
+
         parent.spawn((
-            placed_material_bundle(
-                VisualPlacement::new(
-                    cloud.center_x,
-                    cloud.center_y,
-                    canvas.x,
-                    canvas.y,
-                    cloud.scale,
-                ),
-                material,
-                3,
-            ),
-            QuestionBackgroundCloud,
+            placed_material_container_bundle(placement, -2),
+            children![(
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(0.0),
+                    top: px(0.0),
+                    width: percent(100.0),
+                    height: percent(100.0),
+                    ..default()
+                },
+                MaterialNode(material),
+                Pickable::IGNORE,
+                motion,
+            )],
         ));
     }
 }
@@ -752,6 +852,16 @@ fn placed_material_bundle<M: UiMaterial>(
     z_index: i32,
 ) -> impl Bundle + use<M> {
     (
+        placed_material_container_bundle(placement, z_index),
+        MaterialNode(material),
+    )
+}
+
+fn placed_material_container_bundle(
+    placement: VisualPlacement,
+    z_index: i32,
+) -> impl Bundle + use<> {
+    (
         Node {
             position_type: PositionType::Absolute,
             left: percent(placement.center_x),
@@ -765,10 +875,62 @@ fn placed_material_bundle<M: UiMaterial>(
             scale: Vec2::splat(placement.scale),
             rotation: Rot2::radians(placement.rotation),
         },
-        MaterialNode(material),
         ZIndex(z_index),
         Pickable::IGNORE,
     )
+}
+
+fn animate_question_clouds(
+    time: Res<Time>,
+    mut clouds: Query<(
+        &mut QuestionBackgroundCloud,
+        &mut UiTransform,
+        &ComputedUiRenderTargetInfo,
+    )>,
+) {
+    let delta = time.delta_secs();
+    for (mut cloud, mut transform, target) in &mut clouds {
+        let logical_size = target.logical_size();
+        let vmin = logical_size.min_element();
+        if vmin <= 0.0 || logical_size.x <= 0.0 {
+            continue;
+        }
+
+        cloud.age_seconds = (cloud.age_seconds + delta).min(CLOUD_MOTION_FADE_SECONDS);
+        let fade = smooth_motion_fade(cloud.age_seconds, CLOUD_MOTION_FADE_SECONDS);
+        let design_scale = theme::design_scale_factor(vmin);
+        let visual_scale = design_scale * cloud.placement_scale;
+        let half_width = cloud.canvas_width_design_px * visual_scale * 0.5;
+        let base_center = logical_size.x * cloud.center_x_percent * 0.01;
+        let wrap_span = 2.0_f32.mul_add(half_width, logical_size.x);
+        let distance = cloud.speed_design_px_per_second * delta * fade * visual_scale;
+        let center =
+            (cloud.offset_design_px.mul_add(visual_scale, base_center) + distance + half_width)
+                .rem_euclid(wrap_span)
+                - half_width;
+        cloud.offset_design_px = (center - base_center) / visual_scale;
+        transform.translation = Val2::new(px(cloud.offset_design_px * design_scale), px(0.0));
+    }
+}
+
+fn animate_question_vegetation(
+    wind: Res<LessonWind>,
+    landscapes: Query<&QuestionLandscapeMaterials>,
+    mut flower_materials: ResMut<Assets<FlowerMaterial>>,
+    mut grass_materials: ResMut<Assets<GrassMaterial>>,
+) {
+    let strength = wind.value();
+
+    for landscape in &landscapes {
+        for handle in &landscape.flower_materials {
+            if let Some(mut material) = flower_materials.get_mut(handle) {
+                material.set_bend(strength * FLOWER_BEND_AMOUNT);
+            }
+        }
+        if let Some(mut material) = grass_materials.get_mut(&landscape.grass_material) {
+            material.set_bend(strength * GRASS_BEND_AMOUNT);
+        }
+    }
 }
 
 fn update_path_stone_positions(

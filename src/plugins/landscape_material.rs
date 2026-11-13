@@ -95,6 +95,7 @@ fn smoothstep(start: f32, end: f32, value: f32) -> f32 {
 pub enum LandscapeLayer {
     Sky = 0,
     Meadow = 1,
+    Ridge = 2,
 }
 
 impl LandscapeLayer {

@@ -6,6 +6,7 @@ struct GrassInput {
 struct GrassUniform {
     primary: vec4<f32>,
     secondary: vec4<f32>,
+    motion: vec4<f32>,
 }
 
 @group(1) @binding(0) var<uniform> grass: GrassUniform;
@@ -44,5 +45,7 @@ fn grass_fragment(point: vec2<f32>) -> vec4<f32> {
 fn fragment(input: GrassInput) -> @location(0) vec4<f32> {
     let aspect = input.size.x / max(input.size.y, 0.001);
     let point = vec2<f32>((input.uv.x - 0.5) * aspect, 0.5 - input.uv.y);
-    return grass_fragment(point);
+    let height = clamp(point.y + 0.5, 0.0, 1.0);
+    let bent_point = vec2<f32>(point.x - grass.motion.x * height * height, point.y);
+    return grass_fragment(bent_point);
 }

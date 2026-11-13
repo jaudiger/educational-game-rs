@@ -17,7 +17,7 @@ fn coverage(distance: f32) -> f32 {
 @fragment
 fn fragment(input: TreeInput) -> @location(0) vec4<f32> {
     let x = abs(input.uv.x * 2.0 - 1.0);
-    let half_width = 1.0 - input.uv.y;
+    let half_width = input.uv.y;
     let distance = x - half_width;
     let shade = smoothstep(0.05, 0.9, input.uv.y) * 0.035;
     let color = tree.color.rgb * (1.0 - shade);

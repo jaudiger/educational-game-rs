@@ -14,6 +14,7 @@ use crate::data::ExplorationTheme;
 use crate::plugins::balloon_material::{
     BALLOON_BASKET_CORD_ATTACHMENTS, BalloonFlame, BalloonPart, BalloonUiMaterial,
 };
+use crate::plugins::lesson_motion::{LessonMotionSet, LessonWind};
 use crate::states::ActiveLesson;
 use crate::ui::theme;
 
@@ -24,7 +25,9 @@ impl Plugin for LessonMascotPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (animate_swaying_envelope, animate_pulled_basket).run_if(in_state(ActiveLesson)),
+            (animate_swaying_envelope, animate_pulled_basket)
+                .run_if(in_state(ActiveLesson))
+                .after(LessonMotionSet::AdvanceWind),
         )
         .add_systems(
             PostUpdate,
@@ -41,8 +44,7 @@ impl Plugin for LessonMascotPlugin {
 #[derive(Component, Clone, Default, Reflect)]
 struct SwayingEnvelope;
 
-/// Marker for the balloon basket, subtly pulled by the envelope's sway
-/// with a dephased rotation and horizontal follow.
+/// Marks the basket, which responds to the shared wind with a slight lag.
 #[derive(Component, Clone, Default, Reflect)]
 struct PulledBasket;
 
@@ -98,20 +100,16 @@ const SKY_BASKET_WIDTH: f32 = 129.0;
 /// Vertical overlap between envelope bottom and basket top (design pixels).
 const SKY_BASKET_OVERLAP: f32 = 12.0;
 
-/// Angular frequency of the pendular sway (rad/s).
-const SWAY_FREQUENCY: f32 = 1.0;
 /// Maximum rotation angle of the envelope (rad).
-const SWAY_AMPLITUDE: f32 = 0.005;
+const SWAY_AMPLITUDE: f32 = 0.0075;
 /// Maximum rotation angle of the basket (rad), dephased to follow the envelope.
-const BASKET_SWAY_AMPLITUDE: f32 = 0.008;
-/// Phase delay of the basket relative to the envelope (seconds).
+const BASKET_SWAY_AMPLITUDE: f32 = 0.012;
+/// Delay of the basket response to the shared wind (seconds).
 const BASKET_PHASE_DELAY: f32 = 0.3;
-/// Maximum horizontal pull on the basket from the envelope sway (px).
-const BASKET_PULL_PX: f32 = 3.0;
+/// Maximum horizontal pull on the basket from the shared wind (px).
+const BASKET_PULL_PX: f32 = 4.5;
 /// Vertical bob amplitude (px) for the gentle lift-off effect.
-const BOB_AMPLITUDE: f32 = 2.0;
-/// Vertical bob frequency (rad/s).
-const BOB_FREQUENCY: f32 = 0.8;
+const BOB_AMPLITUDE: f32 = 3.0;
 
 /// Spawns the lesson mascot for the current [`ExplorationTheme`].
 ///
@@ -307,17 +305,15 @@ fn ui_cord_endpoints(
 ///
 /// where `h` is the rendered height from [`ComputedNode`].
 fn animate_swaying_envelope(
-    time: Res<Time>,
+    wind: Option<Res<LessonWind>>,
     mut query: Query<(&mut UiTransform, &ComputedNode), With<SwayingEnvelope>>,
 ) {
-    let elapsed = time.elapsed_secs();
-    let angle = (elapsed * SWAY_FREQUENCY).sin() * SWAY_AMPLITUDE;
+    let Some(wind) = wind else { return };
+    let angle = wind.value() * SWAY_AMPLITUDE;
+    let bob_y = wind.quadrature_value() * BOB_AMPLITUDE;
 
     for (mut ui_transform, computed) in &mut query {
         let half_height = computed.size().y * computed.inverse_scale_factor() / 2.0;
-        // Gentle vertical bob (simulates lift-off from the ground)
-        let bob_y = (elapsed * BOB_FREQUENCY).sin() * BOB_AMPLITUDE;
-
         ui_transform.rotation = Rot2::radians(angle);
         ui_transform.translation = Val2 {
             x: px(-(half_height * angle.sin())),
@@ -326,19 +322,17 @@ fn animate_swaying_envelope(
     }
 }
 
-/// Applies a subtle pull to the basket, following the envelope's sway
-/// with a phase delay and reduced amplitude, as if attached by ropes.
-fn animate_pulled_basket(time: Res<Time>, mut query: Query<&mut UiTransform, With<PulledBasket>>) {
-    let elapsed = time.elapsed_secs();
-    // Dephased rotation (follows the envelope with a delay)
-    let angle = ((elapsed - BASKET_PHASE_DELAY) * SWAY_FREQUENCY).sin() * BASKET_SWAY_AMPLITUDE;
-    // Horizontal pull following the envelope's current tilt direction
-    let pull_x = (elapsed * SWAY_FREQUENCY).sin() * BASKET_PULL_PX;
+/// Applies a delayed response to the shared wind on the balloon basket.
+fn animate_pulled_basket(
+    wind: Option<Res<LessonWind>>,
+    mut query: Query<&mut UiTransform, With<PulledBasket>>,
+) {
+    let Some(wind) = wind else { return };
+    let angle = wind.delayed_value(BASKET_PHASE_DELAY) * BASKET_SWAY_AMPLITUDE;
+    let pull_x = wind.value() * BASKET_PULL_PX;
+    let bob_y = wind.delayed_quadrature_value(BASKET_PHASE_DELAY) * (BOB_AMPLITUDE * 0.6);
 
     for mut ui_transform in &mut query {
-        // Dephased vertical bob (basket follows envelope lift with delay)
-        let bob_y = ((elapsed - BASKET_PHASE_DELAY) * BOB_FREQUENCY).sin() * (BOB_AMPLITUDE * 0.6);
-
         ui_transform.rotation = Rot2::radians(angle);
         ui_transform.translation = Val2 {
             x: px(pull_x),
