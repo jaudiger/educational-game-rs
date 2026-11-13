@@ -3,7 +3,7 @@ name = "educational-game-rs"
 version = "1.0.0"
 authors = ["Jérémy Audiger"]
 edition = "2024"
-rust-version = "1.99"
+rust-version = "1.100"
 
 [features]
 default = []
