@@ -23,6 +23,8 @@ pub enum CursorEyeFrame {
     Open = 0,
     Half = 1,
     Closed = 2,
+    Smiling = 3,
+    Thinking = 4,
 }
 
 impl CursorEyeFrame {
@@ -34,6 +36,7 @@ impl CursorEyeFrame {
 #[derive(Clone, Copy, Debug, Default, Reflect, ShaderType)]
 struct CursorUniform {
     eye_frame: u32,
+    eye_motion: Vec2,
 }
 
 #[derive(Asset, AsBindGroup, Clone, Default, Reflect)]
@@ -45,6 +48,11 @@ pub struct CursorMaterial {
 impl CursorMaterial {
     pub const fn set_eye_frame(&mut self, frame: CursorEyeFrame) {
         self.uniform.eye_frame = frame.id();
+    }
+
+    pub const fn set_eye_state(&mut self, frame: CursorEyeFrame, motion: Vec2) {
+        self.uniform.eye_frame = frame.id();
+        self.uniform.eye_motion = motion;
     }
 }
 

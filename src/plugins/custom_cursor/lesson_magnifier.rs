@@ -12,8 +12,9 @@ use bevy::sprite_render::MeshMaterial2d;
 use bevy::window::{CursorOptions, PrimaryWindow, WindowRef};
 use rand::RngExt;
 
+use crate::data::{AnswerResult, LastAnswer};
 use crate::plugins::cursor_material::{CursorEyeFrame, CursorMaterial};
-use crate::states::AppState;
+use crate::states::{AppState, LessonPhase};
 use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
 
@@ -26,6 +27,11 @@ pub(super) fn register(app: &mut App) {
     app.add_systems(OnEnter(AppState::LessonPlay), setup_lesson_cursor)
         .add_systems(OnExit(AppState::LessonPlay), super::cleanup_custom_cursor)
         .add_systems(
+            OnEnter(LessonPhase::ShowFeedback),
+            show_feedback_eye_expression,
+        )
+        .add_systems(OnExit(LessonPhase::ShowFeedback), restore_lesson_eye)
+        .add_systems(
             Update,
             (
                 (
@@ -34,7 +40,7 @@ pub(super) fn register(app: &mut App) {
                 )
                     .chain()
                     .after(super::follow_pointer_system),
-                animate_eye_blink_system,
+                animate_lesson_eye_system,
             )
                 .run_if(in_state(AppState::LessonPlay))
                 .run_if(resource_exists::<super::CustomCursorActive>),
@@ -54,9 +60,21 @@ struct MagnifierScaleAnimation {
 }
 
 #[derive(Component, Reflect)]
-struct EyeBlinkAnimation {
+struct EyeAnimation {
     timer: Timer,
     phase: EyeBlinkPhase,
+    feedback_motion: Option<FeedbackEyeMotion>,
+}
+
+#[derive(Clone, Copy, Reflect)]
+enum FeedbackEyeMotion {
+    Smiling {
+        bob_elapsed: f32,
+        blink_elapsed: f32,
+    },
+    Thinking {
+        elapsed: f32,
+    },
 }
 
 #[derive(Reflect)]
@@ -118,9 +136,10 @@ fn setup_lesson_cursor(
                 MeshMaterial2d(cursor_material),
                 Transform::from_xyz(MAGNIFIER_VISUAL_OFFSET.x, MAGNIFIER_VISUAL_OFFSET.y, 1.0,)
                     .with_scale(Vec3::splat(MAGNIFIER_SCALE)),
-                EyeBlinkAnimation {
+                EyeAnimation {
                     timer: Timer::from_seconds(blink_interval, TimerMode::Once),
                     phase: EyeBlinkPhase::Waiting,
+                    feedback_motion: None,
                 },
                 Pickable::IGNORE,
                 cursor_layer,
@@ -257,18 +276,163 @@ fn cursor_is_over_button(
     false
 }
 
-fn animate_eye_blink_system(
+fn show_feedback_eye_expression(
+    answer: Res<LastAnswer>,
+    mut materials: ResMut<Assets<CursorMaterial>>,
+    mut eye_query: Query<(&mut EyeAnimation, &MeshMaterial2d<CursorMaterial>)>,
+) {
+    let (frame, motion) = match &answer.result {
+        AnswerResult::Correct => (
+            CursorEyeFrame::Smiling,
+            FeedbackEyeMotion::Smiling {
+                bob_elapsed: 0.0,
+                blink_elapsed: 0.0,
+            },
+        ),
+        AnswerResult::Incorrect => (
+            CursorEyeFrame::Thinking,
+            FeedbackEyeMotion::Thinking { elapsed: 0.0 },
+        ),
+    };
+
+    for (mut animation, material_handle) in &mut eye_query {
+        animation.feedback_motion = Some(motion);
+        if let Some(mut material) = materials.get_mut(&material_handle.0) {
+            material.set_eye_state(frame, Vec2::ZERO);
+        }
+    }
+}
+
+fn restore_lesson_eye(
+    mut materials: ResMut<Assets<CursorMaterial>>,
+    mut eye_query: Query<(&mut EyeAnimation, &MeshMaterial2d<CursorMaterial>)>,
+) {
+    let mut rng = rand::rng();
+    let blink_interval = rng.random_range(EYE_BLINK_MIN_INTERVAL..EYE_BLINK_MAX_INTERVAL);
+
+    for (mut animation, material_handle) in &mut eye_query {
+        animation.feedback_motion = None;
+        animation.phase = EyeBlinkPhase::Waiting;
+        animation.timer = Timer::from_seconds(blink_interval, TimerMode::Once);
+        if let Some(mut material) = materials.get_mut(&material_handle.0) {
+            material.set_eye_state(CursorEyeFrame::Open, Vec2::ZERO);
+        }
+    }
+}
+
+const SMILING_EYE_BOB_AMPLITUDE: f32 = 3.0;
+const SMILING_EYE_BOB_SPEED: f32 = 4.2;
+const SMILING_EYE_BOB_CYCLE_DURATION: f32 = std::f32::consts::TAU / SMILING_EYE_BOB_SPEED;
+const SMILING_EYE_CLOSED_DURATION: f32 = 2.4;
+const SMILING_EYE_OPENING_DURATION: f32 = 0.12;
+const SMILING_EYE_OPEN_DURATION: f32 = 0.18;
+const SMILING_EYE_CLOSING_DURATION: f32 = 0.12;
+const SMILING_EYE_BLINK_CYCLE_DURATION: f32 = SMILING_EYE_CLOSED_DURATION
+    + SMILING_EYE_OPENING_DURATION
+    + SMILING_EYE_OPEN_DURATION
+    + SMILING_EYE_CLOSING_DURATION;
+const THINKING_EYE_SWAY_AMPLITUDE: f32 = 5.0;
+const THINKING_EYE_PAUSE_DURATION: f32 = 1.0;
+const THINKING_EYE_MOVE_DURATION: f32 = 0.8;
+const THINKING_EYE_CYCLE_DURATION: f32 =
+    2.0 * (THINKING_EYE_PAUSE_DURATION + THINKING_EYE_MOVE_DURATION);
+
+fn smiling_eye_bob(elapsed: f32) -> f32 {
+    SMILING_EYE_BOB_AMPLITUDE * (elapsed * SMILING_EYE_BOB_SPEED).sin()
+}
+
+fn smiling_eye_frame(phase: f32) -> CursorEyeFrame {
+    if phase < SMILING_EYE_CLOSED_DURATION {
+        return CursorEyeFrame::Smiling;
+    }
+
+    let phase = phase - SMILING_EYE_CLOSED_DURATION;
+    if phase < SMILING_EYE_OPENING_DURATION {
+        return CursorEyeFrame::Half;
+    }
+
+    let phase = phase - SMILING_EYE_OPENING_DURATION;
+    if phase < SMILING_EYE_OPEN_DURATION {
+        return CursorEyeFrame::Open;
+    }
+
+    if phase < SMILING_EYE_OPEN_DURATION + SMILING_EYE_CLOSING_DURATION {
+        return CursorEyeFrame::Half;
+    }
+
+    CursorEyeFrame::Smiling
+}
+
+fn thinking_eye_sway(mut phase: f32) -> f32 {
+    if phase < THINKING_EYE_PAUSE_DURATION {
+        return -THINKING_EYE_SWAY_AMPLITUDE;
+    }
+
+    phase -= THINKING_EYE_PAUSE_DURATION;
+    if phase < THINKING_EYE_MOVE_DURATION {
+        return interpolate_eye_sway(
+            -THINKING_EYE_SWAY_AMPLITUDE,
+            THINKING_EYE_SWAY_AMPLITUDE,
+            phase / THINKING_EYE_MOVE_DURATION,
+        );
+    }
+
+    phase -= THINKING_EYE_MOVE_DURATION;
+    if phase < THINKING_EYE_PAUSE_DURATION {
+        return THINKING_EYE_SWAY_AMPLITUDE;
+    }
+
+    phase -= THINKING_EYE_PAUSE_DURATION;
+    interpolate_eye_sway(
+        THINKING_EYE_SWAY_AMPLITUDE,
+        -THINKING_EYE_SWAY_AMPLITUDE,
+        phase / THINKING_EYE_MOVE_DURATION,
+    )
+}
+
+fn interpolate_eye_sway(start: f32, end: f32, progress: f32) -> f32 {
+    EasingCurve::new(start, end, EaseFunction::SineInOut).sample_clamped(progress)
+}
+
+fn animate_lesson_eye_system(
     time: Res<Time>,
     mut materials: ResMut<Assets<CursorMaterial>>,
-    eye: Single<(&mut EyeBlinkAnimation, &MeshMaterial2d<CursorMaterial>)>,
+    eye: Single<(&mut EyeAnimation, &MeshMaterial2d<CursorMaterial>)>,
 ) {
-    let (mut blink, material_handle) = eye.into_inner();
-    blink.timer.tick(time.delta());
-    if !blink.timer.is_finished() {
+    let (mut animation, material_handle) = eye.into_inner();
+    if let Some(motion) = &mut animation.feedback_motion {
+        let delta = time.delta_secs();
+        let (frame, eye_motion) = match motion {
+            FeedbackEyeMotion::Smiling {
+                bob_elapsed,
+                blink_elapsed,
+            } => {
+                *bob_elapsed = (*bob_elapsed + delta).rem_euclid(SMILING_EYE_BOB_CYCLE_DURATION);
+                *blink_elapsed =
+                    (*blink_elapsed + delta).rem_euclid(SMILING_EYE_BLINK_CYCLE_DURATION);
+                let frame = smiling_eye_frame(*blink_elapsed);
+                (frame, Vec2::new(0.0, smiling_eye_bob(*bob_elapsed)))
+            }
+            FeedbackEyeMotion::Thinking { elapsed } => {
+                *elapsed = (*elapsed + delta).rem_euclid(THINKING_EYE_CYCLE_DURATION);
+                (
+                    CursorEyeFrame::Thinking,
+                    Vec2::new(thinking_eye_sway(*elapsed), 0.0),
+                )
+            }
+        };
+        if let Some(mut material) = materials.get_mut(&material_handle.0) {
+            material.set_eye_state(frame, eye_motion);
+        }
         return;
     }
 
-    let (phase, frame, duration) = match blink.phase {
+    animation.timer.tick(time.delta());
+    if !animation.timer.is_finished() {
+        return;
+    }
+
+    let (phase, frame, duration) = match animation.phase {
         EyeBlinkPhase::Waiting => (
             EyeBlinkPhase::Closing,
             CursorEyeFrame::Half,
@@ -290,8 +454,8 @@ fn animate_eye_blink_system(
             rand::rng().random_range(EYE_BLINK_MIN_INTERVAL..EYE_BLINK_MAX_INTERVAL),
         ),
     };
-    blink.phase = phase;
-    blink.timer = Timer::from_seconds(duration, TimerMode::Once);
+    animation.phase = phase;
+    animation.timer = Timer::from_seconds(duration, TimerMode::Once);
     if let Some(mut material) = materials.get_mut(&material_handle.0) {
         material.set_eye_frame(frame);
     }

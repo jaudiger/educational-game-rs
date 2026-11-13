@@ -1,5 +1,6 @@
 struct CursorUniform {
     eye_frame: u32,
+    eye_motion: vec2<f32>,
 }
 
 struct CursorInput {
@@ -217,7 +218,43 @@ fn magnifier_color(point: vec2<f32>) -> vec4<f32> {
     return color;
 }
 
-fn eye_color(point: vec2<f32>, frame: u32) -> vec4<f32> {
+fn closed_eye_color(
+    point: vec2<f32>,
+    outline: vec4<f32>,
+    center_y: f32,
+    lash_start_y: f32,
+    stroke_width: f32,
+    vertical_offset: f32,
+) -> vec4<f32> {
+    let dx = point.x - 42.0;
+    let offset = vec2<f32>(0.0, vertical_offset);
+    let eyelid_y = dx * dx * 0.014 + center_y + vertical_offset;
+    let eyelid = edge_coverage(abs(point.y - eyelid_y) - stroke_width)
+        * edge_coverage(abs(dx) - 17.5);
+    var color = vec4<f32>(0.0);
+    color = over(color, outline, eyelid);
+    color = over(
+        color,
+        outline,
+        edge_coverage(segment_distance(
+            point,
+            vec2<f32>(26.0, lash_start_y) + offset,
+            vec2<f32>(22.5, lash_start_y + 3.0) + offset,
+        ) - 0.85),
+    );
+    color = over(
+        color,
+        outline,
+        edge_coverage(segment_distance(
+            point,
+            vec2<f32>(58.0, lash_start_y) + offset,
+            vec2<f32>(61.5, lash_start_y + 3.0) + offset,
+        ) - 0.85),
+    );
+    return color;
+}
+
+fn eye_color(point: vec2<f32>, frame: u32, motion: vec2<f32>) -> vec4<f32> {
     let outline = srgb_color(vec3<f32>(107.0, 79.0, 18.0), 1.0);
     let sclera = srgb_color(vec3<f32>(255.0, 248.0, 226.0), 1.0);
     let iris = srgb_color(vec3<f32>(190.0, 115.0, 44.0), 1.0);
@@ -225,32 +262,12 @@ fn eye_color(point: vec2<f32>, frame: u32) -> vec4<f32> {
     let pupil = srgb_color(vec3<f32>(61.0, 40.0, 20.0), 1.0);
     let glint = srgb_color(vec3<f32>(255.0, 255.0, 242.0), 1.0);
 
+    if frame == 3u {
+        return closed_eye_color(point, outline, 40.0, 43.0, 1.35, motion.y);
+    }
+
     if frame == 2u {
-        var color = vec4<f32>(0.0);
-        let dx = point.x - 42.0;
-        let eyelid_y = dx * dx * 0.014 + 42.0;
-        let eyelid = edge_coverage(abs(point.y - eyelid_y) - 1.25)
-            * edge_coverage(abs(dx) - 17.5);
-        color = over(color, outline, eyelid);
-        color = over(
-            color,
-            outline,
-            edge_coverage(segment_distance(
-                point,
-                vec2<f32>(26.0, 44.0),
-                vec2<f32>(22.5, 47.0),
-            ) - 0.85),
-        );
-        color = over(
-            color,
-            outline,
-            edge_coverage(segment_distance(
-                point,
-                vec2<f32>(58.0, 44.0),
-                vec2<f32>(61.5, 47.0),
-            ) - 0.85),
-        );
-        return color;
+        return closed_eye_color(point, outline, 42.0, 44.0, 1.25, 0.0);
     }
 
     var eye_height = 12.5;
@@ -276,14 +293,19 @@ fn eye_color(point: vec2<f32>, frame: u32) -> vec4<f32> {
     color = over(color, outline, max(outer_eye - sclera_coverage, 0.0));
     color = over(color, sclera, sclera_coverage);
 
+    var gaze_center = vec2<f32>(42.0, 43.0);
+    if frame == 4u {
+        gaze_center += vec2<f32>(motion.x, 4.0);
+    }
+
     let iris_outer = edge_coverage(ellipse_distance(
         point,
-        vec2<f32>(42.0, 43.0),
+        gaze_center,
         vec2<f32>(7.4, iris_height + 1.2),
     )) * sclera_coverage;
     let iris_inner = edge_coverage(ellipse_distance(
         point,
-        vec2<f32>(42.0, 43.0),
+        gaze_center,
         vec2<f32>(6.0, iris_height),
     )) * sclera_coverage;
     color = over(color, outline, max(iris_outer - iris_inner, 0.0));
@@ -291,26 +313,26 @@ fn eye_color(point: vec2<f32>, frame: u32) -> vec4<f32> {
 
     let iris_light_coverage = iris_inner * edge_coverage(ellipse_distance(
         point,
-        vec2<f32>(40.5, 40.5),
+        gaze_center + vec2<f32>(-1.5, -2.5),
         vec2<f32>(4.3, 4.2),
     ));
     color = over(color, iris_light, iris_light_coverage);
 
     let pupil_coverage = iris_inner * edge_coverage(ellipse_distance(
         point,
-        vec2<f32>(43.0, 43.2),
+        gaze_center + vec2<f32>(1.0, 0.2),
         vec2<f32>(3.4, pupil_height),
     ));
     color = over(color, pupil, pupil_coverage);
 
     let first_glint = edge_coverage(ellipse_distance(
         point,
-        vec2<f32>(39.4, 39.7),
+        gaze_center + vec2<f32>(-2.6, -3.3),
         vec2<f32>(2.0, 2.4),
     ));
     let second_glint = edge_coverage(ellipse_distance(
         point,
-        vec2<f32>(45.0, 45.0),
+        gaze_center + vec2<f32>(3.0, 2.0),
         vec2<f32>(0.9, 1.0),
     ));
     let glint_coverage = min(iris_inner, max(first_glint, second_glint))
@@ -324,6 +346,6 @@ fn eye_color(point: vec2<f32>, frame: u32) -> vec4<f32> {
 fn cursor_mesh_fragment(input: CursorInput) -> @location(0) vec4<f32> {
     let point = input.uv * 96.0;
     let magnifier = magnifier_color(point);
-    let eye = eye_color(point, cursor.eye_frame);
+    let eye = eye_color(point, cursor.eye_frame, cursor.eye_motion);
     return finish_color(over_premultiplied(magnifier, eye));
 }
