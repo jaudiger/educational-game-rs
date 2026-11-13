@@ -11,13 +11,13 @@ use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
 use crate::plugins::lesson_mascot::{
     SkyBalloonAssets, SkyBalloonLayout, create_sky_balloon_assets, sky_balloon_scene,
 };
-use crate::plugins::sun_material::{SunLensFlareMaterial, SunMaterial};
+use crate::plugins::sun_material::SunMaterial;
 use crate::states::AppState;
 use crate::ui::components::{save_write_failure_notice, standard_button};
 use crate::ui::theme;
 
 use super::flow::{SummaryPhase, SummaryScreen};
-use super::theme::{SummaryThemeStyle, summary_backdrop, summary_curtain, summary_lens_flare};
+use super::theme::{SummaryThemeStyle, summary_backdrop, summary_curtain};
 use super::{LessonSummaryPresentation, SummaryBalloon};
 
 #[derive(Component, Reflect)]
@@ -41,7 +41,6 @@ struct SummaryCardPresentation {
 pub(super) struct SummaryMaterials<'w> {
     clouds: ResMut<'w, Assets<CloudUiMaterial>>,
     sun: ResMut<'w, Assets<SunMaterial>>,
-    flare: ResMut<'w, Assets<SunLensFlareMaterial>>,
     balloon: ResMut<'w, Assets<BalloonUiMaterial>>,
 }
 
@@ -72,7 +71,6 @@ pub(super) fn setup_lesson_summary(
         .clouds
         .add(CloudUiMaterial::new(CloudShapeId::Puffy, Color::WHITE));
     let sun_material = materials.sun.add(super::theme::create_sun_material());
-    let flare_material = materials.flare.add(SunLensFlareMaterial::new());
     let balloon_assets: SkyBalloonAssets = create_sky_balloon_assets(&mut materials.balloon);
     let balloon_layout = SkyBalloonLayout {
         right: percent(1.0),
@@ -135,7 +133,6 @@ pub(super) fn setup_lesson_summary(
                     content.spawn(summary_card(card, window));
                 })),
             ),
-            summary_lens_flare(flare_material),
             summary_curtain(style, cloud_material),
         ],
     ));

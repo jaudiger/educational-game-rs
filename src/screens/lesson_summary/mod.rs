@@ -2,9 +2,7 @@ mod flow;
 mod layout;
 mod theme;
 
-use bevy::asset::AssetEventSystems;
 use bevy::prelude::*;
-use bevy::ui::UiSystems;
 
 use crate::states::AppState;
 
@@ -39,13 +37,6 @@ impl Plugin for LessonSummaryScreenPlugin {
             .add_systems(
                 Update,
                 theme::update_summary_sun_glare.run_if(in_state(AppState::LessonSummary)),
-            )
-            .add_systems(
-                PostUpdate,
-                theme::update_summary_lens_flare
-                    .run_if(in_state(AppState::LessonSummary))
-                    .after(UiSystems::Layout)
-                    .before(AssetEventSystems),
             )
             .add_systems(
                 Update,

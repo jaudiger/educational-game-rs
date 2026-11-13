@@ -45,11 +45,6 @@ const SHADERS: &[(&str, &str, &[&str])] = &[
         &["cursor_mesh_fragment"],
     ),
     (
-        "sun_lens_flare.wgsl",
-        include_str!("../assets/shaders/sun_lens_flare.wgsl"),
-        &["fragment"],
-    ),
-    (
         "sun.wgsl",
         include_str!("../assets/shaders/sun.wgsl"),
         &["fragment"],

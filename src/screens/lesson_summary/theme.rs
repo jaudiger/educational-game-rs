@@ -4,7 +4,7 @@ use bevy::ui_render::ui_material::MaterialNode;
 use bevy::window::PrimaryWindow;
 
 use crate::plugins::cloud_material::CloudUiMaterial;
-use crate::plugins::sun_material::{SunLensFlareMaterial, SunMaterial};
+use crate::plugins::sun_material::SunMaterial;
 use crate::ui::theme;
 
 const SUMMARY_SUN_ART_SIZE: f32 = 152.0;
@@ -38,9 +38,6 @@ impl Default for SummarySunGlare {
         }
     }
 }
-
-#[derive(Component, Reflect)]
-pub(super) struct SummaryLensFlare;
 
 #[derive(Component, Reflect)]
 pub(super) struct SummaryCurtain {
@@ -156,25 +153,6 @@ pub(super) fn summary_backdrop(sun_material: Handle<SunMaterial>) -> impl Bundle
     )
 }
 
-pub(super) fn summary_lens_flare(material: Handle<SunLensFlareMaterial>) -> impl Bundle + use<> {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(0.0),
-            width: theme::layout::FILL_PARENT,
-            height: theme::layout::FILL_PARENT,
-            ..default()
-        },
-        MaterialNode(material),
-        SummaryLensFlare,
-        SummaryBackdropDecoration {
-            exit_direction: Vec2::new(1.0, -0.5),
-        },
-        Pickable::IGNORE,
-    )
-}
-
 fn summary_sun(sun_material: Handle<SunMaterial>) -> impl Bundle + use<> {
     (
         Node {
@@ -263,64 +241,6 @@ pub(super) fn update_summary_sun_glare(
             && let Some(mut material) = materials.get_mut(&material_node.0)
         {
             material.set_glare(direction, glare.strength);
-        }
-    }
-}
-
-pub(super) fn update_summary_lens_flare(
-    mut materials: ResMut<Assets<SunLensFlareMaterial>>,
-    sun: Single<(&ComputedNode, &UiGlobalTransform, &SummarySunGlare), With<SummarySunGlare>>,
-    flare: Single<
-        (
-            &ComputedNode,
-            &UiGlobalTransform,
-            &MaterialNode<SunLensFlareMaterial>,
-        ),
-        With<SummaryLensFlare>,
-    >,
-) {
-    let (sun_node, sun_transform, sun_glare) = *sun;
-    let (flare_node, flare_transform, material_node) = *flare;
-    if sun_node.is_empty() || flare_node.is_empty() {
-        return;
-    }
-    let Some(inverse_flare_transform) = flare_transform.try_inverse() else {
-        return;
-    };
-
-    let source_position = sun_transform.affine().transform_point2(Vec2::ZERO);
-    let source_position = inverse_flare_transform.transform_point2(source_position)
-        / flare_node.size()
-        + Vec2::splat(0.5);
-    let source_radius = sun_node.size().min_element() * 0.5 / SUMMARY_SUN_ART_SCALE;
-    let cursor_offset =
-        Vec2::new(sun_glare.angle.cos(), sun_glare.angle.sin()) * sun_glare.distance;
-    let cursor_position = sun_transform.affine().transform_point2(cursor_offset);
-    let cursor_position = inverse_flare_transform.transform_point2(cursor_position)
-        / flare_node.size()
-        + Vec2::splat(0.5);
-    if !source_position.is_finite()
-        || !cursor_position.is_finite()
-        || !source_radius.is_finite()
-        || source_radius <= 0.0
-    {
-        return;
-    }
-
-    if let Some(mut material) = materials.get_mut(&material_node.0) {
-        let (previous_position, previous_radius, previous_strength) = material.source();
-        let position_changed = previous_position.distance_squared(source_position) > 0.000_001;
-        let cursor_changed =
-            material.cursor_position().distance_squared(cursor_position) > 0.000_001;
-        let radius_changed = (previous_radius - source_radius).abs() > 0.01;
-        let strength_changed = (previous_strength - sun_glare.strength).abs() > 0.001;
-        if position_changed || cursor_changed || radius_changed || strength_changed {
-            material.set_source(
-                source_position,
-                source_radius,
-                cursor_position,
-                sun_glare.strength,
-            );
         }
     }
 }
