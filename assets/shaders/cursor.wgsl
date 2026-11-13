@@ -8,6 +8,8 @@ struct CursorInput {
 
 @group(2) @binding(0) var<uniform> cursor: CursorUniform;
 
+const LENS_GLASS_BOUNDARY: f32 = 21.3;
+
 fn srgb_to_linear_channel(channel: f32) -> f32 {
     if channel <= 0.04045 {
         return channel / 12.92;
@@ -85,21 +87,27 @@ fn magnifier_color(point: vec2<f32>) -> vec4<f32> {
     let gold_light = srgb_color(vec3<f32>(253.0, 216.0, 104.0), 1.0);
     let gold_dark = srgb_color(vec3<f32>(139.0, 102.0, 28.0), 1.0);
     let rust = srgb_color(vec3<f32>(196.0, 66.0, 31.0), 1.0);
-    let glass = srgb_color(vec3<f32>(166.0, 215.0, 238.0), 1.0);
-    let glass_light = srgb_color(vec3<f32>(225.0, 244.0, 250.0), 1.0);
-    let glass_shade = srgb_color(vec3<f32>(120.0, 184.0, 214.0), 1.0);
+    let glass = srgb_color(vec3<f32>(224.0, 224.0, 224.0), 1.0);
+    let glass_light = srgb_color(vec3<f32>(250.0, 250.0, 250.0), 1.0);
+    let glass_shade = srgb_color(vec3<f32>(190.0, 190.0, 190.0), 1.0);
 
     var color = vec4<f32>(0.0);
     let lens_distance = length(point - vec2<f32>(42.0, 42.0));
     let lens_coverage = edge_coverage(lens_distance - 30.5);
+    let lens_antialias = max(fwidth(lens_distance), 0.65);
+    let inner_glass = 1.0 - boundary_transition(
+        lens_distance,
+        LENS_GLASS_BOUNDARY,
+        lens_antialias,
+    );
     let shadow_coverage = edge_coverage(circle_distance(
         point,
         vec2<f32>(44.0, 45.0),
         31.8,
-    ));
+    )) * (1.0 - inner_glass);
     color = over(color, shadow, shadow_coverage);
 
-    let handle_start = vec2<f32>(58.0, 58.0);
+    let handle_start = vec2<f32>(63.0, 63.0);
     let handle_end = vec2<f32>(83.0, 83.0);
     let handle_distance = segment_distance(point, handle_start, handle_end);
     color = over(color, outline, edge_coverage(handle_distance - 8.0));
@@ -127,12 +135,11 @@ fn magnifier_color(point: vec2<f32>) -> vec4<f32> {
         edge_coverage(rust_distance - 1.1) * edge_coverage(handle_distance - 6.0),
     );
 
-    let lens_antialias = max(fwidth(lens_distance), 0.65);
     var lens_rgb = glass.rgb;
     lens_rgb = mix(
         lens_rgb,
         outline.rgb,
-        boundary_transition(lens_distance, 21.3, lens_antialias),
+        boundary_transition(lens_distance, LENS_GLASS_BOUNDARY, lens_antialias),
     );
     lens_rgb = mix(
         lens_rgb,
@@ -186,7 +193,6 @@ fn magnifier_color(point: vec2<f32>) -> vec4<f32> {
         )),
     );
 
-    let inner_glass = 1.0 - boundary_transition(lens_distance, 21.3, lens_antialias);
     lens_rgb = mix(
         lens_rgb,
         glass_light.rgb,
@@ -205,7 +211,9 @@ fn magnifier_color(point: vec2<f32>) -> vec4<f32> {
             vec2<f32>(13.0, 8.0),
         )),
     );
-    color = over(color, vec4<f32>(lens_rgb, 1.0), lens_coverage);
+
+    let glass_alpha = mix(0.94, 0.30, inner_glass);
+    color = over(color, vec4<f32>(lens_rgb, glass_alpha), lens_coverage);
     return color;
 }
 
