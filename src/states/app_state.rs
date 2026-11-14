@@ -47,8 +47,8 @@ impl ComputedStates for InLessonFlow {
 
 /// Computed state covering the active-lesson cycle (`LessonPlay` and
 /// `LessonSummary`). Used as the cleanup scope for per-lesson runtime
-/// resources so that both normal completion and early exit (quit button)
-/// trigger a single `OnExit` cleanup when returning to `ThemeExploration`.
+/// resources and shared visuals, so normal completion and early exit trigger a
+/// single `OnExit` cleanup when returning to `ThemeExploration`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ActiveLesson;
 

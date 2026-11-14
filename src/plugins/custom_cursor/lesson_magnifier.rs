@@ -14,7 +14,7 @@ use rand::RngExt;
 
 use crate::data::{AnswerResult, LastAnswer};
 use crate::plugins::cursor_material::{CursorEyeFrame, CursorMaterial};
-use crate::states::{AppState, LessonPhase};
+use crate::states::{ActiveLesson, LessonPhase};
 use crate::ui::components::ButtonVisualStyle;
 use crate::ui::theme;
 
@@ -24,8 +24,8 @@ use super::{
 };
 
 pub(super) fn register(app: &mut App) {
-    app.add_systems(OnEnter(AppState::LessonPlay), setup_lesson_cursor)
-        .add_systems(OnExit(AppState::LessonPlay), super::cleanup_custom_cursor)
+    app.add_systems(OnEnter(ActiveLesson), setup_lesson_cursor)
+        .add_systems(OnExit(ActiveLesson), super::cleanup_custom_cursor)
         .add_systems(
             OnEnter(LessonPhase::ShowFeedback),
             show_feedback_eye_expression,
@@ -42,7 +42,7 @@ pub(super) fn register(app: &mut App) {
                     .after(super::follow_pointer_system),
                 animate_lesson_eye_system,
             )
-                .run_if(in_state(AppState::LessonPlay))
+                .run_if(in_state(ActiveLesson))
                 .run_if(resource_exists::<super::CustomCursorActive>),
         );
 }

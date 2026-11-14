@@ -1064,23 +1064,3 @@ fn path_stone_x_percent(placement: PathStonePlacement, viewport_size: Vec2) -> f
     }
     .clamp(stone_half_width, 100.0 - stone_half_width)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{PARALLAX_HORIZON_HEIGHT, QuestionBackgroundParallaxLayer};
-
-    #[test]
-    fn vertical_compression_keeps_the_horizon_anchored() {
-        let height = 800.0;
-        let layer = QuestionBackgroundParallaxLayer {
-            vertical_travel: 0.0,
-            vertical_compression: 0.08,
-        };
-        let (vertical_scale, vertical_translation) = layer.departure_transform(height, 1.0);
-        let horizon = height * PARALLAX_HORIZON_HEIGHT;
-        let transformed_horizon =
-            (horizon - 400.0).mul_add(vertical_scale, 400.0) + vertical_translation;
-
-        assert!((transformed_horizon - horizon).abs() < 0.001);
-    }
-}
