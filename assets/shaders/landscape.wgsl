@@ -38,16 +38,12 @@ fn path_width(y: f32) -> f32 {
     );
 }
 
-fn sky_color(y: f32) -> vec3<f32> {
-    return mix(
-        vec3<f32>(0.36, 0.67, 0.86),
-        vec3<f32>(0.76, 0.87, 0.94),
-        smoothstep(0.02, 0.62, y),
-    );
+fn sky_color() -> vec3<f32> {
+    return vec3<f32>(0.4200333, 0.6920711, 0.9114075);
 }
 
-fn sky_fragment(input: LandscapeInput) -> vec4<f32> {
-    return vec4<f32>(sky_color(input.uv.y), 1.0);
+fn sky_fragment(_input: LandscapeInput) -> vec4<f32> {
+    return vec4<f32>(sky_color(), 1.0);
 }
 
 fn ridge_fragment(input: LandscapeInput) -> vec4<f32> {
@@ -59,7 +55,7 @@ fn ridge_fragment(input: LandscapeInput) -> vec4<f32> {
     let ridge = 0.315 - ridge_height;
     let ridge_strength = smoothstep(0.0, 0.18, 1.0 - abs(ridge_offset));
     let ridge_coverage = coverage(ridge - y) * ridge_strength;
-    let color = mix(sky_color(y), vec3<f32>(0.48, 0.60, 0.66), 0.7);
+    let color = mix(sky_color(), vec3<f32>(0.48, 0.60, 0.66), 0.7);
     return vec4<f32>(color, ridge_coverage);
 }
 

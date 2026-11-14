@@ -1,7 +1,6 @@
 use bevy::ecs::system::SystemParam;
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
-use bevy::ui::InteractionDisabled;
 use bevy::window::PrimaryWindow;
 
 use crate::data::LessonScore;
@@ -11,13 +10,12 @@ use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
 use crate::plugins::lesson_mascot::{
     SkyBalloonAssets, SkyBalloonLayout, create_sky_balloon_assets, sky_balloon_scene,
 };
-use crate::plugins::sun_material::SunMaterial;
 use crate::states::AppState;
 use crate::ui::components::{save_write_failure_notice, standard_button};
 use crate::ui::theme;
 
 use super::flow::{SummaryPhase, SummaryScreen};
-use super::theme::{SummaryThemeStyle, summary_backdrop, summary_curtain};
+use super::theme::{SUMMARY_CURTAIN_COLOR, summary_curtain, summary_departure_fade};
 use super::{LessonSummaryPresentation, SummaryBalloon};
 
 #[derive(Component, Reflect)]
@@ -40,7 +38,6 @@ struct SummaryCardPresentation {
 #[derive(SystemParam)]
 pub(super) struct SummaryMaterials<'w> {
     clouds: ResMut<'w, Assets<CloudUiMaterial>>,
-    sun: ResMut<'w, Assets<SunMaterial>>,
     balloon: ResMut<'w, Assets<BalloonUiMaterial>>,
 }
 
@@ -66,20 +63,11 @@ pub(super) fn setup_lesson_summary(
         TranslationKey::SummaryGood => theme::colors::PRIMARY,
         _ => theme::colors::SECONDARY,
     };
-    let style = SummaryThemeStyle::sky();
     let cloud_material = materials
         .clouds
         .add(CloudUiMaterial::new(CloudShapeId::Puffy, Color::WHITE));
-    let sun_material = materials.sun.add(super::theme::create_sun_material());
     let balloon_assets: SkyBalloonAssets = create_sky_balloon_assets(&mut materials.balloon);
-    let balloon_layout = SkyBalloonLayout {
-        right: percent(1.0),
-        bottom: percent(7.0),
-        root_width: theme::scaled(160.0),
-        envelope_width: 142.0,
-        basket_width: 93.0,
-        basket_overlap: 9.0,
-    };
+    let balloon_layout = SkyBalloonLayout::default();
     let card = SummaryCardPresentation {
         title: i18n.t(&TranslationKey::SummaryTitle).into_owned(),
         score_label: i18n
@@ -105,16 +93,18 @@ pub(super) fn setup_lesson_summary(
             align_items: AlignItems::Center,
             ..default()
         },
-        BackgroundColor(style.background),
         TabGroup::new(0),
         SummaryScreen {
             phase: SummaryPhase::Revealing,
             elapsed: 0.0,
         },
         DespawnOnExit(AppState::LessonSummary),
-        children![
-            summary_backdrop(sun_material),
-            (
+        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+            let mut balloon = parent.spawn_empty();
+            balloon
+                .insert(SummaryBalloon)
+                .queue_apply_scene(sky_balloon_scene(balloon_assets, balloon_layout));
+            parent.spawn((
                 Node {
                     position_type: PositionType::Relative,
                     width: percent(88.0),
@@ -125,16 +115,11 @@ pub(super) fn setup_lesson_summary(
                     align_items: AlignItems::Center,
                     ..default()
                 },
-                Children::spawn(SpawnWith(move |content: &mut ChildSpawner| {
-                    let mut balloon = content.spawn_empty();
-                    balloon
-                        .insert(SummaryBalloon)
-                        .queue_apply_scene(sky_balloon_scene(balloon_assets, balloon_layout));
-                    content.spawn(summary_card(card, window));
-                })),
-            ),
-            summary_curtain(style, cloud_material),
-        ],
+                children![summary_card(card, window)],
+            ));
+            parent.spawn(summary_curtain(SUMMARY_CURTAIN_COLOR, cloud_material));
+            parent.spawn(summary_departure_fade(SUMMARY_CURTAIN_COLOR));
+        })),
     ));
 }
 
@@ -190,7 +175,6 @@ fn summary_card(data: SummaryCardPresentation, window: Entity) -> impl Bundle + 
                     window,
                 ),
                 SummaryReturnButton,
-                InteractionDisabled,
             ));
         })),
     )

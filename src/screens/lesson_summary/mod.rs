@@ -36,10 +36,6 @@ impl Plugin for LessonSummaryScreenPlugin {
             )
             .add_systems(
                 Update,
-                theme::update_summary_sun_glare.run_if(in_state(AppState::LessonSummary)),
-            )
-            .add_systems(
-                Update,
                 (
                     flow::handle_summary_return,
                     flow::tick_summary_reveal,

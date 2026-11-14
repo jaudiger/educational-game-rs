@@ -5,6 +5,7 @@ use bevy::ui_render::ui_material::{MaterialNode, UiMaterial};
 use bevy::window::WindowResized;
 
 use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
+use crate::ui::components::full_screen_overlay_node;
 use crate::ui::theme;
 
 use crate::plugins::lesson_motion::{LessonMotionSet, LessonWind, smooth_motion_fade};
@@ -13,14 +14,16 @@ use crate::plugins::flower_material::FlowerMaterial;
 use crate::plugins::grass_material::GrassMaterial;
 use crate::plugins::landscape_material::{LandscapeLayer, LandscapeMaterial, PathGeometry};
 use crate::plugins::stone_material::{STONE_HALF_WIDTH_RATIO, StoneMaterial};
+use crate::plugins::sun_material::{SunMaterial, sky_sun, sky_sun_material};
 use crate::plugins::tree_material::TreeMaterial;
-use crate::states::AppState;
+use crate::states::ActiveLesson;
 
 const PATH_GEOMETRY: PathGeometry = PathGeometry::DEFAULT;
 const CLOUD_DRIFT_SPEED_DESIGN_PX_PER_SECOND: f32 = 15.0;
 const CLOUD_MOTION_FADE_SECONDS: f32 = 2.0;
 const FLOWER_BEND_AMOUNT: f32 = 0.0375;
 const GRASS_BEND_AMOUNT: f32 = 0.075;
+const PARALLAX_HORIZON_HEIGHT: f32 = 0.32;
 
 pub struct QuestionBackgroundPlugin;
 
@@ -29,6 +32,7 @@ pub struct QuestionBackgroundAssets<'w> {
     pub landscape: ResMut<'w, Assets<LandscapeMaterial>>,
     pub trees: ResMut<'w, Assets<TreeMaterial>>,
     pub clouds: ResMut<'w, Assets<CloudUiMaterial>>,
+    pub sun: ResMut<'w, Assets<SunMaterial>>,
     pub flowers: ResMut<'w, Assets<FlowerMaterial>>,
     pub grass: ResMut<'w, Assets<GrassMaterial>>,
     pub stones: ResMut<'w, Assets<StoneMaterial>>,
@@ -38,22 +42,39 @@ impl Plugin for QuestionBackgroundPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (update_path_stone_positions, update_tree_positions)
-                .run_if(in_state(AppState::LessonPlay)),
+            (update_path_stone_positions, update_tree_positions).run_if(in_state(ActiveLesson)),
         )
         .add_systems(
             Update,
             animate_question_vegetation
                 .after(LessonMotionSet::AdvanceWind)
-                .run_if(in_state(AppState::LessonPlay)),
+                .run_if(in_state(ActiveLesson)),
         )
         .add_systems(
             PostUpdate,
             animate_question_clouds
                 .after(UiSystems::Propagate)
                 .before(UiSystems::Layout)
-                .run_if(in_state(AppState::LessonPlay)),
+                .run_if(in_state(ActiveLesson)),
         );
+    }
+}
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[require(UiTransform)]
+pub struct QuestionBackgroundParallaxLayer {
+    vertical_travel: f32,
+    vertical_compression: f32,
+}
+
+impl QuestionBackgroundParallaxLayer {
+    pub fn departure_transform(self, viewport_height: f32, progress: f32) -> (f32, f32) {
+        let vertical_scale = (-progress).mul_add(self.vertical_compression, 1.0);
+        let horizon_anchor = viewport_height * PARALLAX_HORIZON_HEIGHT;
+        let anchor_distance = (-viewport_height).mul_add(0.5, horizon_anchor);
+        let anchor_offset = (1.0 - vertical_scale) * anchor_distance;
+        let travel = viewport_height * self.vertical_travel * progress;
+        (vertical_scale, anchor_offset + travel)
     }
 }
 
@@ -506,6 +527,7 @@ struct ResponsiveTreePosition {
     side: TreeSide,
 }
 
+#[derive(Clone)]
 struct BackgroundMaterials {
     sky: Handle<LandscapeMaterial>,
     ridge: Handle<LandscapeMaterial>,
@@ -616,43 +638,90 @@ pub fn spawn_question_background(
 ) {
     let materials = BackgroundMaterials::new(assets);
     let motion = QuestionLandscapeMaterials::new(&materials);
+    let sun_material = assets.sun.add(sky_sun_material());
     commands.spawn((
         full_screen_material_bundle(materials.sky.clone()),
         motion,
         GlobalZIndex(-1),
         Pickable::IGNORE,
-        DespawnOnExit(crate::states::AppState::LessonPlay),
+        DespawnOnExit(ActiveLesson),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            spawn_clouds(parent, &materials);
-            parent.spawn((
+            parent.spawn((sky_sun(sun_material), ZIndex(-3)));
+            spawn_distant_layer(parent, &materials, window, viewport_size);
+            spawn_ground_layer(parent, &materials, window, viewport_size);
+            spawn_foreground_layer(parent, &materials, window, viewport_size);
+        })),
+    ));
+}
+
+fn spawn_distant_layer(
+    parent: &mut ChildSpawner,
+    materials: &BackgroundMaterials,
+    window: Entity,
+    viewport_size: Vec2,
+) {
+    let materials = materials.clone();
+    parent.spawn((
+        parallax_layer_bundle(0.025, 0.015, -2),
+        Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
+            spawn_clouds(layer, &materials);
+            layer.spawn((
                 full_screen_material_bundle(materials.ridge.clone()),
                 ZIndex(-1),
                 Pickable::IGNORE,
             ));
             spawn_trees(
-                parent,
+                layer,
                 &materials,
                 window,
                 viewport_size,
                 TreeBand::Background,
             );
-            parent.spawn((
+        })),
+    ));
+}
+
+fn spawn_ground_layer(
+    parent: &mut ChildSpawner,
+    materials: &BackgroundMaterials,
+    window: Entity,
+    viewport_size: Vec2,
+) {
+    let materials = materials.clone();
+    parent.spawn((
+        parallax_layer_bundle(0.07, 0.04, 1),
+        Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
+            layer.spawn((
                 full_screen_material_bundle(materials.meadow.clone()),
                 ZIndex(1),
                 Pickable::IGNORE,
             ));
             spawn_trees(
-                parent,
+                layer,
                 &materials,
                 window,
                 viewport_size,
                 TreeBand::Midground,
             );
-            spawn_flowers(parent, &materials);
-            spawn_grass_tufts(parent, &materials);
-            spawn_path_stones(parent, &materials, window, viewport_size);
+            spawn_path_stones(layer, &materials, window, viewport_size);
+        })),
+    ));
+}
+
+fn spawn_foreground_layer(
+    parent: &mut ChildSpawner,
+    materials: &BackgroundMaterials,
+    window: Entity,
+    viewport_size: Vec2,
+) {
+    let materials = materials.clone();
+    parent.spawn((
+        parallax_layer_bundle(0.11, 0.08, 4),
+        Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
+            spawn_flowers(layer, &materials);
+            spawn_grass_tufts(layer, &materials);
             spawn_trees(
-                parent,
+                layer,
                 &materials,
                 window,
                 viewport_size,
@@ -662,18 +731,24 @@ pub fn spawn_question_background(
     ));
 }
 
-fn full_screen_material_bundle<M: UiMaterial>(material: Handle<M>) -> impl Bundle + use<M> {
+fn parallax_layer_bundle(
+    vertical_travel: f32,
+    vertical_compression: f32,
+    z_index: i32,
+) -> impl Bundle + use<> {
     (
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(0.0),
-            width: percent(100.0),
-            height: percent(100.0),
-            ..default()
+        full_screen_overlay_node(),
+        QuestionBackgroundParallaxLayer {
+            vertical_travel,
+            vertical_compression,
         },
-        MaterialNode(material),
+        ZIndex(z_index),
+        Pickable::IGNORE,
     )
+}
+
+fn full_screen_material_bundle<M: UiMaterial>(material: Handle<M>) -> impl Bundle + use<M> {
+    (full_screen_overlay_node(), MaterialNode(material))
 }
 
 fn spawn_clouds(parent: &mut ChildSpawner, materials: &BackgroundMaterials) {
@@ -988,4 +1063,24 @@ fn path_stone_x_percent(placement: PathStonePlacement, viewport_size: Vec2) -> f
         PathStoneSide::Right => center + half_width + stone_half_width + PATH_STONE_GAP_PERCENT,
     }
     .clamp(stone_half_width, 100.0 - stone_half_width)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PARALLAX_HORIZON_HEIGHT, QuestionBackgroundParallaxLayer};
+
+    #[test]
+    fn vertical_compression_keeps_the_horizon_anchored() {
+        let height = 800.0;
+        let layer = QuestionBackgroundParallaxLayer {
+            vertical_travel: 0.0,
+            vertical_compression: 0.08,
+        };
+        let (vertical_scale, vertical_translation) = layer.departure_transform(height, 1.0);
+        let horizon = height * PARALLAX_HORIZON_HEIGHT;
+        let transformed_horizon =
+            (horizon - 400.0).mul_add(vertical_scale, 400.0) + vertical_translation;
+
+        assert!((transformed_horizon - horizon).abs() < 0.001);
+    }
 }

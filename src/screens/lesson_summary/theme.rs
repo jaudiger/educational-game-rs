@@ -1,43 +1,8 @@
 use bevy::prelude::*;
-use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::ui_material::MaterialNode;
-use bevy::window::PrimaryWindow;
 
 use crate::plugins::cloud_material::CloudUiMaterial;
-use crate::plugins::sun_material::SunMaterial;
-use crate::ui::theme;
-
-const SUMMARY_SUN_ART_SIZE: f32 = 152.0;
-const SUMMARY_SUN_NODE_SIZE: f32 = 184.0;
-const SUMMARY_SUN_ART_SCALE: f32 = SUMMARY_SUN_NODE_SIZE / SUMMARY_SUN_ART_SIZE;
-const DEFAULT_GLARE_ANGLE: f32 = -2.356_194_5;
-const DEFAULT_GLARE_STRENGTH: f32 = 0.25;
-const ACTIVE_GLARE_STRENGTH: f32 = 1.0;
-const GLARE_DEAD_ZONE: f32 = 6.0;
-const GLARE_SMOOTHING: f32 = 10.0;
-
-pub(super) fn create_sun_material() -> SunMaterial {
-    let direction = Vec2::new(DEFAULT_GLARE_ANGLE.cos(), DEFAULT_GLARE_ANGLE.sin());
-    SunMaterial::new(direction, DEFAULT_GLARE_STRENGTH, SUMMARY_SUN_ART_SCALE)
-}
-
-#[derive(Component, Reflect)]
-#[require(RelativeCursorPosition)]
-pub(super) struct SummarySunGlare {
-    angle: f32,
-    strength: f32,
-    distance: f32,
-}
-
-impl Default for SummarySunGlare {
-    fn default() -> Self {
-        Self {
-            angle: DEFAULT_GLARE_ANGLE,
-            strength: DEFAULT_GLARE_STRENGTH,
-            distance: 0.0,
-        }
-    }
-}
+use crate::ui::components::full_screen_overlay_node;
 
 #[derive(Component, Reflect)]
 pub(super) struct SummaryCurtain {
@@ -50,16 +15,9 @@ pub(super) struct SummaryCloud {
 }
 
 #[derive(Component, Reflect)]
-#[require(UiTransform)]
-pub(super) struct SummaryBackdropDecoration {
-    pub(super) exit_direction: Vec2,
-}
+pub(super) struct SummaryDepartureFade;
 
-#[derive(Clone, Copy)]
-pub(super) struct SummaryThemeStyle {
-    pub(super) background: Color,
-    pub(super) curtain: Color,
-}
+pub(super) const SUMMARY_CURTAIN_COLOR: Color = Color::srgb(0.85, 0.93, 0.98);
 
 #[derive(Clone, Copy)]
 struct RevealShapeSpec {
@@ -129,139 +87,24 @@ const REVEAL_SHAPES: [RevealShapeSpec; 8] = [
     },
 ];
 
-impl SummaryThemeStyle {
-    pub(super) const fn sky() -> Self {
-        Self {
-            background: Color::srgb(0.68, 0.85, 0.96),
-            curtain: Color::srgb(0.85, 0.93, 0.98),
-        }
-    }
-}
-
-pub(super) fn summary_backdrop(sun_material: Handle<SunMaterial>) -> impl Bundle + use<> {
+pub(super) fn summary_departure_fade(color: Color) -> impl Bundle + use<> {
     (
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(0.0),
-            width: theme::layout::FILL_PARENT,
-            height: theme::layout::FILL_PARENT,
-            ..default()
-        },
-        Pickable::IGNORE,
-        children![summary_sun(sun_material)],
-    )
-}
-
-fn summary_sun(sun_material: Handle<SunMaterial>) -> impl Bundle + use<> {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            right: theme::scaled(0.0),
-            top: theme::scaled(0.0),
-            width: theme::scaled(SUMMARY_SUN_NODE_SIZE),
-            height: theme::scaled(SUMMARY_SUN_NODE_SIZE),
-            ..default()
-        },
-        MaterialNode(sun_material),
-        SummarySunGlare::default(),
-        SummaryBackdropDecoration {
-            exit_direction: Vec2::new(1.0, -0.5),
-        },
+        full_screen_overlay_node(),
+        BackgroundColor(color.with_alpha(0.0)),
+        ZIndex(10),
+        SummaryDepartureFade,
         Pickable::IGNORE,
     )
-}
-
-pub(super) fn update_summary_sun_glare(
-    time: Res<Time>,
-    primary_window: Single<&Window, With<PrimaryWindow>>,
-    mut materials: ResMut<Assets<SunMaterial>>,
-    mut suns: Query<(
-        &RelativeCursorPosition,
-        &ComputedNode,
-        &MaterialNode<SunMaterial>,
-        &mut SummarySunGlare,
-    )>,
-) {
-    let interpolation = 1.0 - (-GLARE_SMOOTHING * time.delta_secs()).exp();
-    let dead_zone_squared = GLARE_DEAD_ZONE * GLARE_DEAD_ZONE;
-
-    for (cursor, node, material_node, mut glare) in &mut suns {
-        let default_distance = node.size().min_element() * 2.5;
-        let local_position = if primary_window.focused {
-            cursor
-                .normalized
-                .map(|normalized| normalized * node.size())
-                .filter(|position| position.is_finite())
-        } else {
-            None
-        };
-        let (target_angle, target_strength, target_distance) = match local_position {
-            Some(position)
-                if (position * node.inverse_scale_factor()).length_squared()
-                    <= dead_zone_squared =>
-            {
-                let distance = if glare.distance > 0.0 {
-                    glare.distance
-                } else {
-                    default_distance
-                };
-                (glare.angle, glare.strength, distance)
-            }
-            Some(position) => (
-                position.y.atan2(position.x),
-                ACTIVE_GLARE_STRENGTH,
-                position.length(),
-            ),
-            None => (
-                DEFAULT_GLARE_ANGLE,
-                DEFAULT_GLARE_STRENGTH,
-                default_distance,
-            ),
-        };
-
-        let angle_delta = (target_angle - glare.angle + std::f32::consts::PI)
-            .rem_euclid(std::f32::consts::TAU)
-            - std::f32::consts::PI;
-        let angle_change = angle_delta * interpolation;
-        let strength_change = (target_strength - glare.strength) * interpolation;
-        let distance_change = (target_distance - glare.distance) * interpolation;
-        if angle_change.abs() <= f32::EPSILON
-            && strength_change.abs() <= f32::EPSILON
-            && distance_change.abs() <= f32::EPSILON
-        {
-            continue;
-        }
-
-        glare.angle += angle_change;
-        glare.strength += strength_change;
-        glare.distance += distance_change;
-        let direction = Vec2::new(glare.angle.cos(), glare.angle.sin());
-        if (angle_change.abs() > f32::EPSILON || strength_change.abs() > f32::EPSILON)
-            && let Some(mut material) = materials.get_mut(&material_node.0)
-        {
-            material.set_glare(direction, glare.strength);
-        }
-    }
 }
 
 pub(super) fn summary_curtain(
-    style: SummaryThemeStyle,
+    color: Color,
     cloud_material: Handle<CloudUiMaterial>,
 ) -> impl Bundle + use<> {
     (
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(0.0),
-            width: theme::layout::FILL_PARENT,
-            height: theme::layout::FILL_PARENT,
-            ..default()
-        },
-        BackgroundColor(style.curtain),
-        SummaryCurtain {
-            color: style.curtain,
-        },
+        full_screen_overlay_node(),
+        BackgroundColor(color),
+        SummaryCurtain { color },
         Pickable::IGNORE,
         Children::spawn(SpawnIter(
             REVEAL_SHAPES

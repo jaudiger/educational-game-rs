@@ -18,6 +18,18 @@ use bevy::prelude::*;
 use super::theme;
 use crate::ui::layout;
 
+/// Returns an absolute node that fills its parent.
+pub fn full_screen_overlay_node() -> Node {
+    Node {
+        position_type: PositionType::Absolute,
+        left: px(0.0),
+        top: px(0.0),
+        width: theme::layout::FILL_PARENT,
+        height: theme::layout::FILL_PARENT,
+        ..default()
+    }
+}
+
 /// Marks the inner check mark of a styled checkbox.
 #[derive(Component, Reflect, Clone, Default)]
 pub struct CheckboxMark;

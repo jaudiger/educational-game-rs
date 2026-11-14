@@ -4,16 +4,18 @@ use bevy::ui::InteractionDisabled;
 use bevy::ui_render::ui_material::MaterialNode;
 
 use crate::plugins::balloon_material::{BalloonFlame, BalloonUiMaterial};
+use crate::plugins::question_background::QuestionBackgroundParallaxLayer;
 use crate::states::AppState;
 use crate::ui::components::ButtonActivated;
 use crate::ui::theme;
 
 use super::SummaryBalloon;
 use super::layout::{SummaryResultCard, SummaryReturnButton};
-use super::theme::{SummaryBackdropDecoration, SummaryCloud, SummaryCurtain};
+use super::theme::{SummaryCloud, SummaryCurtain, SummaryDepartureFade};
 
 const REVEAL_DURATION: f32 = 3.2;
 const DEPARTURE_DURATION: f32 = 1.6;
+const DEPARTURE_FADE_START: f32 = 0.35;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Reflect)]
 pub(super) enum SummaryPhase {
@@ -32,10 +34,16 @@ pub(super) fn handle_summary_return(
     mut commands: Commands,
     mut activations: MessageReader<ButtonActivated>,
     buttons: Query<(), With<SummaryReturnButton>>,
+    curtains: Query<Entity, With<SummaryCurtain>>,
     mut screen: Single<&mut SummaryScreen>,
 ) {
     for activation in activations.read() {
-        if buttons.contains(activation.0) && screen.phase == SummaryPhase::Ready {
+        if buttons.contains(activation.0) && screen.phase != SummaryPhase::Departing {
+            if screen.phase == SummaryPhase::Revealing {
+                for curtain in &curtains {
+                    commands.entity(curtain).despawn();
+                }
+            }
             screen.phase = SummaryPhase::Departing;
             screen.elapsed = 0.0;
             commands.entity(activation.0).insert(InteractionDisabled);
@@ -80,10 +88,7 @@ pub(super) fn tick_summary_reveal(
         screen.phase = SummaryPhase::Ready;
         screen.elapsed = 0.0;
         if let Ok(button) = buttons.single() {
-            commands
-                .entity(button)
-                .remove::<InteractionDisabled>()
-                .insert(AutoFocus);
+            commands.entity(button).insert(AutoFocus);
         }
     }
 }
@@ -97,12 +102,13 @@ pub(super) fn tick_summary_departure(
     mut animated_elements: ParamSet<(
         Query<(&mut UiTransform, &ComputedUiRenderTargetInfo), With<SummaryBalloon>>,
         Query<(
-            &SummaryBackdropDecoration,
+            &QuestionBackgroundParallaxLayer,
             &mut UiTransform,
             &ComputedUiRenderTargetInfo,
         )>,
         Query<(&mut UiTransform, &ComputedUiRenderTargetInfo), With<SummaryResultCard>>,
     )>,
+    mut departure_fades: Query<&mut BackgroundColor, With<SummaryDepartureFade>>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     if screen.phase != SummaryPhase::Departing {
@@ -129,12 +135,11 @@ pub(super) fn tick_summary_departure(
     }
 
     {
-        for (decoration, mut transform, target) in &mut animated_elements.p1() {
-            let size = target.logical_size();
-            transform.translation = Val2::new(
-                px(decoration.exit_direction.x * size.x * 0.22 * progress),
-                px(decoration.exit_direction.y * size.y * 0.22 * progress),
-            );
+        for (layer, mut transform, target) in &mut animated_elements.p1() {
+            let (vertical_scale, vertical_translation) =
+                layer.departure_transform(target.logical_size().y, progress);
+            transform.translation = Val2::new(px(0.0), px(vertical_translation));
+            transform.scale = Vec2::new(1.0, vertical_scale);
         }
     }
 
@@ -147,6 +152,12 @@ pub(super) fn tick_summary_departure(
         }
     }
 
+    let fade_progress =
+        ((linear_progress - DEPARTURE_FADE_START) / (1.0 - DEPARTURE_FADE_START)).clamp(0.0, 1.0);
+    for mut background in &mut departure_fades {
+        background.0 = background.0.with_alpha(ease_in_out(fade_progress));
+    }
+
     if linear_progress >= 1.0 {
         next_state.set(AppState::ThemeExploration);
     }
@@ -154,4 +165,49 @@ pub(super) fn tick_summary_departure(
 
 fn ease_in_out(progress: f32) -> f32 {
     0.5 * (1.0 - (std::f32::consts::PI * progress).cos())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn summary_return_app(phase: SummaryPhase, elapsed: f32) -> (App, Entity, Entity) {
+        let mut app = App::new();
+        app.add_message::<ButtonActivated>()
+            .add_systems(Update, handle_summary_return);
+        let screen = app.world_mut().spawn(SummaryScreen { phase, elapsed }).id();
+        let button = app.world_mut().spawn(SummaryReturnButton).id();
+        (app, screen, button)
+    }
+
+    #[test]
+    fn returning_during_reveal_dismisses_the_curtain() {
+        let (mut app, screen, button) = summary_return_app(SummaryPhase::Revealing, 1.0);
+        let curtain = app
+            .world_mut()
+            .spawn(SummaryCurtain {
+                color: Color::WHITE,
+            })
+            .id();
+        let _ = app.world_mut().write_message(ButtonActivated(button));
+
+        app.update();
+
+        assert_eq!(
+            app.world().get::<SummaryScreen>(screen).unwrap().phase,
+            SummaryPhase::Departing
+        );
+        assert!(app.world().get::<InteractionDisabled>(button).is_some());
+        assert!(app.world().get_entity(curtain).is_err());
+    }
+
+    #[test]
+    fn repeated_return_activation_does_not_restart_departure() {
+        let (mut app, screen, button) = summary_return_app(SummaryPhase::Departing, 0.5);
+        let _ = app.world_mut().write_message(ButtonActivated(button));
+
+        app.update();
+
+        assert!((app.world().get::<SummaryScreen>(screen).unwrap().elapsed - 0.5).abs() < 0.001);
+    }
 }
