@@ -21,7 +21,7 @@ use crate::states::ActiveLesson;
 const PATH_GEOMETRY: PathGeometry = PathGeometry::DEFAULT;
 const CLOUD_DRIFT_SPEED_DESIGN_PX_PER_SECOND: f32 = 15.0;
 const CLOUD_MOTION_FADE_SECONDS: f32 = 2.0;
-const FLOWER_BEND_AMOUNT: f32 = 0.0375;
+const FLOWER_BEND_AMOUNT: f32 = 0.15;
 const GRASS_BEND_AMOUNT: f32 = 0.075;
 const PARALLAX_HORIZON_HEIGHT: f32 = 0.32;
 
