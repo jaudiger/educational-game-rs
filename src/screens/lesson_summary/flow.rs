@@ -4,7 +4,7 @@ use bevy::ui::InteractionDisabled;
 use bevy::ui_render::ui_material::MaterialNode;
 
 use crate::plugins::balloon_material::{BalloonFlame, BalloonUiMaterial};
-use crate::plugins::question_background::QuestionBackgroundParallaxLayer;
+use crate::plugins::lesson_background::LessonBackgroundParallaxLayer;
 use crate::states::AppState;
 use crate::ui::components::ButtonActivated;
 use crate::ui::theme;
@@ -102,7 +102,7 @@ pub(super) fn tick_summary_departure(
     mut animated_elements: ParamSet<(
         Query<(&mut UiTransform, &ComputedUiRenderTargetInfo), With<SummaryBalloon>>,
         Query<(
-            &QuestionBackgroundParallaxLayer,
+            &LessonBackgroundParallaxLayer,
             &mut UiTransform,
             &ComputedUiRenderTargetInfo,
         )>,

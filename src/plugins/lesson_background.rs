@@ -25,10 +25,10 @@ const FLOWER_BEND_AMOUNT: f32 = 0.0375;
 const GRASS_BEND_AMOUNT: f32 = 0.075;
 const PARALLAX_HORIZON_HEIGHT: f32 = 0.32;
 
-pub struct QuestionBackgroundPlugin;
+pub struct LessonBackgroundPlugin;
 
 #[derive(SystemParam)]
-pub struct QuestionBackgroundAssets<'w> {
+pub struct LessonBackgroundAssets<'w> {
     pub landscape: ResMut<'w, Assets<LandscapeMaterial>>,
     pub trees: ResMut<'w, Assets<TreeMaterial>>,
     pub clouds: ResMut<'w, Assets<CloudUiMaterial>>,
@@ -38,7 +38,7 @@ pub struct QuestionBackgroundAssets<'w> {
     pub stones: ResMut<'w, Assets<StoneMaterial>>,
 }
 
-impl Plugin for QuestionBackgroundPlugin {
+impl Plugin for LessonBackgroundPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -46,13 +46,13 @@ impl Plugin for QuestionBackgroundPlugin {
         )
         .add_systems(
             Update,
-            animate_question_vegetation
+            animate_lesson_vegetation
                 .after(LessonMotionSet::AdvanceWind)
                 .run_if(in_state(ActiveLesson)),
         )
         .add_systems(
             PostUpdate,
-            animate_question_clouds
+            animate_lesson_clouds
                 .after(UiSystems::Propagate)
                 .before(UiSystems::Layout)
                 .run_if(in_state(ActiveLesson)),
@@ -62,12 +62,12 @@ impl Plugin for QuestionBackgroundPlugin {
 
 #[derive(Component, Clone, Copy, Reflect)]
 #[require(UiTransform)]
-pub struct QuestionBackgroundParallaxLayer {
+pub struct LessonBackgroundParallaxLayer {
     vertical_travel: f32,
     vertical_compression: f32,
 }
 
-impl QuestionBackgroundParallaxLayer {
+impl LessonBackgroundParallaxLayer {
     pub fn departure_transform(self, viewport_height: f32, progress: f32) -> (f32, f32) {
         let vertical_scale = (-progress).mul_add(self.vertical_compression, 1.0);
         let horizon_anchor = viewport_height * PARALLAX_HORIZON_HEIGHT;
@@ -80,7 +80,7 @@ impl QuestionBackgroundParallaxLayer {
 
 #[derive(Component, Clone, Copy, Reflect)]
 #[require(UiTransform)]
-pub struct QuestionBackgroundCloud {
+struct LessonBackgroundCloud {
     center_x_percent: f32,
     canvas_width_design_px: f32,
     placement_scale: f32,
@@ -90,7 +90,7 @@ pub struct QuestionBackgroundCloud {
 }
 
 #[derive(Component, Reflect)]
-struct QuestionLandscapeMaterials {
+struct LessonLandscapeMaterials {
     flower_materials: [Handle<FlowerMaterial>; 3],
     grass_material: Handle<GrassMaterial>,
 }
@@ -544,7 +544,7 @@ struct BackgroundMaterials {
     stone: Handle<StoneMaterial>,
 }
 
-impl QuestionLandscapeMaterials {
+impl LessonLandscapeMaterials {
     fn new(materials: &BackgroundMaterials) -> Self {
         Self {
             flower_materials: [
@@ -558,7 +558,7 @@ impl QuestionLandscapeMaterials {
 }
 
 impl BackgroundMaterials {
-    fn new(assets: &mut QuestionBackgroundAssets) -> Self {
+    fn new(assets: &mut LessonBackgroundAssets) -> Self {
         Self {
             sky: assets
                 .landscape
@@ -630,14 +630,14 @@ impl BackgroundMaterials {
     }
 }
 
-pub fn spawn_question_background(
+pub fn spawn_lesson_background(
     commands: &mut Commands,
-    assets: &mut QuestionBackgroundAssets,
+    assets: &mut LessonBackgroundAssets,
     window: Entity,
     viewport_size: Vec2,
 ) {
     let materials = BackgroundMaterials::new(assets);
-    let motion = QuestionLandscapeMaterials::new(&materials);
+    let motion = LessonLandscapeMaterials::new(&materials);
     let sun_material = assets.sun.add(sky_sun_material());
     commands.spawn((
         full_screen_material_bundle(materials.sky.clone()),
@@ -738,7 +738,7 @@ fn parallax_layer_bundle(
 ) -> impl Bundle + use<> {
     (
         full_screen_overlay_node(),
-        QuestionBackgroundParallaxLayer {
+        LessonBackgroundParallaxLayer {
             vertical_travel,
             vertical_compression,
         },
@@ -765,7 +765,7 @@ fn spawn_clouds(parent: &mut ChildSpawner, materials: &BackgroundMaterials) {
             canvas.y,
             cloud.scale,
         );
-        let motion = QuestionBackgroundCloud {
+        let motion = LessonBackgroundCloud {
             center_x_percent: cloud.center_x,
             canvas_width_design_px: canvas.x,
             placement_scale: cloud.scale,
@@ -955,10 +955,10 @@ fn placed_material_container_bundle(
     )
 }
 
-fn animate_question_clouds(
+fn animate_lesson_clouds(
     time: Res<Time>,
     mut clouds: Query<(
-        &mut QuestionBackgroundCloud,
+        &mut LessonBackgroundCloud,
         &mut UiTransform,
         &ComputedUiRenderTargetInfo,
     )>,
@@ -988,9 +988,9 @@ fn animate_question_clouds(
     }
 }
 
-fn animate_question_vegetation(
+fn animate_lesson_vegetation(
     wind: Res<LessonWind>,
-    landscapes: Query<&QuestionLandscapeMaterials>,
+    landscapes: Query<&LessonLandscapeMaterials>,
     mut flower_materials: ResMut<Assets<FlowerMaterial>>,
     mut grass_materials: ResMut<Assets<GrassMaterial>>,
 ) {

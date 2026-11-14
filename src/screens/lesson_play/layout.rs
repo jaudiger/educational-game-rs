@@ -9,8 +9,8 @@ use crate::data::{
 };
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::balloon_material::BalloonUiMaterial;
+use crate::plugins::lesson_background::{LessonBackgroundAssets, spawn_lesson_background};
 use crate::plugins::lesson_mascot::spawn_lesson_mascot;
-use crate::plugins::question_background::{QuestionBackgroundAssets, spawn_question_background};
 use crate::questions::QuestionRoot;
 use crate::states::AppState;
 use crate::ui::animation::ScreenEntryAnimationOptIn;
@@ -74,7 +74,7 @@ fn fit_content_to_available_height(
 #[allow(clippy::too_many_arguments)]
 pub fn setup_lesson_play(
     mut commands: Commands,
-    mut background_assets: QuestionBackgroundAssets,
+    mut background_assets: LessonBackgroundAssets,
     mut balloon_materials: ResMut<Assets<BalloonUiMaterial>>,
     selected_lesson: Res<SelectedLesson>,
     launch_selection: Option<Res<LessonLaunchSelection>>,
@@ -118,7 +118,7 @@ pub fn setup_lesson_play(
         session.questions.len(),
     ));
     commands.insert_resource(session);
-    spawn_question_background(
+    spawn_lesson_background(
         &mut commands,
         &mut background_assets,
         window,

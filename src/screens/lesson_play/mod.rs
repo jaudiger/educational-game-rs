@@ -5,7 +5,6 @@ use crate::data::{
     AnswerResult, LastAnswer, LessonLaunchSelection, LessonScore, LessonSession, SelectedLesson,
 };
 use crate::i18n::{I18n, TranslationKey};
-use crate::plugins::QuestionBackgroundPlugin;
 use crate::questions::QuestionRoot;
 use crate::questions::registry::{
     QuestionInteractionSet, QuestionResponseSubmitted, assess_question_responses,
@@ -33,8 +32,7 @@ pub enum LessonFeedbackSet {
 
 impl Plugin for LessonPlayScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(QuestionBackgroundPlugin)
-            .add_message::<QuestionResponseSubmitted>()
+        app.add_message::<QuestionResponseSubmitted>()
             .init_resource::<explanations::FeedbackPresentation>()
             .register_state_scoped_resource::<ActiveLesson, LessonSession>(ActiveLesson)
             .register_state_scoped_resource::<ActiveLesson, LessonScore>(ActiveLesson)
