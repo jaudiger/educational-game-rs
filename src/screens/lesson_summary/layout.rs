@@ -7,12 +7,13 @@ use crate::data::LessonScore;
 use crate::i18n::{I18n, TranslationKey};
 use crate::plugins::balloon_material::BalloonUiMaterial;
 use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
+use crate::plugins::lesson_background::{LessonBackgroundRoot, lesson_mascot_layer};
 use crate::plugins::lesson_mascot::{
     SkyBalloonAssets, SkyBalloonLayout, create_sky_balloon_assets, sky_balloon_scene,
 };
 use crate::states::AppState;
 use crate::ui::components::{save_write_failure_notice, standard_button};
-use crate::ui::theme;
+use crate::ui::{layers, theme};
 
 use super::flow::{SummaryPhase, SummaryScreen};
 use super::theme::{SUMMARY_CURTAIN_COLOR, summary_curtain, summary_departure_fade};
@@ -47,6 +48,7 @@ pub(super) fn setup_lesson_summary(
     presentation: Res<LessonSummaryPresentation>,
     i18n: Res<I18n>,
     primary_window: Single<Entity, With<PrimaryWindow>>,
+    background_root: Single<Entity, With<LessonBackgroundRoot>>,
     mut materials: SummaryMaterials,
 ) {
     let window = *primary_window;
@@ -68,6 +70,18 @@ pub(super) fn setup_lesson_summary(
         .add(CloudUiMaterial::new(CloudShapeId::Puffy, Color::WHITE));
     let balloon_assets: SkyBalloonAssets = create_sky_balloon_assets(&mut materials.balloon);
     let balloon_layout = SkyBalloonLayout::default();
+    commands.entity(*background_root).with_children(|parent| {
+        parent.spawn((
+            lesson_mascot_layer(),
+            DespawnOnExit(AppState::LessonSummary),
+            Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
+                let mut balloon = layer.spawn_empty();
+                balloon
+                    .insert(SummaryBalloon)
+                    .queue_apply_scene(sky_balloon_scene(balloon_assets, balloon_layout));
+            })),
+        ));
+    });
     let card = SummaryCardPresentation {
         title: i18n.t(&TranslationKey::SummaryTitle).into_owned(),
         score_label: i18n
@@ -94,16 +108,13 @@ pub(super) fn setup_lesson_summary(
             ..default()
         },
         TabGroup::new(0),
+        GlobalZIndex(layers::GLOBAL_SCREEN_CONTENT),
         SummaryScreen {
             phase: SummaryPhase::Revealing,
             elapsed: 0.0,
         },
         DespawnOnExit(AppState::LessonSummary),
         Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            let mut balloon = parent.spawn_empty();
-            balloon
-                .insert(SummaryBalloon)
-                .queue_apply_scene(sky_balloon_scene(balloon_assets, balloon_layout));
             parent.spawn((
                 Node {
                     position_type: PositionType::Relative,

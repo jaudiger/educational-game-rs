@@ -3,6 +3,7 @@ use bevy::ui::FocusPolicy;
 
 use crate::data::{PersistenceAction, PersistenceStatus};
 use crate::i18n::{I18n, ProductionTranslationKey};
+use crate::ui::layers;
 
 use super::ButtonActivated;
 use super::buttons::production::action_button_scene;
@@ -98,7 +99,7 @@ pub fn spawn_confirmation_modal(
             ..default()
         },
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.3)),
-        GlobalZIndex(100),
+        GlobalZIndex(layers::GLOBAL_OVERLAY),
         FocusPolicy::Block,
         children![(
             card_n,

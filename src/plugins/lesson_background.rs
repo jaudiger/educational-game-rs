@@ -6,7 +6,7 @@ use bevy::window::WindowResized;
 
 use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
 use crate::ui::components::full_screen_overlay_node;
-use crate::ui::theme;
+use crate::ui::{layers, theme};
 
 use crate::plugins::lesson_motion::{LessonMotionSet, LessonWind, smooth_motion_fade};
 
@@ -24,8 +24,37 @@ const CLOUD_MOTION_FADE_SECONDS: f32 = 2.0;
 const FLOWER_BEND_AMOUNT: f32 = 0.15;
 const GRASS_BEND_AMOUNT: f32 = 0.075;
 const PARALLAX_HORIZON_HEIGHT: f32 = 0.32;
+const SUN_Z_INDEX: i32 = -3;
+const DISTANT_LAYER_Z_INDEX: i32 = -2;
+const RIDGE_Z_INDEX: i32 = -1;
+const BACKGROUND_TREE_Z_INDEX: i32 = 0;
+const GROUND_LAYER_Z_INDEX: i32 = 1;
+const MEADOW_Z_INDEX: i32 = 1;
+const MIDGROUND_TREE_Z_INDEX: i32 = 2;
+const DISTANT_FLOWER_LAYER_Z_INDEX: i32 = 2;
+pub const LESSON_MASCOT_LAYER_Z_INDEX: i32 = 3;
+const PATH_STONE_Z_INDEX: i32 = 4;
+const FOREGROUND_LAYER_Z_INDEX: i32 = 4;
+const FLOWER_Z_INDEX: i32 = 4;
+const GRASS_TUFT_Z_INDEX: i32 = 5;
+const FOREGROUND_TREE_Z_INDEX: i32 = 6;
 
 pub struct LessonBackgroundPlugin;
+
+#[derive(Component, Reflect)]
+pub struct LessonBackgroundRoot;
+
+#[derive(Component, Reflect)]
+pub struct LessonMascotLayer;
+
+pub fn lesson_mascot_layer() -> impl Bundle + use<> {
+    (
+        full_screen_overlay_node(),
+        ZIndex(LESSON_MASCOT_LAYER_Z_INDEX),
+        Pickable::IGNORE,
+        LessonMascotLayer,
+    )
+}
 
 #[derive(SystemParam)]
 pub struct LessonBackgroundAssets<'w> {
@@ -213,7 +242,7 @@ enum FlowerPalette {
     Lavender,
 }
 
-const FLOWERS: [(VisualPlacement, FlowerPalette); 12] = [
+const DISTANT_FLOWERS: [(VisualPlacement, FlowerPalette); 6] = [
     (
         VisualPlacement::new(36.0, 35.0, 68.0, 88.0, 0.38),
         FlowerPalette::Gold,
@@ -227,18 +256,6 @@ const FLOWERS: [(VisualPlacement, FlowerPalette); 12] = [
         FlowerPalette::Lavender,
     ),
     (
-        VisualPlacement::new(64.0, 61.0, 60.0, 78.0, 0.66),
-        FlowerPalette::Gold,
-    ),
-    (
-        VisualPlacement::new(36.0, 74.0, 68.0, 88.0, 0.80),
-        FlowerPalette::Pink,
-    ),
-    (
-        VisualPlacement::new(78.0, 85.0, 72.0, 94.0, 0.94),
-        FlowerPalette::Lavender,
-    ),
-    (
         VisualPlacement::new(52.0, 34.0, 60.0, 78.0, 0.36),
         FlowerPalette::Pink,
     ),
@@ -248,6 +265,21 @@ const FLOWERS: [(VisualPlacement, FlowerPalette); 12] = [
     ),
     (
         VisualPlacement::new(47.0, 53.0, 64.0, 82.0, 0.56),
+        FlowerPalette::Lavender,
+    ),
+];
+
+const NEAR_FLOWERS: [(VisualPlacement, FlowerPalette); 6] = [
+    (
+        VisualPlacement::new(64.0, 61.0, 60.0, 78.0, 0.66),
+        FlowerPalette::Gold,
+    ),
+    (
+        VisualPlacement::new(36.0, 74.0, 68.0, 88.0, 0.80),
+        FlowerPalette::Pink,
+    ),
+    (
+        VisualPlacement::new(78.0, 85.0, 72.0, 94.0, 0.94),
         FlowerPalette::Lavender,
     ),
     (
@@ -635,23 +667,27 @@ pub fn spawn_lesson_background(
     assets: &mut LessonBackgroundAssets,
     window: Entity,
     viewport_size: Vec2,
-) {
+) -> Entity {
     let materials = BackgroundMaterials::new(assets);
     let motion = LessonLandscapeMaterials::new(&materials);
     let sun_material = assets.sun.add(sky_sun_material());
-    commands.spawn((
-        full_screen_material_bundle(materials.sky.clone()),
-        motion,
-        GlobalZIndex(-1),
-        Pickable::IGNORE,
-        DespawnOnExit(ActiveLesson),
-        Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
-            parent.spawn((sky_sun(sun_material), ZIndex(-3)));
-            spawn_distant_layer(parent, &materials, window, viewport_size);
-            spawn_ground_layer(parent, &materials, window, viewport_size);
-            spawn_foreground_layer(parent, &materials, window, viewport_size);
-        })),
-    ));
+    commands
+        .spawn((
+            full_screen_material_bundle(materials.sky.clone()),
+            motion,
+            LessonBackgroundRoot,
+            GlobalZIndex(layers::GLOBAL_BACKGROUND),
+            Pickable::IGNORE,
+            DespawnOnExit(ActiveLesson),
+            Children::spawn(SpawnWith(move |parent: &mut ChildSpawner| {
+                parent.spawn((sky_sun(sun_material), ZIndex(SUN_Z_INDEX)));
+                spawn_distant_layer(parent, &materials, window, viewport_size);
+                spawn_ground_layer(parent, &materials, window, viewport_size);
+                spawn_distant_flower_layer(parent, &materials);
+                spawn_foreground_layer(parent, &materials, window, viewport_size);
+            })),
+        ))
+        .id()
 }
 
 fn spawn_distant_layer(
@@ -662,12 +698,12 @@ fn spawn_distant_layer(
 ) {
     let materials = materials.clone();
     parent.spawn((
-        parallax_layer_bundle(0.025, 0.015, -2),
+        parallax_layer_bundle(0.025, 0.015, DISTANT_LAYER_Z_INDEX),
         Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
             spawn_clouds(layer, &materials);
             layer.spawn((
                 full_screen_material_bundle(materials.ridge.clone()),
-                ZIndex(-1),
+                ZIndex(RIDGE_Z_INDEX),
                 Pickable::IGNORE,
             ));
             spawn_trees(
@@ -689,11 +725,11 @@ fn spawn_ground_layer(
 ) {
     let materials = materials.clone();
     parent.spawn((
-        parallax_layer_bundle(0.07, 0.04, 1),
+        parallax_layer_bundle(0.07, 0.04, GROUND_LAYER_Z_INDEX),
         Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
             layer.spawn((
                 full_screen_material_bundle(materials.meadow.clone()),
-                ZIndex(1),
+                ZIndex(MEADOW_Z_INDEX),
                 Pickable::IGNORE,
             ));
             spawn_trees(
@@ -708,6 +744,16 @@ fn spawn_ground_layer(
     ));
 }
 
+fn spawn_distant_flower_layer(parent: &mut ChildSpawner, materials: &BackgroundMaterials) {
+    let materials = materials.clone();
+    parent.spawn((
+        parallax_layer_bundle(0.09, 0.06, DISTANT_FLOWER_LAYER_Z_INDEX),
+        Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
+            spawn_flowers(layer, &materials, &DISTANT_FLOWERS);
+        })),
+    ));
+}
+
 fn spawn_foreground_layer(
     parent: &mut ChildSpawner,
     materials: &BackgroundMaterials,
@@ -716,9 +762,9 @@ fn spawn_foreground_layer(
 ) {
     let materials = materials.clone();
     parent.spawn((
-        parallax_layer_bundle(0.11, 0.08, 4),
+        parallax_layer_bundle(0.11, 0.08, FOREGROUND_LAYER_Z_INDEX),
         Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
-            spawn_flowers(layer, &materials);
+            spawn_flowers(layer, &materials, &NEAR_FLOWERS);
             spawn_grass_tufts(layer, &materials);
             spawn_trees(
                 layer,
@@ -793,12 +839,16 @@ fn spawn_clouds(parent: &mut ChildSpawner, materials: &BackgroundMaterials) {
     }
 }
 
-fn spawn_flowers(parent: &mut ChildSpawner, materials: &BackgroundMaterials) {
-    for (placement, palette) in FLOWERS {
+fn spawn_flowers(
+    parent: &mut ChildSpawner,
+    materials: &BackgroundMaterials,
+    flowers: &[(VisualPlacement, FlowerPalette)],
+) {
+    for &(placement, palette) in flowers {
         parent.spawn(placed_material_bundle(
             placement,
             materials.flower(palette),
-            4,
+            FLOWER_Z_INDEX,
         ));
     }
 }
@@ -808,7 +858,7 @@ fn spawn_grass_tufts(parent: &mut ChildSpawner, materials: &BackgroundMaterials)
         parent.spawn(placed_material_bundle(
             placement,
             materials.grass.clone(),
-            4,
+            GRASS_TUFT_Z_INDEX,
         ));
     }
 }
@@ -830,7 +880,7 @@ fn spawn_path_stones(
                     placement.scale,
                 ),
                 materials.stone.clone(),
-                4,
+                PATH_STONE_Z_INDEX,
             ),
             PathStonePosition {
                 window,
@@ -871,9 +921,9 @@ fn spawn_trees(
 impl TreeBand {
     const fn z_index(self) -> i32 {
         match self {
-            Self::Background => 0,
-            Self::Midground => 2,
-            Self::Foreground => 5,
+            Self::Background => BACKGROUND_TREE_Z_INDEX,
+            Self::Midground => MIDGROUND_TREE_Z_INDEX,
+            Self::Foreground => FOREGROUND_TREE_Z_INDEX,
         }
     }
 }
@@ -1063,4 +1113,129 @@ fn path_stone_x_percent(placement: PathStonePlacement, viewport_size: Vec2) -> f
         PathStoneSide::Right => center + half_width + stone_half_width + PATH_STONE_GAP_PERCENT,
     }
     .clamp(stone_half_width, 100.0 - stone_half_width)
+}
+
+const _: () = {
+    assert!(GROUND_LAYER_Z_INDEX < DISTANT_FLOWER_LAYER_Z_INDEX);
+    assert!(DISTANT_FLOWER_LAYER_Z_INDEX < LESSON_MASCOT_LAYER_Z_INDEX);
+    assert!(LESSON_MASCOT_LAYER_Z_INDEX < FOREGROUND_LAYER_Z_INDEX);
+    assert!(FLOWER_Z_INDEX < GRASS_TUFT_Z_INDEX);
+    assert!(GRASS_TUFT_Z_INDEX < FOREGROUND_TREE_Z_INDEX);
+};
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use bevy::prelude::*;
+    use bevy::state::app::StatesPlugin;
+
+    use super::{LessonBackgroundRoot, LessonMascotLayer, lesson_mascot_layer};
+    use crate::states::{ActiveLesson, AppState};
+
+    #[derive(Component)]
+    struct PlayBalloon;
+
+    #[derive(Component)]
+    struct SummaryBalloon;
+
+    fn app_with_lesson_lifecycle() -> App {
+        let mut app = App::new();
+        app.add_plugins(StatesPlugin)
+            .insert_state(AppState::LessonPlay)
+            .add_computed_state::<ActiveLesson>()
+            .add_systems(OnEnter(AppState::LessonPlay), spawn_play_background)
+            .add_systems(OnEnter(AppState::LessonSummary), spawn_summary_balloon);
+        app
+    }
+
+    fn spawn_play_background(mut commands: Commands) {
+        let background = commands
+            .spawn((
+                Node::default(),
+                LessonBackgroundRoot,
+                DespawnOnExit(ActiveLesson),
+            ))
+            .id();
+        commands.entity(background).with_children(|parent| {
+            parent.spawn((
+                lesson_mascot_layer(),
+                DespawnOnExit(AppState::LessonPlay),
+                Children::spawn(SpawnWith(|layer: &mut ChildSpawner| {
+                    layer.spawn(PlayBalloon);
+                })),
+            ));
+        });
+    }
+
+    fn spawn_summary_balloon(
+        mut commands: Commands,
+        background: Single<Entity, With<LessonBackgroundRoot>>,
+    ) {
+        commands.entity(*background).with_children(|parent| {
+            parent.spawn((
+                lesson_mascot_layer(),
+                DespawnOnExit(AppState::LessonSummary),
+                Children::spawn(SpawnWith(|layer: &mut ChildSpawner| {
+                    layer.spawn(SummaryBalloon);
+                })),
+            ));
+        });
+    }
+
+    fn count<T: Component>(app: &mut App) -> usize {
+        let world = app.world_mut();
+        let mut query = world.query_filtered::<Entity, With<T>>();
+        query.iter(world).count()
+    }
+
+    #[test]
+    fn summary_replaces_play_balloon_and_next_lesson_starts_cleanly() {
+        let mut app = app_with_lesson_lifecycle();
+        app.update();
+        assert_eq!(count::<LessonBackgroundRoot>(&mut app), 1);
+        assert_eq!(count::<LessonMascotLayer>(&mut app), 1);
+        assert_eq!(count::<PlayBalloon>(&mut app), 1);
+        assert_eq!(count::<SummaryBalloon>(&mut app), 0);
+
+        app.world_mut()
+            .resource_mut::<NextState<AppState>>()
+            .set(AppState::LessonSummary);
+        app.update();
+        assert_eq!(count::<LessonBackgroundRoot>(&mut app), 1);
+        assert_eq!(count::<LessonMascotLayer>(&mut app), 1);
+        assert_eq!(count::<PlayBalloon>(&mut app), 0);
+        assert_eq!(count::<SummaryBalloon>(&mut app), 1);
+
+        app.world_mut()
+            .resource_mut::<NextState<AppState>>()
+            .set(AppState::ThemeExploration);
+        app.update();
+        assert_eq!(count::<LessonBackgroundRoot>(&mut app), 0);
+        assert_eq!(count::<LessonMascotLayer>(&mut app), 0);
+        assert_eq!(count::<SummaryBalloon>(&mut app), 0);
+
+        app.world_mut()
+            .resource_mut::<NextState<AppState>>()
+            .set(AppState::LessonPlay);
+        app.update();
+        assert_eq!(count::<LessonBackgroundRoot>(&mut app), 1);
+        assert_eq!(count::<LessonMascotLayer>(&mut app), 1);
+        assert_eq!(count::<PlayBalloon>(&mut app), 1);
+        assert_eq!(count::<SummaryBalloon>(&mut app), 0);
+    }
+
+    #[test]
+    fn quitting_lesson_play_cleans_background_and_balloon() {
+        let mut app = app_with_lesson_lifecycle();
+        app.update();
+        assert_eq!(count::<LessonBackgroundRoot>(&mut app), 1);
+        assert_eq!(count::<LessonMascotLayer>(&mut app), 1);
+
+        app.world_mut()
+            .resource_mut::<NextState<AppState>>()
+            .set(AppState::ThemeExploration);
+        app.update();
+        assert_eq!(count::<LessonBackgroundRoot>(&mut app), 0);
+        assert_eq!(count::<LessonMascotLayer>(&mut app), 0);
+        assert_eq!(count::<PlayBalloon>(&mut app), 0);
+    }
 }

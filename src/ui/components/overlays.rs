@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, PopoverSide};
 
-use crate::ui::theme;
+use crate::ui::{layers, theme};
 
 use super::{TooltipPopover, card_node};
 
@@ -43,7 +43,7 @@ pub fn spawn_tooltip_popover(
             card_n,
             card_bg,
             card_border,
-            GlobalZIndex(100),
+            GlobalZIndex(layers::GLOBAL_OVERLAY),
             OverrideClip,
             Visibility::Visible,
             TooltipPopover,

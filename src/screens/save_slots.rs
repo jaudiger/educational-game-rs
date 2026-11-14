@@ -20,7 +20,7 @@ use crate::ui::components::{
 };
 use crate::ui::layout::{self, CollectionItemLayout, CollectionLayout};
 use crate::ui::navigation::NavigateTo;
-use crate::ui::theme;
+use crate::ui::{layers, theme};
 
 const MAX_NAME_LENGTH: usize = 30;
 const SLOT_ACCENTS: [Color; 3] = [
@@ -377,7 +377,7 @@ fn spawn_creation_form(commands: &mut Commands, slot_index: usize, i18n: &I18n, 
             align_items: AlignItems::Center,
             ..default()
         },
-        GlobalZIndex(50),
+        GlobalZIndex(layers::GLOBAL_DIALOG),
         CreationForm,
         DespawnOnExit(AppState::SaveSlots),
         children![(

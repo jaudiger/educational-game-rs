@@ -15,7 +15,7 @@ use crate::questions::QuestionRoot;
 use crate::states::AppState;
 use crate::ui::animation::ScreenEntryAnimationOptIn;
 use crate::ui::components::icon_button;
-use crate::ui::theme;
+use crate::ui::{layers, theme};
 
 use super::{ProgressText, QuitLessonButton};
 
@@ -118,12 +118,15 @@ pub fn setup_lesson_play(
         session.questions.len(),
     ));
     commands.insert_resource(session);
-    spawn_lesson_background(
+    let background = spawn_lesson_background(
         &mut commands,
         &mut background_assets,
         window,
         Vec2::new(primary_window.width(), primary_window.height()),
     );
+    commands.entity(background).with_children(|parent| {
+        spawn_lesson_mascot(parent, settings.exploration_theme, &mut balloon_materials);
+    });
 
     commands
         .spawn((
@@ -140,12 +143,11 @@ pub fn setup_lesson_play(
                 ..default()
             },
             ScreenEntryAnimationOptIn,
+            GlobalZIndex(layers::GLOBAL_SCREEN_CONTENT),
             DespawnOnExit(AppState::LessonPlay),
             TabGroup::new(0),
         ))
         .with_children(|parent| {
-            // Mascot first: absolutely positioned, renders behind siblings.
-            spawn_lesson_mascot(parent, settings.exploration_theme, &mut balloon_materials);
             spawn_top_bar(parent, &progress, window);
             spawn_question_container(parent);
         });

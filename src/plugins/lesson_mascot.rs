@@ -6,7 +6,7 @@
 
 use bevy::asset::AssetEventSystems;
 use bevy::prelude::*;
-use bevy::scene::{EntityCommandsSceneExt, Scene, SceneComponent, bsn};
+use bevy::scene::{EntityWorldMutSceneExt, Scene, SceneComponent, bsn};
 use bevy::ui::{UiGlobalTransform, UiSystems};
 use bevy::ui_render::ui_material::MaterialNode;
 
@@ -14,8 +14,9 @@ use crate::data::ExplorationTheme;
 use crate::plugins::balloon_material::{
     BALLOON_BASKET_CORD_ATTACHMENTS, BalloonFlame, BalloonPart, BalloonUiMaterial,
 };
+use crate::plugins::lesson_background::lesson_mascot_layer;
 use crate::plugins::lesson_motion::{LessonMotionSet, LessonWind};
-use crate::states::ActiveLesson;
+use crate::states::{ActiveLesson, AppState};
 use crate::ui::theme;
 
 /// Registers idle animation systems for the shared Sky balloon.
@@ -111,16 +112,10 @@ const BASKET_PULL_PX: f32 = 4.5;
 /// Vertical bob amplitude (px) for the gentle lift-off effect.
 const BOB_AMPLITUDE: f32 = 3.0;
 
-/// Spawns the lesson mascot for the current [`ExplorationTheme`].
+/// Spawns the mascot for the current [`ExplorationTheme`] on the lesson background.
 ///
-/// Called during lesson play screen setup. The mascot is absolutely
-/// positioned on the background (middle-right, at the meadow level) and
-/// must be spawned **before** the top bar and question container so that
-/// it renders behind them in z-order. The card's semi-transparent overlay
-/// lets the mascot show through.
-///
-/// Each theme variant dispatches to its own spawn function. Themes
-/// without a mascot yet simply spawn nothing.
+/// Its dedicated layer sits between ground and foreground scenery and is scoped to
+/// lesson play. Translucent question cards can reveal the mascot beneath their content.
 pub fn spawn_lesson_mascot(
     parent: &mut ChildSpawnerCommands,
     exploration_theme: ExplorationTheme,
@@ -152,9 +147,14 @@ fn spawn_sky_balloon_mascot(
     materials: &mut Assets<BalloonUiMaterial>,
 ) {
     let assets = create_sky_balloon_assets(materials);
-    parent
-        .spawn_empty()
-        .apply_scene(sky_balloon_scene(assets, SkyBalloonLayout::default()));
+    parent.spawn((
+        lesson_mascot_layer(),
+        DespawnOnExit(AppState::LessonPlay),
+        Children::spawn(SpawnWith(move |layer: &mut ChildSpawner| {
+            let mut balloon = layer.spawn_empty();
+            balloon.queue_apply_scene(sky_balloon_scene(assets, SkyBalloonLayout::default()));
+        })),
+    ));
 }
 
 pub fn sky_balloon_scene(assets: SkyBalloonAssets, layout: SkyBalloonLayout) -> impl Scene {
@@ -185,12 +185,14 @@ impl SkyBalloonMascot {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
             }
+            Pickable::IGNORE
             Children [
                 SwayingEnvelope
                 Node {
                     width: theme::scaled(layout.envelope_width),
                     height: theme::scaled(envelope_height),
                 }
+                Pickable::IGNORE
                 Children [
                     BalloonFlame
                     Node {
@@ -200,6 +202,7 @@ impl SkyBalloonMascot {
                         width: theme::scaled(flame_width),
                         height: theme::scaled(flame_height),
                     }
+                    Pickable::IGNORE
                     MaterialNode<BalloonUiMaterial>({props.flame_material})
                     --
                     BalloonEnvelopeVisual
@@ -210,6 +213,7 @@ impl SkyBalloonMascot {
                         width: percent(100.0),
                         height: percent(100.0),
                     }
+                    Pickable::IGNORE
                     MaterialNode<BalloonUiMaterial>({props.envelope_material})
                 ]
                 --
@@ -219,6 +223,7 @@ impl SkyBalloonMascot {
                     height: theme::scaled(basket_height),
                     margin: UiRect::top(theme::scaled(-layout.basket_overlap)),
                 }
+                Pickable::IGNORE
                 MaterialNode<BalloonUiMaterial>({props.basket_material})
             ]
         }
