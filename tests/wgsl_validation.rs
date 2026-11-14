@@ -5,6 +5,11 @@ const SHADERS: &[(&str, &str, &[&str])] = &[
         &["fragment"],
     ),
     (
+        "bush.wgsl",
+        include_str!("../assets/shaders/bush.wgsl"),
+        &["fragment"],
+    ),
+    (
         "landscape.wgsl",
         include_str!("../assets/shaders/landscape.wgsl"),
         &["fragment"],

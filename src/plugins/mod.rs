@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod balloon_material;
+pub mod bush_material;
 pub mod cloud_material;
 pub mod content;
 pub mod cursor_material;

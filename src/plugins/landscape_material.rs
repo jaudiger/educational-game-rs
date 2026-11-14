@@ -5,6 +5,55 @@ use bevy::ui_render::ui_material::UiMaterial;
 
 const LANDSCAPE_SHADER_PATH: &str = "shaders/landscape.wgsl";
 
+#[derive(Clone, Copy, Debug, Reflect, ShaderType)]
+pub struct RidgeGeometry {
+    center_x_percent: f32,
+    baseline_y: f32,
+    left_half_width: f32,
+    right_half_width: f32,
+    main_height: f32,
+    shoulder_height: f32,
+    shoulder_offset: f32,
+    shoulder_half_width: f32,
+}
+
+impl RidgeGeometry {
+    pub const DEFAULT: Self = Self {
+        center_x_percent: 0.73,
+        baseline_y: 0.34,
+        left_half_width: 0.39,
+        right_half_width: 0.30,
+        main_height: 0.19,
+        shoulder_height: 0.045,
+        shoulder_offset: 0.26,
+        shoulder_half_width: 0.27,
+    };
+
+    pub(crate) fn center_percent_for_offset(self, offset: f32, aspect: f32) -> f32 {
+        self.center_x_percent + offset / aspect
+    }
+
+    pub(crate) fn surface_y_at_offset(self, offset: f32) -> f32 {
+        let half_width = if offset < 0.0 {
+            self.left_half_width
+        } else {
+            self.right_half_width
+        };
+        let ridge_offset = offset / half_width;
+        let shoulder_offset = (offset + self.shoulder_offset) / self.shoulder_half_width;
+        let ridge_height = self.shoulder_height.mul_add(
+            hill_bump(shoulder_offset),
+            self.main_height * hill_bump(ridge_offset),
+        );
+        self.baseline_y - ridge_height
+    }
+}
+
+fn hill_bump(value: f32) -> f32 {
+    let remaining = value.mul_add(-value, 1.0).max(0.0);
+    remaining * remaining
+}
+
 #[derive(Clone, Copy, Debug, Reflect)]
 pub struct PathGeometry {
     center_base: f32,
@@ -62,27 +111,6 @@ impl PathGeometry {
         );
         100.0 * path_width / aspect
     }
-
-    const fn uniform(self, layer: LandscapeLayer) -> LandscapeUniform {
-        LandscapeUniform {
-            center_curve: Vec4::new(
-                self.center_base,
-                self.first_bend,
-                self.second_bend,
-                self.third_bend,
-            ),
-            center_start: Vec4::new(self.first_start, self.second_start, self.third_start, 0.0),
-            center_end: Vec4::new(self.first_end, self.second_end, self.third_end, 0.0),
-            path_width: Vec4::new(
-                self.width_min,
-                self.width_max,
-                self.width_start,
-                self.width_end,
-            ),
-            layer: layer.id(),
-            padding: Vec3::ZERO,
-        }
-    }
 }
 
 fn smoothstep(start: f32, end: f32, value: f32) -> f32 {
@@ -110,6 +138,7 @@ struct LandscapeUniform {
     center_start: Vec4,
     center_end: Vec4,
     path_width: Vec4,
+    ridge: RidgeGeometry,
     layer: u32,
     padding: Vec3,
 }
@@ -122,8 +151,27 @@ pub struct LandscapeMaterial {
 
 impl LandscapeMaterial {
     pub const fn new(layer: LandscapeLayer) -> Self {
+        let path = PathGeometry::DEFAULT;
         Self {
-            uniform: PathGeometry::DEFAULT.uniform(layer),
+            uniform: LandscapeUniform {
+                center_curve: Vec4::new(
+                    path.center_base,
+                    path.first_bend,
+                    path.second_bend,
+                    path.third_bend,
+                ),
+                center_start: Vec4::new(path.first_start, path.second_start, path.third_start, 0.0),
+                center_end: Vec4::new(path.first_end, path.second_end, path.third_end, 0.0),
+                path_width: Vec4::new(
+                    path.width_min,
+                    path.width_max,
+                    path.width_start,
+                    path.width_end,
+                ),
+                ridge: RidgeGeometry::DEFAULT,
+                layer: layer.id(),
+                padding: Vec3::ZERO,
+            },
         }
     }
 }

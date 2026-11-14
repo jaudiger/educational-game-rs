@@ -3,11 +3,23 @@ struct LandscapeInput {
     @location(4) @interpolate(flat) size: vec2<f32>,
 }
 
+struct RidgeGeometry {
+    center_x_percent: f32,
+    baseline_y: f32,
+    left_half_width: f32,
+    right_half_width: f32,
+    main_height: f32,
+    shoulder_height: f32,
+    shoulder_offset: f32,
+    shoulder_half_width: f32,
+}
+
 struct LandscapeUniform {
     center_curve: vec4<f32>,
     center_start: vec4<f32>,
     center_end: vec4<f32>,
     path_width: vec4<f32>,
+    ridge: RidgeGeometry,
     layer: u32,
     padding: vec3<f32>,
 }
@@ -21,6 +33,27 @@ const RIDGE: u32 = 2u;
 fn coverage(distance: f32) -> f32 {
     let width = max(fwidth(distance), 0.001);
     return 1.0 - smoothstep(-width, width, distance);
+}
+
+fn hill_bump(t: f32) -> f32 {
+    let q = max(1.0 - t * t, 0.0);
+    return q * q;
+}
+
+fn ridge_offset_at(x: f32, aspect: f32, ridge: RidgeGeometry) -> f32 {
+    let ridge_center = (ridge.center_x_percent - 0.5) * aspect;
+    let ridge_half_width = select(ridge.right_half_width, ridge.left_half_width, x < ridge_center);
+    return (x - ridge_center) / ridge_half_width;
+}
+
+fn ridge_surface_y(x: f32, aspect: f32, ridge: RidgeGeometry) -> f32 {
+    let ridge_center = (ridge.center_x_percent - 0.5) * aspect;
+    let ridge_offset = ridge_offset_at(x, aspect, ridge);
+    let shoulder_offset =
+        (x - ridge_center + ridge.shoulder_offset) / ridge.shoulder_half_width;
+    let ridge_height = ridge.main_height * hill_bump(ridge_offset)
+        + ridge.shoulder_height * hill_bump(shoulder_offset);
+    return ridge.baseline_y - ridge_height;
 }
 
 fn path_center_offset(y: f32) -> f32 {
@@ -47,15 +80,21 @@ fn sky_fragment(_input: LandscapeInput) -> vec4<f32> {
 }
 
 fn ridge_fragment(input: LandscapeInput) -> vec4<f32> {
+    let aspect = input.size.x / max(input.size.y, 0.001);
+    let x = (input.uv.x - 0.5) * aspect;
     let y = input.uv.y;
-    let ridge_center = 0.75;
-    let ridge_half_width = select(0.14, 0.13, input.uv.x < ridge_center);
-    let ridge_offset = (input.uv.x - ridge_center) / ridge_half_width;
-    let ridge_height = 0.14 * sqrt(max(1.0 - ridge_offset * ridge_offset, 0.0));
-    let ridge = 0.315 - ridge_height;
-    let ridge_strength = smoothstep(0.0, 0.18, 1.0 - abs(ridge_offset));
-    let ridge_coverage = coverage(ridge - y) * ridge_strength;
-    let color = mix(sky_color(), vec3<f32>(0.48, 0.60, 0.66), 0.7);
+    let ridge_offset = ridge_offset_at(x, aspect, landscape.ridge);
+    let ridge_line = ridge_surface_y(x, aspect, landscape.ridge);
+    let ridge_coverage = coverage(ridge_line - y);
+
+    let slope_light = smoothstep(-0.7, 0.8, ridge_offset);
+    let hill_color = mix(
+        vec3<f32>(0.29, 0.48, 0.43),
+        vec3<f32>(0.41, 0.59, 0.45),
+        slope_light,
+    );
+    let atmospheric_haze = smoothstep(0.17, 0.25, y) * 0.12;
+    let color = mix(hill_color, vec3<f32>(0.48, 0.60, 0.66), atmospheric_haze);
     return vec4<f32>(color, ridge_coverage);
 }
 

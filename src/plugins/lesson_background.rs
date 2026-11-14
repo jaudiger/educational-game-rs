@@ -4,6 +4,7 @@ use bevy::ui::UiSystems;
 use bevy::ui_render::ui_material::{MaterialNode, UiMaterial};
 use bevy::window::WindowResized;
 
+use crate::plugins::bush_material::BushMaterial;
 use crate::plugins::cloud_material::{CloudShapeId, CloudUiMaterial};
 use crate::ui::components::full_screen_overlay_node;
 use crate::ui::{layers, theme};
@@ -12,13 +13,16 @@ use crate::plugins::lesson_motion::{LessonMotionSet, LessonWind, smooth_motion_f
 
 use crate::plugins::flower_material::FlowerMaterial;
 use crate::plugins::grass_material::GrassMaterial;
-use crate::plugins::landscape_material::{LandscapeLayer, LandscapeMaterial, PathGeometry};
+use crate::plugins::landscape_material::{
+    LandscapeLayer, LandscapeMaterial, PathGeometry, RidgeGeometry,
+};
 use crate::plugins::stone_material::{STONE_HALF_WIDTH_RATIO, StoneMaterial};
 use crate::plugins::sun_material::{SunMaterial, sky_sun, sky_sun_material};
 use crate::plugins::tree_material::TreeMaterial;
 use crate::states::ActiveLesson;
 
 const PATH_GEOMETRY: PathGeometry = PathGeometry::DEFAULT;
+const RIDGE_GEOMETRY: RidgeGeometry = RidgeGeometry::DEFAULT;
 const CLOUD_DRIFT_SPEED_DESIGN_PX_PER_SECOND: f32 = 15.0;
 const CLOUD_MOTION_FADE_SECONDS: f32 = 2.0;
 const FLOWER_BEND_AMOUNT: f32 = 0.15;
@@ -27,17 +31,18 @@ const PARALLAX_HORIZON_HEIGHT: f32 = 0.32;
 const SUN_Z_INDEX: i32 = -3;
 const DISTANT_LAYER_Z_INDEX: i32 = -2;
 const RIDGE_Z_INDEX: i32 = -1;
-const BACKGROUND_TREE_Z_INDEX: i32 = 0;
-const GROUND_LAYER_Z_INDEX: i32 = 1;
-const MEADOW_Z_INDEX: i32 = 1;
-const MIDGROUND_TREE_Z_INDEX: i32 = 2;
-const DISTANT_FLOWER_LAYER_Z_INDEX: i32 = 2;
-pub const LESSON_MASCOT_LAYER_Z_INDEX: i32 = 3;
-const PATH_STONE_Z_INDEX: i32 = 4;
-const FOREGROUND_LAYER_Z_INDEX: i32 = 4;
-const FLOWER_Z_INDEX: i32 = 4;
-const GRASS_TUFT_Z_INDEX: i32 = 5;
-const FOREGROUND_TREE_Z_INDEX: i32 = 6;
+const HILL_BUSH_Z_INDEX: i32 = 0;
+const BACKGROUND_TREE_Z_INDEX: i32 = 1;
+const GROUND_LAYER_Z_INDEX: i32 = 2;
+const MEADOW_Z_INDEX: i32 = 2;
+const MIDGROUND_TREE_Z_INDEX: i32 = 3;
+const DISTANT_FLOWER_LAYER_Z_INDEX: i32 = 3;
+pub const LESSON_MASCOT_LAYER_Z_INDEX: i32 = 4;
+const PATH_STONE_Z_INDEX: i32 = 5;
+const FOREGROUND_LAYER_Z_INDEX: i32 = 5;
+const FLOWER_Z_INDEX: i32 = 5;
+const GRASS_TUFT_Z_INDEX: i32 = 6;
+const FOREGROUND_TREE_Z_INDEX: i32 = 7;
 
 pub struct LessonBackgroundPlugin;
 
@@ -59,6 +64,7 @@ pub fn lesson_mascot_layer() -> impl Bundle + use<> {
 #[derive(SystemParam)]
 pub struct LessonBackgroundAssets<'w> {
     pub landscape: ResMut<'w, Assets<LandscapeMaterial>>,
+    pub bushes: ResMut<'w, Assets<BushMaterial>>,
     pub trees: ResMut<'w, Assets<TreeMaterial>>,
     pub clouds: ResMut<'w, Assets<CloudUiMaterial>>,
     pub sun: ResMut<'w, Assets<SunMaterial>>,
@@ -71,7 +77,12 @@ impl Plugin for LessonBackgroundPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (update_path_stone_positions, update_tree_positions).run_if(in_state(ActiveLesson)),
+            (
+                update_path_stone_positions,
+                update_tree_positions,
+                update_hill_bush_positions,
+            )
+                .run_if(in_state(ActiveLesson)),
         )
         .add_systems(
             Update,
@@ -122,6 +133,30 @@ struct LessonBackgroundCloud {
 struct LessonLandscapeMaterials {
     flower_materials: [Handle<FlowerMaterial>; 3],
     grass_material: Handle<GrassMaterial>,
+}
+
+#[derive(Clone, Copy)]
+struct HillBushPlacement {
+    center_offset: f32,
+    offset_from_crest: f32,
+    width_design_px: f32,
+    height_design_px: f32,
+}
+
+impl HillBushPlacement {
+    const fn new(
+        center_offset: f32,
+        offset_from_crest: f32,
+        width_design_px: f32,
+        height_design_px: f32,
+    ) -> Self {
+        Self {
+            center_offset,
+            offset_from_crest,
+            width_design_px,
+            height_design_px,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -241,6 +276,15 @@ enum FlowerPalette {
     Pink,
     Lavender,
 }
+
+const HILL_BUSH_PLACEMENTS: [HillBushPlacement; 6] = [
+    HillBushPlacement::new(-0.12, 0.055, 20.0, 9.0),
+    HillBushPlacement::new(-0.08, 0.030, 16.0, 7.0),
+    HillBushPlacement::new(-0.035, 0.065, 22.0, 9.0),
+    HillBushPlacement::new(0.045, 0.035, 18.0, 8.0),
+    HillBushPlacement::new(0.08, 0.055, 20.0, 9.0),
+    HillBushPlacement::new(0.11, 0.070, 14.0, 7.0),
+];
 
 const DISTANT_FLOWERS: [(VisualPlacement, FlowerPalette); 6] = [
     (
@@ -551,6 +595,13 @@ struct PathStonePosition {
 }
 
 #[derive(Component, Clone, Copy, Reflect)]
+struct ResponsiveHillBushPosition {
+    window: Entity,
+    center_offset: f32,
+    offset_from_crest: f32,
+}
+
+#[derive(Component, Clone, Copy, Reflect)]
 struct ResponsiveTreePosition {
     window: Entity,
     edge_center: f32,
@@ -563,6 +614,7 @@ struct ResponsiveTreePosition {
 struct BackgroundMaterials {
     sky: Handle<LandscapeMaterial>,
     ridge: Handle<LandscapeMaterial>,
+    bushes: Handle<BushMaterial>,
     meadow: Handle<LandscapeMaterial>,
     background_tree: Handle<TreeMaterial>,
     midground_tree: Handle<TreeMaterial>,
@@ -598,6 +650,10 @@ impl BackgroundMaterials {
             ridge: assets
                 .landscape
                 .add(LandscapeMaterial::new(LandscapeLayer::Ridge)),
+            bushes: assets.bushes.add(BushMaterial::new(
+                Color::srgba(0.20, 0.37, 0.28, 0.94),
+                Color::srgba(0.32, 0.49, 0.34, 1.0),
+            )),
             meadow: assets
                 .landscape
                 .add(LandscapeMaterial::new(LandscapeLayer::Meadow)),
@@ -706,6 +762,7 @@ fn spawn_distant_layer(
                 ZIndex(RIDGE_Z_INDEX),
                 Pickable::IGNORE,
             ));
+            spawn_hill_bushes(layer, &materials, window, viewport_size);
             spawn_trees(
                 layer,
                 &materials,
@@ -715,6 +772,62 @@ fn spawn_distant_layer(
             );
         })),
     ));
+}
+
+fn spawn_hill_bushes(
+    parent: &mut ChildSpawner,
+    materials: &BackgroundMaterials,
+    window: Entity,
+    viewport_size: Vec2,
+) {
+    for placement in HILL_BUSH_PLACEMENTS {
+        parent.spawn((
+            hill_bush_bundle(placement, materials.bushes.clone(), viewport_size),
+            ResponsiveHillBushPosition {
+                window,
+                center_offset: placement.center_offset,
+                offset_from_crest: placement.offset_from_crest,
+            },
+        ));
+    }
+}
+
+fn hill_bush_bundle(
+    placement: HillBushPlacement,
+    material: Handle<BushMaterial>,
+    viewport_size: Vec2,
+) -> impl Bundle + use<> {
+    let position = hill_bush_position(
+        placement.center_offset,
+        placement.offset_from_crest,
+        viewport_size,
+    );
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            left: percent(position.x),
+            top: percent(position.y),
+            width: theme::scaled(placement.width_design_px),
+            height: theme::scaled(placement.height_design_px),
+            ..default()
+        },
+        UiTransform {
+            translation: Val2::percent(-50.0, 0.0),
+            scale: Vec2::ONE,
+            rotation: Rot2::IDENTITY,
+        },
+        MaterialNode(material),
+        ZIndex(HILL_BUSH_Z_INDEX),
+        Pickable::IGNORE,
+    )
+}
+
+fn hill_bush_position(center_offset: f32, offset_from_crest: f32, viewport_size: Vec2) -> Vec2 {
+    let aspect = viewport_size.x.max(0.001) / viewport_size.y.max(0.001);
+    Vec2::new(
+        100.0 * RIDGE_GEOMETRY.center_percent_for_offset(center_offset, aspect),
+        100.0 * (RIDGE_GEOMETRY.surface_y_at_offset(0.0) + offset_from_crest),
+    )
 }
 
 fn spawn_ground_layer(
@@ -1080,6 +1193,26 @@ fn update_path_stone_positions(
     }
 }
 
+fn update_hill_bush_positions(
+    mut resized_windows: MessageReader<WindowResized>,
+    mut bushes: Query<(&ResponsiveHillBushPosition, &mut Node)>,
+) {
+    for resized_window in resized_windows.read() {
+        let viewport_size = Vec2::new(resized_window.width, resized_window.height);
+        if viewport_size.min_element() <= 0.0 {
+            continue;
+        }
+        for (bush, mut node) in &mut bushes {
+            if bush.window == resized_window.window {
+                let position =
+                    hill_bush_position(bush.center_offset, bush.offset_from_crest, viewport_size);
+                node.left = percent(position.x);
+                node.top = percent(position.y);
+            }
+        }
+    }
+}
+
 fn update_tree_positions(
     mut resized_windows: MessageReader<WindowResized>,
     mut trees: Query<(&ResponsiveTreePosition, &mut Node)>,
@@ -1116,12 +1249,57 @@ fn path_stone_x_percent(placement: PathStonePlacement, viewport_size: Vec2) -> f
 }
 
 const _: () = {
+    assert!(RIDGE_Z_INDEX < HILL_BUSH_Z_INDEX);
+    assert!(HILL_BUSH_Z_INDEX < BACKGROUND_TREE_Z_INDEX);
+    assert!(BACKGROUND_TREE_Z_INDEX < GROUND_LAYER_Z_INDEX);
     assert!(GROUND_LAYER_Z_INDEX < DISTANT_FLOWER_LAYER_Z_INDEX);
     assert!(DISTANT_FLOWER_LAYER_Z_INDEX < LESSON_MASCOT_LAYER_Z_INDEX);
     assert!(LESSON_MASCOT_LAYER_Z_INDEX < FOREGROUND_LAYER_Z_INDEX);
     assert!(FLOWER_Z_INDEX < GRASS_TUFT_Z_INDEX);
     assert!(GRASS_TUFT_Z_INDEX < FOREGROUND_TREE_Z_INDEX);
 };
+
+#[cfg(test)]
+mod hill_bush_tests {
+    use bevy::prelude::Vec2;
+
+    use super::{HILL_BUSH_PLACEMENTS, RIDGE_GEOMETRY, hill_bush_position};
+
+    #[test]
+    fn hill_bushes_are_smaller_than_the_smallest_distant_cloud() {
+        for placement in HILL_BUSH_PLACEMENTS {
+            assert!(placement.width_design_px < 42.0);
+            assert!(placement.height_design_px < 17.5);
+        }
+    }
+
+    #[test]
+    fn whole_hill_bushes_stay_inside_the_ridge_at_ultrawide_aspect() {
+        let viewport_size = Vec2::new(3200.0, 900.0);
+        let scale = crate::ui::theme::design_scale_factor(viewport_size.min_element());
+
+        for placement in HILL_BUSH_PLACEMENTS {
+            let position = hill_bush_position(
+                placement.center_offset,
+                placement.offset_from_crest,
+                viewport_size,
+            );
+            let half_width = placement.width_design_px * scale * 0.5 / viewport_size.y;
+            let left_surface_y =
+                RIDGE_GEOMETRY.surface_y_at_offset(placement.center_offset - half_width);
+            let center_surface_y = RIDGE_GEOMETRY.surface_y_at_offset(placement.center_offset);
+            let right_surface_y =
+                RIDGE_GEOMETRY.surface_y_at_offset(placement.center_offset + half_width);
+            let highest_surface_y = left_surface_y.max(center_surface_y).max(right_surface_y);
+            let top_y = position.y * 0.01;
+            let bottom_y = top_y + placement.height_design_px * scale / viewport_size.y;
+
+            assert!(position.x > 0.0 && position.x < 100.0);
+            assert!(top_y > highest_surface_y);
+            assert!(bottom_y < 0.242);
+        }
+    }
+}
 
 #[cfg(test)]
 mod lifecycle_tests {
